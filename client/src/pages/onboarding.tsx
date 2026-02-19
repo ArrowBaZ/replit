@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Shirt, Star, ArrowRight, ArrowLeft } from "lucide-react";
-import sellzyLogo from "@assets/sellzy_logo_1_bold_1771509552160.png";
+import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
 
 type Role = "seller" | "reusse";
 

@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Shirt, HandshakeIcon, TrendingUp, ArrowRight, Star, Shield, Zap } from "lucide-react";
-import sellzyLogo from "@assets/sellzy_logo_1_bold_1771509552160.png";
+import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
 
 const heroImage = "/images/hero-fashion.png";
 
@@ -58,7 +58,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-4 h-16">
             <div className="flex items-center gap-2">
-              <img src={sellzyLogo} alt="Sellzy" className="h-8" data-testid="text-brand-name" />
+              <img src={sellzyLogo} alt="Sellzy" className="h-10" data-testid="text-brand-name" />
             </div>
             <div className="hidden md:flex items-center gap-6">
               <a href="#features" className="text-sm text-muted-foreground transition-colors hover-elevate rounded-md px-3 py-2">Features</a>
@@ -270,7 +270,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <img src={sellzyLogo} alt="Sellzy" className="h-5" />
+              <img src={sellzyLogo} alt="Sellzy" className="h-7" />
             </div>
             <p className="text-xs text-muted-foreground">
               2026 Sellzy. All rights reserved.

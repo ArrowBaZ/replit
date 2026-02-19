@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import type { Profile } from "@shared/schema";
-import sellzyLogo from "@assets/sellzy_logo_1_bold_1771509552160.png";
+import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
 import {
   Sidebar,
   SidebarContent,
