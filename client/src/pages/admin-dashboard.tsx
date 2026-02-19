@@ -88,7 +88,7 @@ export default function AdminDashboard() {
                   <Shield className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Active Reusses</p>
+                  <p className="text-sm text-muted-foreground">Active Resellers</p>
                   <p className="text-xl font-bold">{stats?.totalReusses || 0}</p>
                 </div>
               </CardContent>
@@ -188,7 +188,7 @@ export default function AdminDashboard() {
               <CardContent className="p-8 text-center">
                 <Shield className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm font-medium mb-1">No pending applications</p>
-                <p className="text-xs text-muted-foreground">All Reusse applications have been reviewed.</p>
+                <p className="text-xs text-muted-foreground">All reseller applications have been reviewed.</p>
               </CardContent>
             </Card>
           )}

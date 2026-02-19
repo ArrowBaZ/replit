@@ -1,7 +1,7 @@
-# Reusses - Fashion Resale Marketplace
+# Sellzy - Fashion Resale Marketplace
 
 ## Overview
-Reusses connects clothing sellers with expert resellers (called "Reusses"). Sellers submit resale requests, get matched with local Reusses, schedule meetings for item pickup, track items through the resale process, and manage earnings.
+Sellzy connects clothing sellers with expert resellers. Sellers submit resale requests, get matched with local resellers, schedule meetings for item pickup, track items through the resale process, and manage earnings.
 
 ## Brand Identity
 - Primary Navy: #2C3E50 (HSL 210 29% 24%)

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Shirt, Star, ArrowRight, ArrowLeft } from "lucide-react";
+import sellzyLogo from "@assets/sellzy_logo_1_bold_1771509552160.png";
 
 type Role = "seller" | "reusse";
 
@@ -42,7 +43,7 @@ export default function OnboardingPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-      toast({ title: "Profile created!", description: role === "reusse" ? "Your application is being reviewed." : "Welcome to Reusses!" });
+      toast({ title: "Profile created!", description: role === "reusse" ? "Your application is being reviewed." : "Welcome to Sellzy!" });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create profile. Please try again.", variant: "destructive" });
@@ -65,12 +66,10 @@ export default function OnboardingPage() {
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[hsl(var(--success))] text-white font-bold">
-              R
-            </div>
+            <img src={sellzyLogo} alt="Sellzy" className="h-10" />
           </div>
           <h1 className="font-serif text-2xl font-bold mb-2" data-testid="text-onboarding-title">
-            Welcome to Reusses
+            Welcome to Sellzy
           </h1>
           <p className="text-muted-foreground text-sm">
             {user?.firstName ? `Hi ${user.firstName}! ` : ""}Let's set up your profile.

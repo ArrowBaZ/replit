@@ -56,7 +56,7 @@ export default function ReusseDashboard() {
             </div>
             <h2 className="text-lg font-semibold mb-2" data-testid="text-pending-title">Application Under Review</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Your Reusse application is being reviewed by our team. We'll notify you once it's approved. This usually takes 1-2 business days.
+              Your reseller application is being reviewed by our team. We'll notify you once it's approved. This usually takes 1-2 business days.
             </p>
           </CardContent>
         </Card>

@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Shirt, HandshakeIcon, TrendingUp, ArrowRight, Star, Shield, Zap } from "lucide-react";
+import sellzyLogo from "@assets/sellzy_logo_1_bold_1771509552160.png";
 
 const heroImage = "/images/hero-fashion.png";
 
@@ -16,7 +17,7 @@ const features = [
   {
     icon: HandshakeIcon,
     title: "Personal Matching",
-    description: "Get matched with a local Reusse expert based on your location and the type of items you have.",
+    description: "Get matched with a local resale expert based on your location and the type of items you have.",
   },
   {
     icon: TrendingUp,
@@ -33,20 +34,20 @@ const steps = [
   },
   {
     number: "02",
-    title: "Meet Your Reusse",
+    title: "Meet Your Reseller",
     description: "A verified resale expert near you picks up and evaluates your items in person.",
   },
   {
     number: "03",
     title: "Earn from Sales",
-    description: "Your Reusse lists items on premium platforms. You get paid when they sell.",
+    description: "Your reseller lists items on premium platforms. You get paid when they sell.",
   },
 ];
 
 const stats = [
   { value: "2,500+", label: "Items Sold" },
   { value: "450+", label: "Happy Sellers" },
-  { value: "120+", label: "Expert Reusses" },
+  { value: "120+", label: "Expert Resellers" },
   { value: "85%", label: "Avg. Sell Rate" },
 ];
 
@@ -57,10 +58,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-4 h-16">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[hsl(var(--success))] text-white font-bold text-sm">
-                R
-              </div>
-              <span className="text-xl font-bold tracking-tight" data-testid="text-brand-name">Reusses</span>
+              <img src={sellzyLogo} alt="Sellzy" className="h-8" data-testid="text-brand-name" />
             </div>
             <div className="hidden md:flex items-center gap-6">
               <a href="#features" className="text-sm text-muted-foreground transition-colors hover-elevate rounded-md px-3 py-2">Features</a>
@@ -145,7 +143,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <p className="text-sm font-medium tracking-wider uppercase text-[hsl(var(--success))] mb-3">
-              Why Reusses
+              Why Sellzy
             </p>
             <h2 className="font-serif text-3xl sm:text-4xl font-bold mb-4">
               A Better Way to Resell
@@ -181,7 +179,7 @@ export default function LandingPage() {
               Three Simple Steps
             </h2>
             <p className="text-muted-foreground leading-relaxed">
-              From closet to cash in just a few steps. Our Reusses handle the rest.
+              From closet to cash in just a few steps. Our experts handle the rest.
             </p>
           </div>
 
@@ -211,14 +209,14 @@ export default function LandingPage() {
               Testimonials
             </p>
             <h2 className="font-serif text-3xl sm:text-4xl font-bold mb-4">
-              Loved by Sellers and Reusses
+              Loved by Sellers and Resellers
             </h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { name: "Marie D.", role: "Seller", text: "I cleared out my closet and made over 800 euros without lifting a finger. My Reusse was professional, friendly, and got great prices." },
-              { name: "Thomas L.", role: "Reusse", text: "As a reseller, this platform gives me a steady stream of quality items and handles the logistics. I've grown my business 3x." },
+              { name: "Marie D.", role: "Seller", text: "I cleared out my closet and made over 800 euros without lifting a finger. My reseller was professional, friendly, and got great prices." },
+              { name: "Thomas L.", role: "Reseller", text: "As a reseller, this platform gives me a steady stream of quality items and handles the logistics. I've grown my business 3x." },
               { name: "Sophie B.", role: "Seller", text: "The transparency is amazing. I can see exactly where each item is in the process and what I'll earn. Highly recommend!" },
             ].map((t) => (
               <Card key={t.name}>
@@ -272,13 +270,10 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[hsl(var(--success))] text-white font-bold text-xs">
-                R
-              </div>
-              <span className="text-sm font-semibold">Reusses</span>
+              <img src={sellzyLogo} alt="Sellzy" className="h-5" />
             </div>
             <p className="text-xs text-muted-foreground">
-              2026 Reusses. All rights reserved.
+              2026 Sellzy. All rights reserved.
             </p>
           </div>
         </div>

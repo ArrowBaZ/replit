@@ -16,7 +16,7 @@ const ThemeContext = createContext<ThemeContextType>({
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("reusses-theme") as Theme;
+      const stored = localStorage.getItem("sellzy-theme") as Theme;
       if (stored) return stored;
       return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
@@ -27,7 +27,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     root.classList.remove("light", "dark");
     root.classList.add(theme);
-    localStorage.setItem("reusses-theme", theme);
+    localStorage.setItem("sellzy-theme", theme);
   }, [theme]);
 
   const toggleTheme = () => {

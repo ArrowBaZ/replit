@@ -43,7 +43,7 @@ export default function RequestsListPage() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-requests-title">{title}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {isAvailable ? "Requests from sellers looking for a Reusse." : isSeller ? "Track your resale requests." : "Requests you're working on."}
+            {isAvailable ? "Requests from sellers looking for a reseller." : isSeller ? "Track your resale requests." : "Requests you're working on."}
           </p>
         </div>
         {isSeller && (

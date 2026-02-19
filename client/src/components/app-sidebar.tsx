@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import type { Profile } from "@shared/schema";
+import sellzyLogo from "@assets/sellzy_logo_1_bold_1771509552160.png";
 import {
   Sidebar,
   SidebarContent,
@@ -79,10 +80,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <Link href="/dashboard" data-testid="link-logo">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[hsl(var(--success))] text-white font-bold text-sm">
-              R
-            </div>
-            <span className="text-lg font-bold tracking-tight">Reusses</span>
+            <img src={sellzyLogo} alt="Sellzy" className="h-8" />
           </div>
         </Link>
       </SidebarHeader>

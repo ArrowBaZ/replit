@@ -54,7 +54,7 @@ export default function CreateRequestPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests"] });
-      toast({ title: "Request created!", description: "A Reusse will be matched with you soon." });
+      toast({ title: "Request created!", description: "A reseller will be matched with you soon." });
       setLocation(`/requests/${data.id}`);
     },
     onError: (error) => {

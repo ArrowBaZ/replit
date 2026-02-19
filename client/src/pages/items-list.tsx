@@ -85,7 +85,7 @@ export default function ItemsListPage() {
             <Shirt className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
             <p className="text-sm font-medium mb-1">No items yet</p>
             <p className="text-xs text-muted-foreground">
-              Items will appear here once a Reusse adds them to your requests.
+              Items will appear here once a reseller adds them to your requests.
             </p>
           </CardContent>
         </Card>

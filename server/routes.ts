@@ -151,10 +151,10 @@ export async function registerRoutes(
       const userId = req.user.claims.sub;
       const profile = await storage.getProfile(userId);
       if (!profile || profile.role !== "reusse") {
-        return res.status(403).json({ message: "Only Reusses can accept requests" });
+        return res.status(403).json({ message: "Only resellers can accept requests" });
       }
       if (profile.status !== "approved") {
-        return res.status(403).json({ message: "Reusse must be approved" });
+        return res.status(403).json({ message: "Reseller must be approved" });
       }
       const id = parseInt(req.params.id);
       const request = await storage.acceptRequest(id, userId);
@@ -166,7 +166,7 @@ export async function registerRoutes(
         userId: request.sellerId,
         type: "request_matched",
         title: "Request Matched",
-        message: "A Reusse has been assigned to your request!",
+        message: "A reseller has been assigned to your request!",
         link: `/requests/${request.id}`,
       });
 
@@ -397,8 +397,8 @@ export async function registerRoutes(
         type: "application_update",
         title: status === "approved" ? "Application Approved" : "Application Update",
         message: status === "approved"
-          ? "Your Reusse application has been approved! You can now accept seller requests."
-          : "Your Reusse application status has been updated.",
+          ? "Your reseller application has been approved! You can now accept seller requests."
+          : "Your reseller application status has been updated.",
       });
 
       res.json(profile);
