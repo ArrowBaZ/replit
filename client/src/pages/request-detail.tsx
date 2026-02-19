@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/lib/i18n";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -36,17 +37,12 @@ const itemStatusColors: Record<string, string> = {
   donated: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
 };
 
-const serviceTypeLabels: Record<string, string> = {
-  classic: "Classic",
-  express: "Express",
-  sos_dressing: "SOS Dressing",
-};
-
 export default function RequestDetailPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { t } = useI18n();
   const [showAddItem, setShowAddItem] = useState(false);
   const [showScheduleMeeting, setShowScheduleMeeting] = useState(false);
 
@@ -110,6 +106,28 @@ export default function RequestDetailPage() {
     },
   });
 
+  const serviceTypeLabels: Record<string, string> = {
+    classic: t("classic"),
+    express: t("express"),
+    sos_dressing: t("sosDressing"),
+  };
+
+  const translateStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      pending: t("statusPending"),
+      matched: t("statusMatched"),
+      scheduled: t("statusScheduled"),
+      in_progress: t("statusInProgress"),
+      completed: t("statusCompleted"),
+      cancelled: t("statusCancelled"),
+      pending_approval: t("statusPendingApproval"),
+      approved: t("statusApproved"),
+      listed: t("statusListed"),
+      sold: t("statusSold"),
+    };
+    return statusMap[status] || status.replace(/_/g, " ");
+  };
+
   if (isLoading) {
     return (
       <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4">
@@ -141,14 +159,14 @@ export default function RequestDetailPage() {
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-bold" data-testid="text-request-detail-title">
-              {serviceTypeLabels[request.serviceType]} Request #{request.id}
+              {serviceTypeLabels[request.serviceType]} {t("requestDetail")} #{request.id}
             </h1>
             <Badge variant="secondary" className={statusColors[request.status] || ""}>
-              {request.status.replace(/_/g, " ")}
+              {translateStatus(request.status)}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Created {request.createdAt ? new Date(request.createdAt).toLocaleDateString("fr-FR") : ""}
+            {t("created")} {request.createdAt ? new Date(request.createdAt).toLocaleDateString("fr-FR") : ""}
           </p>
         </div>
         {canAccept && (
@@ -159,7 +177,7 @@ export default function RequestDetailPage() {
             data-testid="button-accept-request"
           >
             <CheckCircle className="h-4 w-4 mr-2" />
-            Accept
+            {t("acceptRequest")}
           </Button>
         )}
       </div>
@@ -169,7 +187,7 @@ export default function RequestDetailPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <Package className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-xs text-muted-foreground">Items</p>
+              <p className="text-xs text-muted-foreground">{t("items")}</p>
               <p className="text-sm font-medium">{request.itemCount}</p>
             </div>
           </CardContent>
@@ -178,7 +196,7 @@ export default function RequestDetailPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <MapPin className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-xs text-muted-foreground">Location</p>
+              <p className="text-xs text-muted-foreground">{t("location")}</p>
               <p className="text-sm font-medium truncate">{request.meetingLocation || "Not specified"}</p>
             </div>
           </CardContent>
@@ -187,7 +205,7 @@ export default function RequestDetailPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <Clock className="h-5 w-5 text-muted-foreground" />
             <div>
-              <p className="text-xs text-muted-foreground">Est. Value</p>
+              <p className="text-xs text-muted-foreground">{t("estimatedValue")}</p>
               <p className="text-sm font-medium">{request.estimatedValue ? `${request.estimatedValue} EUR` : "Not specified"}</p>
             </div>
           </CardContent>
@@ -197,7 +215,7 @@ export default function RequestDetailPage() {
       {request.notes && (
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Notes</p>
+            <p className="text-xs text-muted-foreground mb-1">{t("notes")}</p>
             <p className="text-sm">{request.notes}</p>
           </CardContent>
         </Card>
@@ -205,8 +223,8 @@ export default function RequestDetailPage() {
 
       <Tabs defaultValue="items" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="items">Items ({requestItems?.length || 0})</TabsTrigger>
-          <TabsTrigger value="meetings">Meetings ({requestMeetings?.length || 0})</TabsTrigger>
+          <TabsTrigger value="items">{t("items")} ({requestItems?.length || 0})</TabsTrigger>
+          <TabsTrigger value="meetings">{t("meetingsSection")} ({requestMeetings?.length || 0})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="items" className="space-y-3">
@@ -214,67 +232,67 @@ export default function RequestDetailPage() {
             <Dialog open={showAddItem} onOpenChange={setShowAddItem}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline" data-testid="button-add-item">
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Item
+                  <Plus className="h-3.5 w-3.5 mr-1" /> {t("addItem")}
                 </Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>Add Item</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{t("addItem")}</DialogTitle></DialogHeader>
                 <form onSubmit={(e) => { e.preventDefault(); addItem.mutate(itemForm); }} className="space-y-3">
                   <div className="space-y-2">
-                    <Label>Title *</Label>
+                    <Label>{t("title")} *</Label>
                     <Input value={itemForm.title} onChange={(e) => setItemForm({...itemForm, title: e.target.value})} required data-testid="input-item-title" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label>Brand</Label>
+                      <Label>{t("brand")}</Label>
                       <Input value={itemForm.brand} onChange={(e) => setItemForm({...itemForm, brand: e.target.value})} data-testid="input-item-brand" />
                     </div>
                     <div className="space-y-2">
-                      <Label>Size</Label>
+                      <Label>{t("size")}</Label>
                       <Input value={itemForm.size} onChange={(e) => setItemForm({...itemForm, size: e.target.value})} data-testid="input-item-size" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label>Category</Label>
+                      <Label>{t("category")}</Label>
                       <Select value={itemForm.category} onValueChange={(v) => setItemForm({...itemForm, category: v})}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="clothing">Clothing</SelectItem>
-                          <SelectItem value="shoes">Shoes</SelectItem>
-                          <SelectItem value="accessories">Accessories</SelectItem>
+                          <SelectItem value="clothing">{t("catTops")}</SelectItem>
+                          <SelectItem value="shoes">{t("catShoes")}</SelectItem>
+                          <SelectItem value="accessories">{t("catAccessories")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Condition</Label>
+                      <Label>{t("condition")}</Label>
                       <Select value={itemForm.condition} onValueChange={(v) => setItemForm({...itemForm, condition: v})}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="new">New</SelectItem>
-                          <SelectItem value="excellent">Excellent</SelectItem>
-                          <SelectItem value="good">Good</SelectItem>
-                          <SelectItem value="fair">Fair</SelectItem>
+                          <SelectItem value="new">{t("condNew")}</SelectItem>
+                          <SelectItem value="excellent">{t("condLikeNew")}</SelectItem>
+                          <SelectItem value="good">{t("condGood")}</SelectItem>
+                          <SelectItem value="fair">{t("condFair")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label>Min Price (EUR)</Label>
+                      <Label>{t("minPrice")} (EUR)</Label>
                       <Input type="number" value={itemForm.minPrice} onChange={(e) => setItemForm({...itemForm, minPrice: e.target.value})} data-testid="input-item-min-price" />
                     </div>
                     <div className="space-y-2">
-                      <Label>Max Price (EUR)</Label>
+                      <Label>{t("maxPrice")} (EUR)</Label>
                       <Input type="number" value={itemForm.maxPrice} onChange={(e) => setItemForm({...itemForm, maxPrice: e.target.value})} data-testid="input-item-max-price" />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Description</Label>
+                    <Label>{t("description")}</Label>
                     <Textarea value={itemForm.description} onChange={(e) => setItemForm({...itemForm, description: e.target.value})} className="resize-none" rows={2} data-testid="input-item-description" />
                   </div>
                   <Button type="submit" className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" disabled={addItem.isPending} data-testid="button-submit-item">
-                    {addItem.isPending ? "Adding..." : "Add Item"}
+                    {addItem.isPending ? "Adding..." : t("addItem")}
                   </Button>
                 </form>
               </DialogContent>
@@ -295,7 +313,7 @@ export default function RequestDetailPage() {
                       <p className="text-sm font-medium" data-testid={`text-item-title-${item.id}`}>{item.title}</p>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         {item.brand && <span className="text-xs text-muted-foreground">{item.brand}</span>}
-                        {item.size && <span className="text-xs text-muted-foreground">Size {item.size}</span>}
+                        {item.size && <span className="text-xs text-muted-foreground">{t("size")} {item.size}</span>}
                         <span className="text-xs text-muted-foreground capitalize">{item.condition}</span>
                       </div>
                       {item.minPrice && item.maxPrice && (
@@ -304,7 +322,7 @@ export default function RequestDetailPage() {
                     </div>
                   </div>
                   <Badge variant="secondary" className={itemStatusColors[item.status] || ""}>
-                    {item.status.replace(/_/g, " ")}
+                    {translateStatus(item.status)}
                   </Badge>
                 </CardContent>
               </Card>
@@ -313,7 +331,7 @@ export default function RequestDetailPage() {
             <Card>
               <CardContent className="p-8 text-center">
                 <Shirt className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No items added yet.</p>
+                <p className="text-sm text-muted-foreground">{t("noItemsAdded")}</p>
               </CardContent>
             </Card>
           )}
@@ -324,11 +342,11 @@ export default function RequestDetailPage() {
             <Dialog open={showScheduleMeeting} onOpenChange={setShowScheduleMeeting}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline" data-testid="button-schedule-meeting">
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Schedule Meeting
+                  <Plus className="h-3.5 w-3.5 mr-1" /> {t("scheduleMeeting")}
                 </Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader><DialogTitle>Schedule Meeting</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{t("scheduleMeeting")}</DialogTitle></DialogHeader>
                 <form onSubmit={(e) => {
                   e.preventDefault();
                   scheduleMeeting.mutate({
@@ -339,24 +357,24 @@ export default function RequestDetailPage() {
                 }} className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label>Date *</Label>
+                      <Label>{t("date")} *</Label>
                       <Input type="date" value={meetingForm.date} onChange={(e) => setMeetingForm({...meetingForm, date: e.target.value})} required data-testid="input-meeting-date" />
                     </div>
                     <div className="space-y-2">
-                      <Label>Time *</Label>
+                      <Label>{t("time")} *</Label>
                       <Input type="time" value={meetingForm.time} onChange={(e) => setMeetingForm({...meetingForm, time: e.target.value})} required data-testid="input-meeting-time" />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Location *</Label>
+                    <Label>{t("location")} *</Label>
                     <Input value={meetingForm.location} onChange={(e) => setMeetingForm({...meetingForm, location: e.target.value})} required data-testid="input-meeting-location" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Notes</Label>
+                    <Label>{t("notes")}</Label>
                     <Textarea value={meetingForm.notes} onChange={(e) => setMeetingForm({...meetingForm, notes: e.target.value})} className="resize-none" rows={2} data-testid="input-meeting-notes" />
                   </div>
                   <Button type="submit" className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" disabled={scheduleMeeting.isPending} data-testid="button-submit-meeting">
-                    {scheduleMeeting.isPending ? "Scheduling..." : "Schedule"}
+                    {scheduleMeeting.isPending ? "Scheduling..." : t("scheduleMeeting")}
                   </Button>
                 </form>
               </DialogContent>
@@ -385,7 +403,7 @@ export default function RequestDetailPage() {
                     </div>
                   </div>
                   <Badge variant="secondary" className={statusColors[meeting.status] || ""}>
-                    {meeting.status}
+                    {translateStatus(meeting.status)}
                   </Badge>
                 </CardContent>
               </Card>
@@ -394,7 +412,7 @@ export default function RequestDetailPage() {
             <Card>
               <CardContent className="p-8 text-center">
                 <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No meetings scheduled.</p>
+                <p className="text-sm text-muted-foreground">{t("noUpcomingMeetings")}</p>
               </CardContent>
             </Card>
           )}

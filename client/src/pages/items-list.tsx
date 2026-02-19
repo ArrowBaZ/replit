@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useI18n } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,13 +16,9 @@ const itemStatusColors: Record<string, string> = {
   donated: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
 };
 
-const categoryLabels: Record<string, string> = {
-  clothing: "Clothing",
-  shoes: "Shoes",
-  accessories: "Accessories",
-};
-
 export default function ItemsListPage() {
+  const { t } = useI18n();
+
   const { data: profile } = useQuery<Profile>({
     queryKey: ["/api/profile"],
   });
@@ -30,11 +27,33 @@ export default function ItemsListPage() {
     queryKey: ["/api/items"],
   });
 
+  const translateStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      pending: t("statusPending"),
+      matched: t("statusMatched"),
+      scheduled: t("statusScheduled"),
+      in_progress: t("statusInProgress"),
+      completed: t("statusCompleted"),
+      cancelled: t("statusCancelled"),
+      pending_approval: t("statusPendingApproval"),
+      approved: t("statusApproved"),
+      listed: t("statusListed"),
+      sold: t("statusSold"),
+    };
+    return statusMap[status] || status.replace(/_/g, " ");
+  };
+
+  const categoryLabels: Record<string, string> = {
+    clothing: t("catTops"),
+    shoes: t("catShoes"),
+    accessories: t("catAccessories"),
+  };
+
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-items-title">My Items</h1>
-        <p className="text-sm text-muted-foreground mt-1">Track the status of your clothing items.</p>
+        <h1 className="text-2xl font-bold" data-testid="text-items-title">{t("myItemsTitle")}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t("itemsWillAppear")}</p>
       </div>
 
       {isLoading ? (
@@ -57,7 +76,7 @@ export default function ItemsListPage() {
                       <p className="text-sm font-medium" data-testid={`text-item-name-${item.id}`}>{item.title}</p>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         {item.brand && <span className="text-xs text-muted-foreground">{item.brand}</span>}
-                        {item.size && <span className="text-xs text-muted-foreground">Size {item.size}</span>}
+                        {item.size && <span className="text-xs text-muted-foreground">{t("size")} {item.size}</span>}
                         <span className="text-xs text-muted-foreground">{categoryLabels[item.category] || item.category}</span>
                         <span className="text-xs text-muted-foreground capitalize">{item.condition}</span>
                       </div>
@@ -66,13 +85,13 @@ export default function ItemsListPage() {
                           <span className="text-xs text-muted-foreground">Range: {item.minPrice} - {item.maxPrice} EUR</span>
                         )}
                         {item.salePrice && (
-                          <span className="text-xs font-medium text-[hsl(var(--success))]">Sold: {item.salePrice} EUR</span>
+                          <span className="text-xs font-medium text-[hsl(var(--success))]">{t("statusSold")}: {item.salePrice} EUR</span>
                         )}
                       </div>
                     </div>
                   </div>
                   <Badge variant="secondary" className={`shrink-0 ${itemStatusColors[item.status] || ""}`}>
-                    {item.status.replace(/_/g, " ")}
+                    {translateStatus(item.status)}
                   </Badge>
                 </div>
               </CardContent>
@@ -83,9 +102,9 @@ export default function ItemsListPage() {
         <Card>
           <CardContent className="p-12 text-center">
             <Shirt className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-sm font-medium mb-1">No items yet</p>
+            <p className="text-sm font-medium mb-1">{t("noItemsYet")}</p>
             <p className="text-xs text-muted-foreground">
-              Items will appear here once a reseller adds them to your requests.
+              {t("itemsWillAppear")}
             </p>
           </CardContent>
         </Card>

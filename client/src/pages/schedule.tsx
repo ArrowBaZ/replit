@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useI18n } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +14,8 @@ const statusColors: Record<string, string> = {
 };
 
 export default function SchedulePage() {
+  const { t } = useI18n();
+
   const { data: meetings, isLoading } = useQuery<Meeting[]>({
     queryKey: ["/api/meetings"],
   });
@@ -20,10 +23,19 @@ export default function SchedulePage() {
   const upcoming = meetings?.filter((m) => m.status === "scheduled" && new Date(m.scheduledDate) >= new Date()) || [];
   const past = meetings?.filter((m) => m.status !== "scheduled" || new Date(m.scheduledDate) < new Date()) || [];
 
+  const translateStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      scheduled: t("statusScheduled"),
+      completed: t("statusCompleted"),
+      cancelled: t("statusCancelled"),
+    };
+    return statusMap[status] || status;
+  };
+
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-schedule-title">Schedule</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-schedule-title">{t("scheduleTitle")}</h1>
         <p className="text-sm text-muted-foreground mt-1">View your upcoming and past meetings.</p>
       </div>
 
@@ -36,7 +48,7 @@ export default function SchedulePage() {
       ) : (
         <>
           <div className="space-y-3">
-            <h2 className="font-semibold">Upcoming</h2>
+            <h2 className="font-semibold">{t("upcoming")}</h2>
             {upcoming.length > 0 ? (
               upcoming.map((m) => (
                 <Card key={m.id}>
@@ -63,7 +75,7 @@ export default function SchedulePage() {
                       </div>
                     </div>
                     <Badge variant="secondary" className={statusColors[m.status] || ""}>
-                      {m.status}
+                      {translateStatus(m.status)}
                     </Badge>
                   </CardContent>
                 </Card>
@@ -72,7 +84,7 @@ export default function SchedulePage() {
               <Card>
                 <CardContent className="p-8 text-center">
                   <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No upcoming meetings</p>
+                  <p className="text-sm text-muted-foreground">{t("noUpcomingMeetings")}</p>
                 </CardContent>
               </Card>
             )}
@@ -80,7 +92,7 @@ export default function SchedulePage() {
 
           {past.length > 0 && (
             <div className="space-y-3">
-              <h2 className="font-semibold">Past</h2>
+              <h2 className="font-semibold">{t("past")}</h2>
               {past.map((m) => (
                 <Card key={m.id} className="opacity-60">
                   <CardContent className="p-4 flex flex-wrap items-start justify-between gap-3">
@@ -98,7 +110,7 @@ export default function SchedulePage() {
                       </div>
                     </div>
                     <Badge variant="secondary" className={statusColors[m.status] || ""}>
-                      {m.status}
+                      {translateStatus(m.status)}
                     </Badge>
                   </CardContent>
                 </Card>

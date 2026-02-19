@@ -55,3 +55,8 @@ client/src/
 - Database schema: profiles, requests, items, meetings, messages, notifications
 - All pages: landing, onboarding, seller/reusse/admin dashboards, request management, messaging, profile
 - API: Full CRUD for all entities with auth middleware
+- Multilingual i18n system (English/French) with flag-based language switcher on landing page
+  - i18n system: client/src/lib/i18n.tsx with I18nProvider, useI18n hook, useTranslateStatus helper
+  - French is default language, stored in localStorage as "sellzy-lang"
+  - All pages translated: landing, onboarding, dashboards, requests, items, messages, schedule, profile, admin
+  - UK and French flag SVG buttons in landing page navbar for language switching

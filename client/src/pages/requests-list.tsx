@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
+import { useI18n } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,15 +17,10 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
 };
 
-const serviceTypeLabels: Record<string, string> = {
-  classic: "Classic",
-  express: "Express",
-  sos_dressing: "SOS Dressing",
-};
-
 export default function RequestsListPage() {
   const [location] = useLocation();
   const isAvailable = location === "/available";
+  const { t } = useI18n();
 
   const { data: profile } = useQuery<Profile>({
     queryKey: ["/api/profile"],
@@ -35,7 +31,29 @@ export default function RequestsListPage() {
   });
 
   const isSeller = profile?.role === "seller";
-  const title = isAvailable ? "Available Requests" : isSeller ? "My Requests" : "My Assignments";
+  const title = isAvailable ? t("availableRequests") : isSeller ? t("myRequests") : t("myAssignments");
+
+  const serviceTypeLabels: Record<string, string> = {
+    classic: t("classic"),
+    express: t("express"),
+    sos_dressing: t("sosDressing"),
+  };
+
+  const translateStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      pending: t("statusPending"),
+      matched: t("statusMatched"),
+      scheduled: t("statusScheduled"),
+      in_progress: t("statusInProgress"),
+      completed: t("statusCompleted"),
+      cancelled: t("statusCancelled"),
+      pending_approval: t("statusPendingApproval"),
+      approved: t("statusApproved"),
+      listed: t("statusListed"),
+      sold: t("statusSold"),
+    };
+    return statusMap[status] || status.replace(/_/g, " ");
+  };
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
@@ -43,13 +61,13 @@ export default function RequestsListPage() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-requests-title">{title}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {isAvailable ? "Requests from sellers looking for a reseller." : isSeller ? "Track your resale requests." : "Requests you're working on."}
+            {isAvailable ? t("requestsAvailableDesc") : isSeller ? t("requestsSellerDesc") : t("requestsReusseDesc")}
           </p>
         </div>
         {isSeller && (
           <Link href="/requests/new">
             <Button className="bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" data-testid="button-new-request-list">
-              <Plus className="h-4 w-4 mr-2" /> New Request
+              <Plus className="h-4 w-4 mr-2" /> {t("newRequest")}
             </Button>
           </Link>
         )}
@@ -74,7 +92,7 @@ export default function RequestsListPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium">
-                          {serviceTypeLabels[req.serviceType]} - {req.itemCount} items
+                          {serviceTypeLabels[req.serviceType]} - {req.itemCount} {t("items")}
                         </p>
                         <div className="flex flex-wrap items-center gap-3 mt-1">
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -95,7 +113,7 @@ export default function RequestsListPage() {
                       </div>
                     </div>
                     <Badge variant="secondary" className={`shrink-0 ${statusColors[req.status] || ""}`}>
-                      {req.status.replace(/_/g, " ")}
+                      {translateStatus(req.status)}
                     </Badge>
                   </div>
                 </CardContent>
@@ -108,15 +126,15 @@ export default function RequestsListPage() {
           <CardContent className="p-12 text-center">
             <Package className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
             <p className="text-sm font-medium mb-1">
-              {isAvailable ? "No available requests" : "No requests yet"}
+              {isAvailable ? t("noAvailableRequests") : t("noRequests")}
             </p>
             <p className="text-xs text-muted-foreground mb-4">
-              {isAvailable ? "Check back soon for new seller requests." : isSeller ? "Create your first request to get started." : "Accept a request to start working."}
+              {isAvailable ? t("noAvailableRequestsMsg") : isSeller ? t("createFirstRequest") : t("acceptRequestToStart")}
             </p>
             {isSeller && (
               <Link href="/requests/new">
                 <Button size="sm" className="bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white">
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Create Request
+                  <Plus className="h-3.5 w-3.5 mr-1" /> {t("createRequestBtn")}
                 </Button>
               </Link>
             )}

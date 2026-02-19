@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
+import { useI18n } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,14 +18,9 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
 };
 
-const serviceTypeLabels: Record<string, string> = {
-  classic: "Classic",
-  express: "Express",
-  sos_dressing: "SOS Dressing",
-};
-
 export default function ReusseDashboard() {
   const { user } = useAuth();
+  const { t } = useI18n();
 
   const { data: profile } = useQuery<Profile>({
     queryKey: ["/api/profile"],
@@ -46,6 +42,28 @@ export default function ReusseDashboard() {
   const soldItems = items?.filter((i) => i.status === "sold") || [];
   const totalEarnings = soldItems.reduce((sum, i) => sum + (parseFloat(i.salePrice || "0") * 0.2), 0);
 
+  const serviceTypeLabels: Record<string, string> = {
+    classic: t("classic"),
+    express: t("express"),
+    sos_dressing: t("sosDressing"),
+  };
+
+  const translateStatus = (status: string) => {
+    const statusMap: Record<string, string> = {
+      pending: t("statusPending"),
+      matched: t("statusMatched"),
+      scheduled: t("statusScheduled"),
+      in_progress: t("statusInProgress"),
+      completed: t("statusCompleted"),
+      cancelled: t("statusCancelled"),
+      pending_approval: t("statusPendingApproval"),
+      approved: t("statusApproved"),
+      listed: t("statusListed"),
+      sold: t("statusSold"),
+    };
+    return statusMap[status] || status.replace(/_/g, " ");
+  };
+
   if (profile?.status === "pending") {
     return (
       <div className="p-4 sm:p-6 flex items-center justify-center min-h-[60vh]">
@@ -54,9 +72,9 @@ export default function ReusseDashboard() {
             <div className="h-12 w-12 rounded-md bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-4">
               <Clock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
             </div>
-            <h2 className="text-lg font-semibold mb-2" data-testid="text-pending-title">Application Under Review</h2>
+            <h2 className="text-lg font-semibold mb-2" data-testid="text-pending-title">{t("applicationUnderReview")}</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Your reseller application is being reviewed by our team. We'll notify you once it's approved. This usually takes 1-2 business days.
+              {t("applicationReviewMsg")}
             </p>
           </CardContent>
         </Card>
@@ -68,9 +86,9 @@ export default function ReusseDashboard() {
     <div className="p-4 sm:p-6 space-y-6 max-w-6xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-reusse-dashboard-title">
-          Welcome back{user?.firstName ? `, ${user.firstName}` : ""}
+          {t("welcomeBack")}{user?.firstName ? `, ${user.firstName}` : ""}
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage your assignments and find new sellers.</p>
+        <p className="text-sm text-muted-foreground mt-1">{t("reusseDashSubtitle")}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -86,7 +104,7 @@ export default function ReusseDashboard() {
                   <Package className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Active Assignments</p>
+                  <p className="text-sm text-muted-foreground">{t("assignedItems")}</p>
                   <p className="text-xl font-bold">{activeAssignments.length}</p>
                 </div>
               </CardContent>
@@ -97,7 +115,7 @@ export default function ReusseDashboard() {
                   <Shirt className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Items Listed</p>
+                  <p className="text-sm text-muted-foreground">{t("statusListed")}</p>
                   <p className="text-xl font-bold">{items?.filter((i) => i.status === "listed").length || 0}</p>
                 </div>
               </CardContent>
@@ -108,7 +126,7 @@ export default function ReusseDashboard() {
                   <Calendar className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Items Sold</p>
+                  <p className="text-sm text-muted-foreground">{t("completedSales")}</p>
                   <p className="text-xl font-bold">{soldItems.length}</p>
                 </div>
               </CardContent>
@@ -119,7 +137,7 @@ export default function ReusseDashboard() {
                   <TrendingUp className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Commission Earned</p>
+                  <p className="text-sm text-muted-foreground">{t("commission")}</p>
                   <p className="text-xl font-bold">{totalEarnings.toFixed(0)} EUR</p>
                 </div>
               </CardContent>
@@ -131,10 +149,10 @@ export default function ReusseDashboard() {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="font-semibold text-lg">Available Requests</h2>
+            <h2 className="font-semibold text-lg">{t("availableRequests")}</h2>
             <Link href="/available">
               <Button variant="ghost" size="sm" data-testid="link-view-all-available">
-                View all <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                {t("viewAllRequests")} <ArrowRight className="h-3.5 w-3.5 ml-1" />
               </Button>
             </Link>
           </div>
@@ -158,7 +176,7 @@ export default function ReusseDashboard() {
                           </div>
                           <div className="min-w-0">
                             <p className="text-sm font-medium">
-                              {serviceTypeLabels[req.serviceType]} - {req.itemCount} items
+                              {serviceTypeLabels[req.serviceType]} - {req.itemCount} {t("items")}
                             </p>
                             <div className="flex flex-wrap items-center gap-2 mt-1">
                               {req.meetingLocation && (
@@ -175,7 +193,7 @@ export default function ReusseDashboard() {
                           </div>
                         </div>
                         <Badge variant="secondary" className={statusColors[req.status] || ""}>
-                          {req.status.replace(/_/g, " ")}
+                          {translateStatus(req.status)}
                         </Badge>
                       </div>
                     </CardContent>
@@ -187,15 +205,15 @@ export default function ReusseDashboard() {
             <Card>
               <CardContent className="p-8 text-center">
                 <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm font-medium mb-1">No available requests</p>
-                <p className="text-xs text-muted-foreground">Check back soon for new seller requests in your area.</p>
+                <p className="text-sm font-medium mb-1">{t("noAvailableRequests")}</p>
+                <p className="text-xs text-muted-foreground">{t("checkBackLater")}</p>
               </CardContent>
             </Card>
           )}
         </div>
 
         <div className="space-y-4">
-          <h2 className="font-semibold text-lg">My Assignments</h2>
+          <h2 className="font-semibold text-lg">{t("myAssignments")}</h2>
           {myRequestsLoading ? (
             <Card><CardContent className="p-4"><Skeleton className="h-32" /></CardContent></Card>
           ) : activeAssignments.length > 0 ? (
@@ -206,10 +224,10 @@ export default function ReusseDashboard() {
                     <CardContent className="p-3 flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{serviceTypeLabels[req.serviceType]} #{req.id}</p>
-                        <p className="text-xs text-muted-foreground">{req.itemCount} items</p>
+                        <p className="text-xs text-muted-foreground">{req.itemCount} {t("items")}</p>
                       </div>
                       <Badge variant="secondary" className={`shrink-0 ${statusColors[req.status] || ""}`}>
-                        {req.status.replace(/_/g, " ")}
+                        {translateStatus(req.status)}
                       </Badge>
                     </CardContent>
                   </Card>
@@ -220,7 +238,7 @@ export default function ReusseDashboard() {
             <Card>
               <CardContent className="p-6 text-center">
                 <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">No active assignments</p>
+                <p className="text-xs text-muted-foreground">{t("noActiveAssignments")}</p>
               </CardContent>
             </Card>
           )}

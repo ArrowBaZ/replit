@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ interface UserWithProfile {
 
 export default function AdminDashboard() {
   const { toast } = useToast();
+  const { t } = useI18n();
 
   const { data: allUsers, isLoading: usersLoading } = useQuery<UserWithProfile[]>({
     queryKey: ["/api/admin/users"],
@@ -50,18 +52,18 @@ export default function AdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/applications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-      toast({ title: "Application updated" });
+      toast({ title: t("applicationUpdated") });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update application.", variant: "destructive" });
+      toast({ title: t("error"), description: t("failedUpdateApplication"), variant: "destructive" });
     },
   });
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-6xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-admin-title">Administration</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage users, applications, and platform activity.</p>
+        <h1 className="text-2xl font-bold" data-testid="text-admin-title">{t("administration")}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t("adminSubtitle")}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -77,7 +79,7 @@ export default function AdminDashboard() {
                   <Users className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Users</p>
+                  <p className="text-sm text-muted-foreground">{t("totalUsers")}</p>
                   <p className="text-xl font-bold">{stats?.totalUsers || 0}</p>
                 </div>
               </CardContent>
@@ -88,7 +90,7 @@ export default function AdminDashboard() {
                   <Shield className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Active Resellers</p>
+                  <p className="text-sm text-muted-foreground">{t("activeResellers")}</p>
                   <p className="text-xl font-bold">{stats?.totalReusses || 0}</p>
                 </div>
               </CardContent>
@@ -99,7 +101,7 @@ export default function AdminDashboard() {
                   <Clock className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Pending Applications</p>
+                  <p className="text-sm text-muted-foreground">{t("pendingApplications")}</p>
                   <p className="text-xl font-bold">{stats?.pendingApplications || 0}</p>
                 </div>
               </CardContent>
@@ -110,7 +112,7 @@ export default function AdminDashboard() {
                   <Package className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Active Requests</p>
+                  <p className="text-sm text-muted-foreground">{t("activeRequests")}</p>
                   <p className="text-xl font-bold">{stats?.activeRequests || 0}</p>
                 </div>
               </CardContent>
@@ -122,9 +124,9 @@ export default function AdminDashboard() {
       <Tabs defaultValue="applications" className="space-y-4">
         <TabsList>
           <TabsTrigger value="applications" data-testid="tab-applications">
-            Applications {stats?.pendingApplications ? `(${stats.pendingApplications})` : ""}
+            {t("applications")} {stats?.pendingApplications ? `(${stats.pendingApplications})` : ""}
           </TabsTrigger>
-          <TabsTrigger value="users" data-testid="tab-users">All Users</TabsTrigger>
+          <TabsTrigger value="users" data-testid="tab-users">{t("users")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="applications" className="space-y-3">
@@ -166,7 +168,7 @@ export default function AdminDashboard() {
                         disabled={updateApplication.isPending}
                         data-testid={`button-approve-${u.id}`}
                       >
-                        <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
+                        <CheckCircle className="h-3.5 w-3.5 mr-1" /> {t("approve")}
                       </Button>
                       <Button
                         size="sm"
@@ -176,7 +178,7 @@ export default function AdminDashboard() {
                         disabled={updateApplication.isPending}
                         data-testid={`button-reject-${u.id}`}
                       >
-                        <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                        <XCircle className="h-3.5 w-3.5 mr-1" /> {t("reject")}
                       </Button>
                     </div>
                   </div>
@@ -187,8 +189,8 @@ export default function AdminDashboard() {
             <Card>
               <CardContent className="p-8 text-center">
                 <Shield className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm font-medium mb-1">No pending applications</p>
-                <p className="text-xs text-muted-foreground">All reseller applications have been reviewed.</p>
+                <p className="text-sm font-medium mb-1">{t("noPendingApplications")}</p>
+                <p className="text-xs text-muted-foreground">{t("allReviewedMsg")}</p>
               </CardContent>
             </Card>
           )}

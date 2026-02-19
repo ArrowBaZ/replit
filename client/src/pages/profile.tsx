@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/lib/i18n";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import { User, MapPin, Phone, Mail, Pencil, Save } from "lucide-react";
 export default function ProfilePage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
 
   const { data: profile, isLoading } = useQuery<Profile>({
@@ -49,10 +51,10 @@ export default function ProfilePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
       setEditing(false);
-      toast({ title: "Profile updated!" });
+      toast({ title: t("profileCreated") });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update profile.", variant: "destructive" });
+      toast({ title: t("error"), description: t("failedUpdateProfile"), variant: "destructive" });
     },
   });
 
@@ -72,7 +74,7 @@ export default function ProfilePage() {
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <h1 className="text-2xl font-bold" data-testid="text-profile-title">Profile</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-profile-title">{t("profileTitle")}</h1>
         {!editing && (
           <Button variant="outline" onClick={startEditing} data-testid="button-edit-profile">
             <Pencil className="h-4 w-4 mr-2" /> Edit
@@ -114,48 +116,48 @@ export default function ProfilePage() {
           {editing ? (
             <form onSubmit={(e) => { e.preventDefault(); updateProfile.mutate(formData); }} className="space-y-4">
               <div className="space-y-2">
-                <Label>Phone</Label>
+                <Label>{t("phone")}</Label>
                 <Input value={formData.phone || ""} onChange={(e) => updateField("phone", e.target.value)} data-testid="input-edit-phone" />
               </div>
               <div className="space-y-2">
-                <Label>Address</Label>
+                <Label>{t("address")}</Label>
                 <Input value={formData.address || ""} onChange={(e) => updateField("address", e.target.value)} data-testid="input-edit-address" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>City</Label>
+                  <Label>{t("city")}</Label>
                   <Input value={formData.city || ""} onChange={(e) => updateField("city", e.target.value)} data-testid="input-edit-city" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Postal Code</Label>
+                  <Label>{t("postalCode")}</Label>
                   <Input value={formData.postalCode || ""} onChange={(e) => updateField("postalCode", e.target.value)} data-testid="input-edit-postal" />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Department</Label>
+                <Label>{t("department")}</Label>
                 <Input value={formData.department || ""} onChange={(e) => updateField("department", e.target.value)} data-testid="input-edit-department" />
               </div>
               {profile?.role === "reusse" && (
                 <>
                   <div className="space-y-2">
-                    <Label>Bio</Label>
+                    <Label>{t("bio")}</Label>
                     <Textarea value={formData.bio || ""} onChange={(e) => updateField("bio", e.target.value)} className="resize-none" rows={3} data-testid="input-edit-bio" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Experience</Label>
+                    <Label>{t("resaleExperience")}</Label>
                     <Textarea value={formData.experience || ""} onChange={(e) => updateField("experience", e.target.value)} className="resize-none" rows={3} data-testid="input-edit-experience" />
                   </div>
                   <div className="space-y-2">
-                    <Label>SIRET Number</Label>
+                    <Label>{t("siretNumber")}</Label>
                     <Input value={formData.siretNumber || ""} onChange={(e) => updateField("siretNumber", e.target.value)} data-testid="input-edit-siret" />
                   </div>
                 </>
               )}
               <div className="flex items-center gap-2">
                 <Button type="submit" className="bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" disabled={updateProfile.isPending} data-testid="button-save-profile">
-                  <Save className="h-4 w-4 mr-2" /> {updateProfile.isPending ? "Saving..." : "Save Changes"}
+                  <Save className="h-4 w-4 mr-2" /> {updateProfile.isPending ? t("saving") : t("saveChanges")}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+                <Button type="button" variant="outline" onClick={() => setEditing(false)}>{t("back")}</Button>
               </div>
             </form>
           ) : (
@@ -176,19 +178,19 @@ export default function ProfilePage() {
               )}
               {profile?.bio && (
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Bio</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t("bio")}</p>
                   <p className="text-sm" data-testid="text-profile-bio">{profile.bio}</p>
                 </div>
               )}
               {profile?.experience && (
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Experience</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t("resaleExperience")}</p>
                   <p className="text-sm" data-testid="text-profile-experience">{profile.experience}</p>
                 </div>
               )}
               {profile?.siretNumber && (
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">SIRET</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t("siretNumber")}</p>
                   <p className="text-sm" data-testid="text-profile-siret">{profile.siretNumber}</p>
                 </div>
               )}

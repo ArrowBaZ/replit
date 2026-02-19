@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/lib/i18n";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,32 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { isUnauthorizedError } from "@/lib/auth-utils";
 import { ArrowLeft, Package, Zap, Sparkles } from "lucide-react";
 
-const serviceTypes = [
-  {
-    value: "classic",
-    label: "Classic",
-    description: "Standard pickup and resale. Perfect for non-urgent items.",
-    icon: Package,
-    color: "bg-primary/10 text-primary",
-  },
-  {
-    value: "express",
-    label: "Express",
-    description: "Priority handling with faster listing and sales turnaround.",
-    icon: Zap,
-    color: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
-  },
-  {
-    value: "sos_dressing",
-    label: "SOS Dressing",
-    description: "Full wardrobe cleanout. Ideal for large collections.",
-    icon: Sparkles,
-    color: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
-  },
-];
-
 export default function CreateRequestPage() {
   const { toast } = useToast();
+  const { t } = useI18n();
   const [, setLocation] = useLocation();
   const [selectedType, setSelectedType] = useState("");
   const [formData, setFormData] = useState({
@@ -47,6 +25,30 @@ export default function CreateRequestPage() {
     notes: "",
   });
 
+  const serviceTypes = [
+    {
+      value: "classic",
+      label: t("classic"),
+      description: t("classicDesc"),
+      icon: Package,
+      color: "bg-primary/10 text-primary",
+    },
+    {
+      value: "express",
+      label: t("express"),
+      description: t("expressDesc"),
+      icon: Zap,
+      color: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
+    },
+    {
+      value: "sos_dressing",
+      label: t("sosDressing"),
+      description: t("sosDressingDesc"),
+      icon: Sparkles,
+      color: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
+    },
+  ];
+
   const createRequest = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/requests", data);
@@ -54,7 +56,7 @@ export default function CreateRequestPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests"] });
-      toast({ title: "Request created!", description: "A reseller will be matched with you soon." });
+      toast({ title: t("requestCreated"), description: t("resellerMatchedSoon") });
       setLocation(`/requests/${data.id}`);
     },
     onError: (error) => {
@@ -63,7 +65,7 @@ export default function CreateRequestPage() {
         setTimeout(() => { window.location.href = "/api/login"; }, 500);
         return;
       }
-      toast({ title: "Error", description: "Failed to create request.", variant: "destructive" });
+      toast({ title: t("error"), description: t("failedCreateRequest"), variant: "destructive" });
     },
   });
 
@@ -90,14 +92,14 @@ export default function CreateRequestPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-create-request-title">New Request</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-create-request-title">{t("newRequestTitle")}</h1>
           <p className="text-sm text-muted-foreground">Tell us about your items and preferred service.</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-3">
-          <Label className="text-base font-medium">Service Type</Label>
+          <Label className="text-base font-medium">{t("serviceType")}</Label>
           <div className="grid gap-3">
             {serviceTypes.map((type) => (
               <Card
@@ -122,7 +124,7 @@ export default function CreateRequestPage() {
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="itemCount">Number of Items *</Label>
+            <Label htmlFor="itemCount">{t("numberOfItems")} *</Label>
             <Input
               id="itemCount"
               type="number"
@@ -135,7 +137,7 @@ export default function CreateRequestPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="estimatedValue">Estimated Value (EUR)</Label>
+            <Label htmlFor="estimatedValue">{t("estimatedValue")} (EUR)</Label>
             <Input
               id="estimatedValue"
               type="number"
@@ -149,10 +151,10 @@ export default function CreateRequestPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="meetingLocation">Preferred Meeting Location</Label>
+          <Label htmlFor="meetingLocation">{t("meetingLocation")}</Label>
           <Input
             id="meetingLocation"
-            placeholder="e.g. My home, local cafe, etc."
+            placeholder={t("locationPlaceholder")}
             value={formData.meetingLocation}
             onChange={(e) => updateField("meetingLocation", e.target.value)}
             data-testid="input-meeting-location"
@@ -160,10 +162,10 @@ export default function CreateRequestPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="notes">Additional Notes</Label>
+          <Label htmlFor="notes">{t("additionalNotes")}</Label>
           <Textarea
             id="notes"
-            placeholder="Any details about the items, preferred timing, etc."
+            placeholder={t("notesPlaceholder")}
             value={formData.notes}
             onChange={(e) => updateField("notes", e.target.value)}
             className="resize-none"
@@ -178,7 +180,7 @@ export default function CreateRequestPage() {
           disabled={!selectedType || !formData.itemCount || createRequest.isPending}
           data-testid="button-submit-request"
         >
-          {createRequest.isPending ? "Creating..." : "Submit Request"}
+          {createRequest.isPending ? t("submitting") : t("submitRequest")}
         </Button>
       </form>
     </div>

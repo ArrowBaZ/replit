@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useI18n } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ interface Conversation {
 
 export default function MessagesPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messageText, setMessageText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -63,7 +65,7 @@ export default function MessagesPage() {
     <div className="flex h-[calc(100vh-65px)]">
       <div className={`${selectedConversation ? "hidden md:flex" : "flex"} w-full md:w-80 lg:w-96 flex-col border-r`}>
         <div className="p-4 border-b">
-          <h1 className="font-semibold" data-testid="text-messages-title">Messages</h1>
+          <h1 className="font-semibold" data-testid="text-messages-title">{t("messagesTitle")}</h1>
         </div>
         <ScrollArea className="flex-1">
           {convsLoading ? (
@@ -108,7 +110,7 @@ export default function MessagesPage() {
           ) : (
             <div className="p-8 text-center">
               <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No conversations yet</p>
+              <p className="text-sm text-muted-foreground">{t("noConversations")}</p>
             </div>
           )}
         </ScrollArea>
@@ -167,7 +169,7 @@ export default function MessagesPage() {
 
             <form onSubmit={handleSend} className="p-4 border-t flex gap-2">
               <Input
-                placeholder="Type a message..."
+                placeholder={t("typeMessage")}
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
                 className="flex-1"
@@ -188,7 +190,7 @@ export default function MessagesPage() {
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <MessageSquare className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Select a conversation to start messaging</p>
+              <p className="text-sm text-muted-foreground">{t("startConversation")}</p>
             </div>
           </div>
         )}

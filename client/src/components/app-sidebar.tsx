@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
+import { useI18n } from "@/lib/i18n";
 import type { Profile } from "@shared/schema";
 import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
 import {
@@ -32,31 +33,6 @@ import {
   Shirt,
 } from "lucide-react";
 
-const sellerItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "My Requests", url: "/requests", icon: ClipboardList },
-  { title: "My Items", url: "/items", icon: Shirt },
-  { title: "Messages", url: "/messages", icon: MessageSquare },
-  { title: "Profile", url: "/profile", icon: User },
-];
-
-const reusseItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Available Requests", url: "/available", icon: Package },
-  { title: "My Assignments", url: "/requests", icon: ClipboardList },
-  { title: "Schedule", url: "/schedule", icon: Calendar },
-  { title: "Messages", url: "/messages", icon: MessageSquare },
-  { title: "Profile", url: "/profile", icon: User },
-];
-
-const adminItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Users", url: "/admin/users", icon: Users },
-  { title: "Applications", url: "/admin/applications", icon: Shield },
-  { title: "All Requests", url: "/requests", icon: ClipboardList },
-  { title: "Messages", url: "/messages", icon: MessageSquare },
-];
-
 function getInitials(firstName?: string | null, lastName?: string | null): string {
   const f = firstName?.[0] || "";
   const l = lastName?.[0] || "";
@@ -66,6 +42,7 @@ function getInitials(firstName?: string | null, lastName?: string | null): strin
 export function AppSidebar() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
+  const { t } = useI18n();
 
   const { data: profile } = useQuery<Profile>({
     queryKey: ["/api/profile"],
@@ -73,6 +50,32 @@ export function AppSidebar() {
   });
 
   const role = profile?.role || "seller";
+
+  const sellerItems = [
+    { title: t("dashboard"), url: "/dashboard", icon: LayoutDashboard },
+    { title: t("myRequests"), url: "/requests", icon: ClipboardList },
+    { title: t("myItems"), url: "/items", icon: Shirt },
+    { title: t("messages"), url: "/messages", icon: MessageSquare },
+    { title: t("profile"), url: "/profile", icon: User },
+  ];
+
+  const reusseItems = [
+    { title: t("dashboard"), url: "/dashboard", icon: LayoutDashboard },
+    { title: t("availableRequests"), url: "/available", icon: Package },
+    { title: t("myAssignments"), url: "/requests", icon: ClipboardList },
+    { title: t("schedule"), url: "/schedule", icon: Calendar },
+    { title: t("messages"), url: "/messages", icon: MessageSquare },
+    { title: t("profile"), url: "/profile", icon: User },
+  ];
+
+  const adminItems = [
+    { title: t("dashboard"), url: "/dashboard", icon: LayoutDashboard },
+    { title: t("users"), url: "/admin/users", icon: Users },
+    { title: t("applications"), url: "/admin/applications", icon: Shield },
+    { title: t("myRequests"), url: "/requests", icon: ClipboardList },
+    { title: t("messages"), url: "/messages", icon: MessageSquare },
+  ];
+
   const menuItems = role === "admin" ? adminItems : role === "reusse" ? reusseItems : sellerItems;
 
   return (
@@ -91,20 +94,20 @@ export function AppSidebar() {
             <Link href="/requests/new">
               <Button className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" data-testid="button-new-request">
                 <Plus className="h-4 w-4 mr-2" />
-                New Request
+                {t("newRequest")}
               </Button>
             </Link>
           </div>
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel>{role === "admin" ? "Administration" : role === "reusse" ? "Reusse" : "Seller"}</SidebarGroupLabel>
+          <SidebarGroupLabel>{role === "admin" ? t("administration") : role === "reusse" ? t("reusse") : t("seller")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild data-active={location === item.url || (item.url !== "/dashboard" && location.startsWith(item.url))}>
-                    <Link href={item.url} data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                    <Link href={item.url} data-testid={`link-nav-${item.url.replace(/\//g, "-").slice(1)}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -129,7 +132,7 @@ export function AppSidebar() {
               {user?.firstName || "User"}
             </p>
             <p className="text-xs text-muted-foreground truncate">
-              {role === "reusse" ? "Reusse" : role === "admin" ? "Admin" : "Seller"}
+              {role === "reusse" ? t("reusse") : role === "admin" ? "Admin" : t("seller")}
             </p>
           </div>
           <Button
