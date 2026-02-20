@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Request, Item, Meeting, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle } from "lucide-react";
+import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag } from "lucide-react";
 import { useState } from "react";
 
 const statusColors: Record<string, string> = {
@@ -103,6 +103,100 @@ export default function RequestDetailPage() {
       setShowScheduleMeeting(false);
       setMeetingForm({ date: "", time: "", location: "", notes: "" });
       toast({ title: "Meeting scheduled" });
+    },
+  });
+
+  const [showMarkSold, setShowMarkSold] = useState<number | null>(null);
+  const [soldPrice, setSoldPrice] = useState("");
+  const [showCounterOffer, setShowCounterOffer] = useState<number | null>(null);
+  const [counterMin, setCounterMin] = useState("");
+  const [counterMax, setCounterMax] = useState("");
+  const [showListItem, setShowListItem] = useState<number | null>(null);
+  const [listPlatform, setListPlatform] = useState("");
+
+  const approveItem = useMutation({
+    mutationFn: async (itemId: number) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/approve`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      toast({ title: t("itemApproved") });
+    },
+  });
+
+  const counterOfferItem = useMutation({
+    mutationFn: async ({ itemId, minPrice, maxPrice }: { itemId: number; minPrice: string; maxPrice: string }) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/counter-offer`, { minPrice, maxPrice });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      setShowCounterOffer(null);
+      setCounterMin("");
+      setCounterMax("");
+      toast({ title: t("counterOfferSent") });
+    },
+  });
+
+  const declineItem = useMutation({
+    mutationFn: async (itemId: number) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/decline`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      toast({ title: t("itemDeclined") });
+    },
+  });
+
+  const listItem = useMutation({
+    mutationFn: async ({ itemId, platformListedOn }: { itemId: number; platformListedOn: string }) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/list`, { platformListedOn });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      setShowListItem(null);
+      setListPlatform("");
+      toast({ title: t("itemListed") });
+    },
+  });
+
+  const markSold = useMutation({
+    mutationFn: async ({ itemId, salePrice }: { itemId: number; salePrice: string }) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/mark-sold`, { salePrice });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      setShowMarkSold(null);
+      setSoldPrice("");
+      toast({ title: t("itemMarkedSold") });
+    },
+  });
+
+  const cancelRequest = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/requests/${params.id}/cancel`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/requests"] });
+      toast({ title: t("requestCancelled") });
+    },
+  });
+
+  const completeRequest = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/requests/${params.id}/complete`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/requests"] });
+      toast({ title: t("requestCompleted") });
     },
   });
 
@@ -304,26 +398,118 @@ export default function RequestDetailPage() {
           ) : requestItems && requestItems.length > 0 ? (
             requestItems.map((item) => (
               <Card key={item.id}>
-                <CardContent className="p-4 flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center shrink-0">
-                      <Shirt className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium" data-testid={`text-item-title-${item.id}`}>{item.title}</p>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        {item.brand && <span className="text-xs text-muted-foreground">{item.brand}</span>}
-                        {item.size && <span className="text-xs text-muted-foreground">{t("size")} {item.size}</span>}
-                        <span className="text-xs text-muted-foreground capitalize">{item.condition}</span>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center shrink-0">
+                        <Shirt className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      {item.minPrice && item.maxPrice && (
-                        <p className="text-xs text-muted-foreground mt-1">{item.minPrice} - {item.maxPrice} EUR</p>
-                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium" data-testid={`text-item-title-${item.id}`}>{item.title}</p>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          {item.brand && <span className="text-xs text-muted-foreground">{item.brand}</span>}
+                          {item.size && <span className="text-xs text-muted-foreground">{t("size")} {item.size}</span>}
+                          <span className="text-xs text-muted-foreground capitalize">{item.condition}</span>
+                        </div>
+                        {item.minPrice && item.maxPrice && (
+                          <p className="text-xs text-muted-foreground mt-1">{item.minPrice} - {item.maxPrice} EUR</p>
+                        )}
+                        {item.salePrice && (
+                          <p className="text-xs font-medium text-emerald-600 mt-1">{t("salePrice")}: {item.salePrice} EUR</p>
+                        )}
+                      </div>
                     </div>
+                    <Badge variant="secondary" className={itemStatusColors[item.status] || ""}>
+                      {translateStatus(item.status)}
+                    </Badge>
                   </div>
-                  <Badge variant="secondary" className={itemStatusColors[item.status] || ""}>
-                    {translateStatus(item.status)}
-                  </Badge>
+
+                  {isSeller && item.status === "pending_approval" && (
+                    <div className="flex flex-wrap gap-2 ml-13">
+                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approveItem.mutate(item.id)} disabled={approveItem.isPending} data-testid={`button-approve-${item.id}`}>
+                        <ThumbsUp className="h-3.5 w-3.5 mr-1" /> {t("approvePrice")}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setShowCounterOffer(item.id)} data-testid={`button-counter-${item.id}`}>
+                        <DollarSign className="h-3.5 w-3.5 mr-1" /> {t("counterOffer")}
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => declineItem.mutate(item.id)} disabled={declineItem.isPending} data-testid={`button-decline-${item.id}`}>
+                        <ThumbsDown className="h-3.5 w-3.5 mr-1" /> {t("declineItem")}
+                      </Button>
+                    </div>
+                  )}
+
+                  {showCounterOffer === item.id && (
+                    <div className="ml-13 p-3 bg-muted rounded-lg space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">{t("minPrice")} (EUR)</Label>
+                          <Input type="number" value={counterMin} onChange={(e) => setCounterMin(e.target.value)} data-testid="input-counter-min" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">{t("maxPrice")} (EUR)</Label>
+                          <Input type="number" value={counterMax} onChange={(e) => setCounterMax(e.target.value)} data-testid="input-counter-max" />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => counterOfferItem.mutate({ itemId: item.id, minPrice: counterMin, maxPrice: counterMax })} disabled={counterOfferItem.isPending} data-testid="button-submit-counter">
+                          {t("counterOffer")}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowCounterOffer(null)}>{t("back")}</Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isReusse && isAssigned && item.status === "approved" && (
+                    <div className="flex flex-wrap gap-2 ml-13">
+                      <Button size="sm" variant="outline" onClick={() => setShowListItem(item.id)} data-testid={`button-list-${item.id}`}>
+                        <Tag className="h-3.5 w-3.5 mr-1" /> {t("markAsListed")}
+                      </Button>
+                    </div>
+                  )}
+
+                  {showListItem === item.id && (
+                    <div className="ml-13 p-3 bg-muted rounded-lg space-y-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("platformListed")}</Label>
+                        <Input value={listPlatform} onChange={(e) => setListPlatform(e.target.value)} placeholder="Vinted, Vestiaire Collective..." data-testid="input-platform" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => listItem.mutate({ itemId: item.id, platformListedOn: listPlatform })} disabled={listItem.isPending} data-testid="button-submit-list">
+                          {t("markAsListed")}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowListItem(null)}>{t("back")}</Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isReusse && isAssigned && item.status === "listed" && (
+                    <div className="flex flex-wrap gap-2 ml-13">
+                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setShowMarkSold(item.id)} data-testid={`button-sell-${item.id}`}>
+                        <ShoppingBag className="h-3.5 w-3.5 mr-1" /> {t("markAsSold")}
+                      </Button>
+                    </div>
+                  )}
+
+                  {showMarkSold === item.id && (
+                    <div className="ml-13 p-3 bg-muted rounded-lg space-y-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("salePrice")} (EUR)</Label>
+                        <Input type="number" step="0.01" value={soldPrice} onChange={(e) => setSoldPrice(e.target.value)} placeholder={t("enterSalePrice")} data-testid="input-sale-price" />
+                      </div>
+                      {soldPrice && parseFloat(soldPrice) > 0 && (
+                        <div className="text-xs space-y-1">
+                          <p>{t("sellerEarning")}: <span className="font-medium text-emerald-600">{(parseFloat(soldPrice) * 0.8).toFixed(2)} EUR</span></p>
+                          <p>{t("reusseEarning")}: <span className="font-medium text-blue-600">{(parseFloat(soldPrice) * 0.2).toFixed(2)} EUR</span></p>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => markSold.mutate({ itemId: item.id, salePrice: soldPrice })} disabled={markSold.isPending || !soldPrice} data-testid="button-confirm-sold">
+                          {t("confirmSold")}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setShowMarkSold(null); setSoldPrice(""); }}>{t("back")}</Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))
@@ -418,6 +604,21 @@ export default function RequestDetailPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {request.status !== "completed" && request.status !== "cancelled" && (
+        <div className="flex flex-wrap gap-3 pt-2">
+          {isSeller && (
+            <Button variant="destructive" size="sm" onClick={() => cancelRequest.mutate()} disabled={cancelRequest.isPending} data-testid="button-cancel-request">
+              <XCircle className="h-4 w-4 mr-1" /> {t("cancelRequest")}
+            </Button>
+          )}
+          {(isSeller || (isReusse && isAssigned)) && request.status === "in_progress" && (
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => completeRequest.mutate()} disabled={completeRequest.isPending} data-testid="button-complete-request">
+              <CheckCircle className="h-4 w-4 mr-1" /> {t("completeRequest")}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

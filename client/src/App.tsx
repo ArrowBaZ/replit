@@ -23,6 +23,10 @@ import MessagesPage from "@/pages/messages";
 import ItemsListPage from "@/pages/items-list";
 import ProfilePage from "@/pages/profile";
 import SchedulePage from "@/pages/schedule";
+import FaqPage from "@/pages/faq";
+import ContactPage from "@/pages/contact";
+import TermsPage from "@/pages/terms";
+import PrivacyPage from "@/pages/privacy";
 import { Loader2 } from "lucide-react";
 
 function DashboardRoute() {
@@ -61,6 +65,10 @@ function AuthenticatedRouter() {
       <Route path="/schedule" component={SchedulePage} />
       <Route path="/admin/users">{() => <AdminDashboard />}</Route>
       <Route path="/admin/applications">{() => <AdminDashboard />}</Route>
+      <Route path="/faq" component={FaqPage} />
+      <Route path="/contact" component={ContactPage} />
+      <Route path="/terms" component={TermsPage} />
+      <Route path="/privacy" component={PrivacyPage} />
       <Route path="/">{() => <DashboardRoute />}</Route>
       <Route component={NotFound} />
     </Switch>
@@ -108,7 +116,15 @@ function AppContent() {
   }
 
   if (!user) {
-    return <LandingPage />;
+    return (
+      <Switch>
+        <Route path="/faq" component={FaqPage} />
+        <Route path="/contact" component={ContactPage} />
+        <Route path="/terms" component={TermsPage} />
+        <Route path="/privacy" component={PrivacyPage} />
+        <Route><LandingPage /></Route>
+      </Switch>
+    );
   }
 
   return <AuthenticatedLayout />;

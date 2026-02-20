@@ -142,12 +142,37 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),
 }));
 
+export const transactions = pgTable("transactions", {
+  id: serial("id").primaryKey(),
+  itemId: integer("item_id").references(() => items.id),
+  requestId: integer("request_id").references(() => requests.id),
+  sellerId: varchar("seller_id").notNull().references(() => users.id),
+  reusseId: varchar("reusse_id").notNull().references(() => users.id),
+  salePrice: numeric("sale_price").notNull(),
+  sellerEarning: numeric("seller_earning").notNull(),
+  reusseEarning: numeric("reusse_earning").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("completed"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_transactions_seller").on(table.sellerId),
+  index("idx_transactions_reusse").on(table.reusseId),
+  index("idx_transactions_item").on(table.itemId),
+]);
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  item: one(items, { fields: [transactions.itemId], references: [items.id] }),
+  request: one(requests, { fields: [transactions.requestId], references: [requests.id] }),
+  seller: one(users, { fields: [transactions.sellerId], references: [users.id], relationName: "sellerTransactions" }),
+  reusse: one(users, { fields: [transactions.reusseId], references: [users.id], relationName: "reusseTransactions" }),
+}));
+
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRequestSchema = createInsertSchema(requests).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
 export const insertItemSchema = createInsertSchema(items).omit({ id: true, createdAt: true, updatedAt: true, listedAt: true, soldAt: true });
 export const insertMeetingSchema = createInsertSchema(meetings).omit({ id: true, createdAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true, isRead: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, isRead: true });
+export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true });
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
@@ -161,3 +186,5 @@ export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;

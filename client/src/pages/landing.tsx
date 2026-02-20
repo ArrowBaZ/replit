@@ -276,10 +276,16 @@ export default function LandingPage() {
             <div className="flex items-center gap-2">
               <img src={sellzyLogo} alt="Sellzy" className="h-7" />
             </div>
-            <p className="text-xs text-muted-foreground">
-              {t("allRightsReserved")}
-            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              <Link href="/faq" className="text-xs text-muted-foreground hover:text-foreground transition-colors" data-testid="link-faq">{t("faq")}</Link>
+              <Link href="/contact" className="text-xs text-muted-foreground hover:text-foreground transition-colors" data-testid="link-contact">{t("contactUs")}</Link>
+              <Link href="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors" data-testid="link-terms">{t("termsOfService")}</Link>
+              <Link href="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors" data-testid="link-privacy">{t("privacyPolicy")}</Link>
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground mt-4 text-center">
+            {t("allRightsReserved")}
+          </p>
         </div>
       </footer>
     </div>

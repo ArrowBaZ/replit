@@ -418,5 +418,231 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/items/:id/approve", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const item = await storage.updateItem(id, {
+        status: "approved",
+        priceApprovedBySeller: true,
+        approvedPrice: req.body.approvedPrice || null,
+        updatedAt: new Date(),
+      });
+      if (!item) return res.status(404).json({ message: "Item not found" });
+
+      if (item.reusseId) {
+        await storage.createNotification({
+          userId: item.reusseId,
+          type: "item_approved",
+          title: "Price Approved",
+          message: `Seller approved pricing for "${item.title}".`,
+          link: `/requests/${item.requestId}`,
+        });
+      }
+      res.json(item);
+    } catch (error) {
+      console.error("Error approving item:", error);
+      res.status(500).json({ message: "Failed to approve item" });
+    }
+  });
+
+  app.post("/api/items/:id/counter-offer", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { minPrice, maxPrice } = req.body;
+      const item = await storage.updateItem(id, {
+        status: "pending_approval",
+        minPrice: minPrice || null,
+        maxPrice: maxPrice || null,
+        priceApprovedBySeller: false,
+        updatedAt: new Date(),
+      });
+      if (!item) return res.status(404).json({ message: "Item not found" });
+
+      if (item.reusseId) {
+        await storage.createNotification({
+          userId: item.reusseId,
+          type: "counter_offer",
+          title: "Counter Offer",
+          message: `Seller suggested a different price for "${item.title}".`,
+          link: `/requests/${item.requestId}`,
+        });
+      }
+      res.json(item);
+    } catch (error) {
+      console.error("Error counter-offering:", error);
+      res.status(500).json({ message: "Failed to submit counter offer" });
+    }
+  });
+
+  app.post("/api/items/:id/decline", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const item = await storage.updateItem(id, {
+        status: "returned",
+        priceApprovedBySeller: false,
+        updatedAt: new Date(),
+      });
+      if (!item) return res.status(404).json({ message: "Item not found" });
+
+      if (item.reusseId) {
+        await storage.createNotification({
+          userId: item.reusseId,
+          type: "item_declined",
+          title: "Item Declined",
+          message: `Seller declined "${item.title}".`,
+          link: `/requests/${item.requestId}`,
+        });
+      }
+      res.json(item);
+    } catch (error) {
+      console.error("Error declining item:", error);
+      res.status(500).json({ message: "Failed to decline item" });
+    }
+  });
+
+  app.post("/api/items/:id/list", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { platformListedOn } = req.body;
+      const item = await storage.updateItem(id, {
+        status: "listed",
+        listedAt: new Date(),
+        platformListedOn: platformListedOn || null,
+        updatedAt: new Date(),
+      });
+      if (!item) return res.status(404).json({ message: "Item not found" });
+
+      if (item.sellerId) {
+        await storage.createNotification({
+          userId: item.sellerId,
+          type: "item_listed",
+          title: "Item Listed",
+          message: `"${item.title}" has been listed${platformListedOn ? ` on ${platformListedOn}` : ""}.`,
+          link: `/requests/${item.requestId}`,
+        });
+      }
+
+      if (item.requestId) {
+        await storage.updateRequest(item.requestId, { status: "in_progress" });
+      }
+
+      res.json(item);
+    } catch (error) {
+      console.error("Error listing item:", error);
+      res.status(500).json({ message: "Failed to list item" });
+    }
+  });
+
+  app.post("/api/items/:id/mark-sold", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { salePrice } = req.body;
+      if (!salePrice || parseFloat(salePrice) <= 0) {
+        return res.status(400).json({ message: "Valid sale price required" });
+      }
+
+      const salePriceNum = parseFloat(salePrice);
+      const sellerEarning = (salePriceNum * 0.8).toFixed(2);
+      const reusseEarning = (salePriceNum * 0.2).toFixed(2);
+
+      const item = await storage.updateItem(id, {
+        status: "sold",
+        salePrice: salePrice.toString(),
+        soldAt: new Date(),
+        updatedAt: new Date(),
+      });
+      if (!item) return res.status(404).json({ message: "Item not found" });
+
+      const transaction = await storage.createTransaction({
+        itemId: item.id,
+        requestId: item.requestId || null,
+        sellerId: item.sellerId,
+        reusseId: item.reusseId || req.user.claims.sub,
+        salePrice: salePrice.toString(),
+        sellerEarning,
+        reusseEarning,
+        status: "completed",
+      });
+
+      await storage.createNotification({
+        userId: item.sellerId,
+        type: "item_sold",
+        title: "Item Sold!",
+        message: `"${item.title}" sold for ${salePrice} EUR. Your earnings: ${sellerEarning} EUR.`,
+        link: `/items`,
+      });
+
+      res.json({ item, transaction });
+    } catch (error) {
+      console.error("Error marking item sold:", error);
+      res.status(500).json({ message: "Failed to mark item as sold" });
+    }
+  });
+
+  app.patch("/api/requests/:id/cancel", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const request = await storage.getRequest(id);
+      if (!request) return res.status(404).json({ message: "Request not found" });
+
+      const updated = await storage.updateRequest(id, { status: "cancelled" });
+
+      if (request.reusseId) {
+        await storage.createNotification({
+          userId: request.reusseId,
+          type: "request_cancelled",
+          title: "Request Cancelled",
+          message: `Request #${id} has been cancelled.`,
+          link: `/requests/${id}`,
+        });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error cancelling request:", error);
+      res.status(500).json({ message: "Failed to cancel request" });
+    }
+  });
+
+  app.patch("/api/requests/:id/complete", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const request = await storage.getRequest(id);
+      if (!request) return res.status(404).json({ message: "Request not found" });
+
+      const updated = await storage.updateRequest(id, { status: "completed", completedAt: new Date() });
+
+      const notifyUserId = req.user.claims.sub === request.sellerId ? request.reusseId : request.sellerId;
+      if (notifyUserId) {
+        await storage.createNotification({
+          userId: notifyUserId,
+          type: "request_completed",
+          title: "Request Completed",
+          message: `Request #${id} has been marked as complete.`,
+          link: `/requests/${id}`,
+        });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error completing request:", error);
+      res.status(500).json({ message: "Failed to complete request" });
+    }
+  });
+
+  app.get("/api/earnings", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profile = await storage.getProfile(userId);
+      if (!profile) return res.status(400).json({ message: "Profile required" });
+      const earnings = await storage.getEarnings(userId, profile.role);
+      res.json(earnings);
+    } catch (error) {
+      console.error("Error fetching earnings:", error);
+      res.status(500).json({ message: "Failed to fetch earnings" });
+    }
+  });
+
   return httpServer;
 }

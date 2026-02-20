@@ -52,7 +52,7 @@ client/src/
 
 ## Recent Changes
 - Initial MVP build: complete frontend + backend
-- Database schema: profiles, requests, items, meetings, messages, notifications
+- Database schema: profiles, requests, items, meetings, messages, notifications, transactions
 - All pages: landing, onboarding, seller/reusse/admin dashboards, request management, messaging, profile
 - API: Full CRUD for all entities with auth middleware
 - Multilingual i18n system (English/French) with flag-based language switcher on landing page
@@ -60,3 +60,10 @@ client/src/
   - French is default language, stored in localStorage as "sellzy-lang"
   - All pages translated: landing, onboarding, dashboards, requests, items, messages, schedule, profile, admin
   - UK and French flag SVG buttons in landing page navbar for language switching
+- Commission/Transaction tracking system (transactions table with 80/20 seller/reseller split)
+- Item approval workflow: sellers can approve/counter-offer/decline pricing on items
+- Item lifecycle: resellers can mark items as listed (with platform) and sold (with sale price)
+- Request lifecycle: cancel and complete request endpoints with notifications
+- Earnings API endpoint for both sellers and resellers
+- Static pages: FAQ, Contact Us, Terms of Service, Privacy Policy (all bilingual)
+- Landing page footer links to static pages

@@ -8,6 +8,7 @@ import {
   meetings, type Meeting, type InsertMeeting,
   messages, type Message, type InsertMessage,
   notifications, type Notification, type InsertNotification,
+  transactions, type Transaction, type InsertTransaction,
   type User,
 } from "@shared/schema";
 
@@ -45,6 +46,10 @@ export interface IStorage {
   getPendingReusses(): Promise<any[]>;
   updateProfileStatus(userId: string, status: string): Promise<Profile | undefined>;
   getAdminStats(): Promise<any>;
+
+  createTransaction(data: InsertTransaction): Promise<Transaction>;
+  getTransactions(userId: string, role: string): Promise<Transaction[]>;
+  getEarnings(userId: string, role: string): Promise<{ total: number; transactions: Transaction[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -285,6 +290,27 @@ export class DatabaseStorage implements IStorage {
       totalRequests: Number(requestCount.count),
       activeRequests: Number(activeRequestCount.count),
     };
+  }
+
+  async createTransaction(data: InsertTransaction): Promise<Transaction> {
+    const [transaction] = await db.insert(transactions).values(data).returning();
+    return transaction;
+  }
+
+  async getTransactions(userId: string, role: string): Promise<Transaction[]> {
+    if (role === "reusse") {
+      return db.select().from(transactions).where(eq(transactions.reusseId, userId)).orderBy(desc(transactions.createdAt));
+    }
+    return db.select().from(transactions).where(eq(transactions.sellerId, userId)).orderBy(desc(transactions.createdAt));
+  }
+
+  async getEarnings(userId: string, role: string): Promise<{ total: number; transactions: Transaction[] }> {
+    const txns = await this.getTransactions(userId, role);
+    const total = txns.reduce((sum, t) => {
+      const earning = role === "reusse" ? parseFloat(t.reusseEarning) : parseFloat(t.sellerEarning);
+      return sum + (isNaN(earning) ? 0 : earning);
+    }, 0);
+    return { total, transactions: txns };
   }
 }
 
