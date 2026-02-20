@@ -32,6 +32,8 @@ export interface IStorage {
   getMeetings(userId: string): Promise<Meeting[]>;
   getMeetingsByRequest(requestId: number): Promise<Meeting[]>;
   createMeeting(data: InsertMeeting): Promise<Meeting>;
+  getMeeting(id: number): Promise<Meeting | undefined>;
+  updateMeeting(id: number, data: Partial<Meeting>): Promise<Meeting>;
 
   getConversations(userId: string): Promise<any[]>;
   getMessagesBetween(userId: string, otherUserId: string): Promise<Message[]>;
@@ -157,6 +159,16 @@ export class DatabaseStorage implements IStorage {
 
   async createMeeting(data: InsertMeeting): Promise<Meeting> {
     const [meeting] = await db.insert(meetings).values(data).returning();
+    return meeting;
+  }
+
+  async getMeeting(id: number): Promise<Meeting | undefined> {
+    const [meeting] = await db.select().from(meetings).where(eq(meetings.id, id));
+    return meeting;
+  }
+
+  async updateMeeting(id: number, data: Partial<Meeting>): Promise<Meeting> {
+    const [meeting] = await db.update(meetings).set(data).where(eq(meetings.id, id)).returning();
     return meeting;
   }
 

@@ -129,14 +129,19 @@ export async function registerRoutes(
   app.post("/api/requests", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { serviceType, itemCount, estimatedValue, meetingLocation, notes } = req.body;
+      const { serviceType, itemCount, estimatedValue, categories, condition, brands, meetingLocation, preferredDateStart, preferredDateEnd, notes } = req.body;
       const request = await storage.createRequest({
         sellerId: userId,
         serviceType,
         status: "pending",
         itemCount,
         estimatedValue: estimatedValue || null,
+        categories: categories || null,
+        condition: condition || null,
+        brands: brands || null,
         meetingLocation: meetingLocation || null,
+        preferredDateStart: preferredDateStart ? new Date(preferredDateStart) : null,
+        preferredDateEnd: preferredDateEnd ? new Date(preferredDateEnd) : null,
         notes: notes || null,
       });
       res.json(request);
@@ -196,7 +201,7 @@ export async function registerRoutes(
       if (!request) {
         return res.status(404).json({ message: "Request not found" });
       }
-      const { title, description, brand, size, category, condition, minPrice, maxPrice } = req.body;
+      const { title, description, brand, size, category, condition, minPrice, maxPrice, photos } = req.body;
       const item = await storage.createItem({
         requestId,
         sellerId: request.sellerId,
@@ -210,6 +215,7 @@ export async function registerRoutes(
         status: "pending_approval",
         minPrice: minPrice || null,
         maxPrice: maxPrice || null,
+        photos: photos || null,
       });
 
       await storage.createNotification({
@@ -287,6 +293,85 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error creating meeting:", error);
       res.status(500).json({ message: "Failed to create meeting" });
+    }
+  });
+
+  app.patch("/api/meetings/:meetingId/cancel", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const meetingId = parseInt(req.params.meetingId);
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+      const request = await storage.getRequest(meeting.requestId);
+      if (!request) {
+        return res.status(404).json({ message: "Request not found" });
+      }
+      const userId = req.user.claims.sub;
+      if (userId !== request.sellerId && userId !== request.reusseId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const updated = await storage.updateMeeting(meetingId, { status: "cancelled" });
+      const notifyUserId = userId === request.sellerId ? request.reusseId : request.sellerId;
+      if (notifyUserId) {
+        await storage.createNotification({
+          userId: notifyUserId,
+          type: "meeting_cancelled",
+          title: "Meeting Cancelled",
+          message: `A meeting scheduled for ${meeting.scheduledDate ? new Date(meeting.scheduledDate).toLocaleDateString("fr-FR") : "unknown date"} has been cancelled.`,
+          link: `/requests/${request.id}`,
+        });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error cancelling meeting:", error);
+      res.status(500).json({ message: "Failed to cancel meeting" });
+    }
+  });
+
+  app.patch("/api/meetings/:meetingId/reschedule", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const meetingId = parseInt(req.params.meetingId);
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+      const request = await storage.getRequest(meeting.requestId);
+      if (!request) {
+        return res.status(404).json({ message: "Request not found" });
+      }
+      const userId = req.user.claims.sub;
+      if (userId !== request.sellerId && userId !== request.reusseId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const { scheduledDate, location, notes } = req.body;
+      if (!scheduledDate) {
+        return res.status(400).json({ message: "scheduledDate is required" });
+      }
+      const parsedDate = new Date(scheduledDate);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ message: "Invalid date format" });
+      }
+      const updated = await storage.updateMeeting(meetingId, {
+        scheduledDate: parsedDate,
+        location: location || meeting.location,
+        notes: notes !== undefined ? notes : meeting.notes,
+        status: "scheduled",
+      });
+      const notifyUserId = userId === request.sellerId ? request.reusseId : request.sellerId;
+      if (notifyUserId) {
+        await storage.createNotification({
+          userId: notifyUserId,
+          type: "meeting_rescheduled",
+          title: "Meeting Rescheduled",
+          message: `A meeting has been rescheduled to ${new Date(scheduledDate).toLocaleDateString("fr-FR")}.`,
+          link: `/requests/${request.id}`,
+        });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error rescheduling meeting:", error);
+      res.status(500).json({ message: "Failed to reschedule meeting" });
     }
   });
 

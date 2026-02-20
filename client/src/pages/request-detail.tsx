@@ -15,8 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Request, Item, Meeting, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { useUpload } from "@/hooks/use-upload";
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
@@ -77,6 +78,29 @@ export default function RequestDetailPage() {
   const [itemForm, setItemForm] = useState({
     title: "", description: "", brand: "", size: "", category: "clothing", condition: "good", minPrice: "", maxPrice: "",
   });
+  const [itemPhotos, setItemPhotos] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { uploadFile, isUploading: isUploadingPhoto } = useUpload({
+    onSuccess: (response) => {
+      setItemPhotos((prev) => [...prev, response.objectPath]);
+    },
+  });
+
+  const MAX_PHOTOS = 5;
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const remaining = MAX_PHOTOS - itemPhotos.length;
+    const filesToUpload = Array.from(files).slice(0, remaining);
+    for (const file of filesToUpload) {
+      await uploadFile(file);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removePhoto = (index: number) => {
+    setItemPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const addItem = useMutation({
     mutationFn: async (data: any) => {
@@ -87,6 +111,7 @@ export default function RequestDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
       setShowAddItem(false);
       setItemForm({ title: "", description: "", brand: "", size: "", category: "clothing", condition: "good", minPrice: "", maxPrice: "" });
+      setItemPhotos([]);
       toast({ title: "Item added" });
     },
   });
@@ -113,6 +138,8 @@ export default function RequestDetailPage() {
   const [counterMax, setCounterMax] = useState("");
   const [showListItem, setShowListItem] = useState<number | null>(null);
   const [listPlatform, setListPlatform] = useState("");
+  const [showReschedule, setShowReschedule] = useState<number | null>(null);
+  const [rescheduleForm, setRescheduleForm] = useState({ date: "", time: "", location: "" });
 
   const approveItem = useMutation({
     mutationFn: async (itemId: number) => {
@@ -173,6 +200,30 @@ export default function RequestDetailPage() {
       setShowMarkSold(null);
       setSoldPrice("");
       toast({ title: t("itemMarkedSold") });
+    },
+  });
+
+  const cancelMeeting = useMutation({
+    mutationFn: async (meetingId: number) => {
+      const res = await apiRequest("PATCH", `/api/meetings/${meetingId}/cancel`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "meetings"] });
+      toast({ title: t("meetingCancelled") });
+    },
+  });
+
+  const rescheduleMeeting = useMutation({
+    mutationFn: async ({ meetingId, scheduledDate, location }: { meetingId: number; scheduledDate: string; location: string }) => {
+      const res = await apiRequest("PATCH", `/api/meetings/${meetingId}/reschedule`, { scheduledDate, location });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "meetings"] });
+      setShowReschedule(null);
+      setRescheduleForm({ date: "", time: "", location: "" });
+      toast({ title: t("meetingRescheduled") });
     },
   });
 
@@ -331,7 +382,7 @@ export default function RequestDetailPage() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>{t("addItem")}</DialogTitle></DialogHeader>
-                <form onSubmit={(e) => { e.preventDefault(); addItem.mutate(itemForm); }} className="space-y-3">
+                <form onSubmit={(e) => { e.preventDefault(); addItem.mutate({ ...itemForm, photos: itemPhotos.length > 0 ? itemPhotos : undefined }); }} className="space-y-3">
                   <div className="space-y-2">
                     <Label>{t("title")} *</Label>
                     <Input value={itemForm.title} onChange={(e) => setItemForm({...itemForm, title: e.target.value})} required data-testid="input-item-title" />
@@ -352,7 +403,10 @@ export default function RequestDetailPage() {
                       <Select value={itemForm.category} onValueChange={(v) => setItemForm({...itemForm, category: v})}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="clothing">{t("catTops")}</SelectItem>
+                          <SelectItem value="tops">{t("catTops")}</SelectItem>
+                          <SelectItem value="bottoms">{t("catBottoms")}</SelectItem>
+                          <SelectItem value="dresses">{t("catDresses")}</SelectItem>
+                          <SelectItem value="outerwear">{t("catOuterwear")}</SelectItem>
                           <SelectItem value="shoes">{t("catShoes")}</SelectItem>
                           <SelectItem value="accessories">{t("catAccessories")}</SelectItem>
                         </SelectContent>
@@ -363,8 +417,8 @@ export default function RequestDetailPage() {
                       <Select value={itemForm.condition} onValueChange={(v) => setItemForm({...itemForm, condition: v})}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="new">{t("condNew")}</SelectItem>
-                          <SelectItem value="excellent">{t("condLikeNew")}</SelectItem>
+                          <SelectItem value="new_with_tags">{t("condNew")}</SelectItem>
+                          <SelectItem value="like_new">{t("condLikeNew")}</SelectItem>
                           <SelectItem value="good">{t("condGood")}</SelectItem>
                           <SelectItem value="fair">{t("condFair")}</SelectItem>
                         </SelectContent>
@@ -385,7 +439,47 @@ export default function RequestDetailPage() {
                     <Label>{t("description")}</Label>
                     <Textarea value={itemForm.description} onChange={(e) => setItemForm({...itemForm, description: e.target.value})} className="resize-none" rows={2} data-testid="input-item-description" />
                   </div>
-                  <Button type="submit" className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" disabled={addItem.isPending} data-testid="button-submit-item">
+                  <div className="space-y-2">
+                    <Label>{t("photos")}</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {itemPhotos.map((photo, idx) => (
+                        <div key={idx} className="relative h-16 w-16 rounded-md overflow-hidden border">
+                          <img src={photo} alt="" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => removePhoto(idx)}
+                            className="absolute top-0 right-0 bg-black/60 rounded-bl-md p-0.5"
+                            data-testid={`button-remove-photo-${idx}`}
+                          >
+                            <X className="h-3 w-3 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                      {itemPhotos.length < MAX_PHOTOS && (
+                        <label
+                          className="h-16 w-16 rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-[hsl(var(--success))] transition-colors"
+                          data-testid="button-upload-photo"
+                        >
+                          {isUploadingPhoto ? (
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                          ) : (
+                            <Camera className="h-5 w-5 text-muted-foreground" />
+                          )}
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={handlePhotoUpload}
+                            disabled={isUploadingPhoto}
+                          />
+                        </label>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t("photoHint")}</p>
+                  </div>
+                  <Button type="submit" className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" disabled={addItem.isPending || isUploadingPhoto} data-testid="button-submit-item">
                     {addItem.isPending ? "Adding..." : t("addItem")}
                   </Button>
                 </form>
@@ -401,21 +495,41 @@ export default function RequestDetailPage() {
                 <CardContent className="p-4 space-y-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
-                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center shrink-0">
-                        <Shirt className="h-5 w-5 text-muted-foreground" />
-                      </div>
+                      {item.photos && item.photos.length > 0 ? (
+                        <div className="h-14 w-14 rounded-md overflow-hidden shrink-0 border">
+                          <img src={item.photos[0]} alt={item.title} className="h-full w-full object-cover" data-testid={`img-item-${item.id}`} />
+                        </div>
+                      ) : (
+                        <div className="h-14 w-14 rounded-md bg-muted flex items-center justify-center shrink-0">
+                          <Shirt className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <p className="text-sm font-medium" data-testid={`text-item-title-${item.id}`}>{item.title}</p>
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                           {item.brand && <span className="text-xs text-muted-foreground">{item.brand}</span>}
                           {item.size && <span className="text-xs text-muted-foreground">{t("size")} {item.size}</span>}
-                          <span className="text-xs text-muted-foreground capitalize">{item.condition}</span>
+                          <span className="text-xs text-muted-foreground capitalize">{item.condition?.replace(/_/g, " ")}</span>
                         </div>
                         {item.minPrice && item.maxPrice && (
                           <p className="text-xs text-muted-foreground mt-1">{item.minPrice} - {item.maxPrice} EUR</p>
                         )}
                         {item.salePrice && (
                           <p className="text-xs font-medium text-emerald-600 mt-1">{t("salePrice")}: {item.salePrice} EUR</p>
+                        )}
+                        {item.photos && item.photos.length > 1 && (
+                          <div className="flex gap-1 mt-1.5">
+                            {item.photos.slice(1, 4).map((photo: string, idx: number) => (
+                              <div key={idx} className="h-8 w-8 rounded overflow-hidden border">
+                                <img src={photo} alt="" className="h-full w-full object-cover" />
+                              </div>
+                            ))}
+                            {item.photos.length > 4 && (
+                              <div className="h-8 w-8 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                                +{item.photos.length - 4}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -425,7 +539,7 @@ export default function RequestDetailPage() {
                   </div>
 
                   {isSeller && item.status === "pending_approval" && (
-                    <div className="flex flex-wrap gap-2 ml-13">
+                    <div className="flex flex-wrap gap-2 ml-[4.25rem]">
                       <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approveItem.mutate(item.id)} disabled={approveItem.isPending} data-testid={`button-approve-${item.id}`}>
                         <ThumbsUp className="h-3.5 w-3.5 mr-1" /> {t("approvePrice")}
                       </Button>
@@ -439,7 +553,7 @@ export default function RequestDetailPage() {
                   )}
 
                   {showCounterOffer === item.id && (
-                    <div className="ml-13 p-3 bg-muted rounded-lg space-y-2">
+                    <div className="ml-[4.25rem] p-3 bg-muted rounded-lg space-y-2">
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
                           <Label className="text-xs">{t("minPrice")} (EUR)</Label>
@@ -460,7 +574,7 @@ export default function RequestDetailPage() {
                   )}
 
                   {isReusse && isAssigned && item.status === "approved" && (
-                    <div className="flex flex-wrap gap-2 ml-13">
+                    <div className="flex flex-wrap gap-2 ml-[4.25rem]">
                       <Button size="sm" variant="outline" onClick={() => setShowListItem(item.id)} data-testid={`button-list-${item.id}`}>
                         <Tag className="h-3.5 w-3.5 mr-1" /> {t("markAsListed")}
                       </Button>
@@ -468,7 +582,7 @@ export default function RequestDetailPage() {
                   )}
 
                   {showListItem === item.id && (
-                    <div className="ml-13 p-3 bg-muted rounded-lg space-y-2">
+                    <div className="ml-[4.25rem] p-3 bg-muted rounded-lg space-y-2">
                       <div className="space-y-1">
                         <Label className="text-xs">{t("platformListed")}</Label>
                         <Input value={listPlatform} onChange={(e) => setListPlatform(e.target.value)} placeholder="Vinted, Vestiaire Collective..." data-testid="input-platform" />
@@ -483,7 +597,7 @@ export default function RequestDetailPage() {
                   )}
 
                   {isReusse && isAssigned && item.status === "listed" && (
-                    <div className="flex flex-wrap gap-2 ml-13">
+                    <div className="flex flex-wrap gap-2 ml-[4.25rem]">
                       <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setShowMarkSold(item.id)} data-testid={`button-sell-${item.id}`}>
                         <ShoppingBag className="h-3.5 w-3.5 mr-1" /> {t("markAsSold")}
                       </Button>
@@ -491,7 +605,7 @@ export default function RequestDetailPage() {
                   )}
 
                   {showMarkSold === item.id && (
-                    <div className="ml-13 p-3 bg-muted rounded-lg space-y-2">
+                    <div className="ml-[4.25rem] p-3 bg-muted rounded-lg space-y-2">
                       <div className="space-y-1">
                         <Label className="text-xs">{t("salePrice")} (EUR)</Label>
                         <Input type="number" step="0.01" value={soldPrice} onChange={(e) => setSoldPrice(e.target.value)} placeholder={t("enterSalePrice")} data-testid="input-sale-price" />
@@ -570,27 +684,63 @@ export default function RequestDetailPage() {
           {requestMeetings && requestMeetings.length > 0 ? (
             requestMeetings.map((meeting) => (
               <Card key={meeting.id}>
-                <CardContent className="p-4 flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-md bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
-                      <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 rounded-md bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
+                        <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {meeting.scheduledDate ? new Date(meeting.scheduledDate).toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {meeting.scheduledDate ? new Date(meeting.scheduledDate).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}
+                          {meeting.duration ? ` - ${meeting.duration} min` : ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" /> {meeting.location}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">
-                        {meeting.scheduledDate ? new Date(meeting.scheduledDate).toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : ""}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {meeting.scheduledDate ? new Date(meeting.scheduledDate).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""}
-                        {meeting.duration ? ` - ${meeting.duration} min` : ""}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                        <MapPin className="h-3 w-3" /> {meeting.location}
-                      </p>
-                    </div>
+                    <Badge variant="secondary" className={statusColors[meeting.status] || ""}>
+                      {translateStatus(meeting.status)}
+                    </Badge>
                   </div>
-                  <Badge variant="secondary" className={statusColors[meeting.status] || ""}>
-                    {translateStatus(meeting.status)}
-                  </Badge>
+                  {meeting.status === "scheduled" && (
+                    <div className="flex flex-wrap gap-2 ml-[4.25rem]">
+                      <Button size="sm" variant="outline" onClick={() => { setShowReschedule(meeting.id); setRescheduleForm({ date: "", time: "", location: meeting.location }); }} data-testid={`button-reschedule-${meeting.id}`}>
+                        <Clock className="h-3.5 w-3.5 mr-1" /> {t("rescheduleMeeting")}
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => cancelMeeting.mutate(meeting.id)} disabled={cancelMeeting.isPending} data-testid={`button-cancel-meeting-${meeting.id}`}>
+                        <XCircle className="h-3.5 w-3.5 mr-1" /> {t("cancelMeeting")}
+                      </Button>
+                    </div>
+                  )}
+                  {showReschedule === meeting.id && (
+                    <div className="ml-[4.25rem] p-3 bg-muted rounded-lg space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">{t("newDate")}</Label>
+                          <Input type="date" value={rescheduleForm.date} onChange={(e) => setRescheduleForm({...rescheduleForm, date: e.target.value})} data-testid="input-reschedule-date" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">{t("newTime")}</Label>
+                          <Input type="time" value={rescheduleForm.time} onChange={(e) => setRescheduleForm({...rescheduleForm, time: e.target.value})} data-testid="input-reschedule-time" />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("location")}</Label>
+                        <Input value={rescheduleForm.location} onChange={(e) => setRescheduleForm({...rescheduleForm, location: e.target.value})} data-testid="input-reschedule-location" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => rescheduleMeeting.mutate({ meetingId: meeting.id, scheduledDate: new Date(`${rescheduleForm.date}T${rescheduleForm.time}`).toISOString(), location: rescheduleForm.location })} disabled={rescheduleMeeting.isPending || !rescheduleForm.date || !rescheduleForm.time} data-testid="button-confirm-reschedule">
+                          {t("rescheduleMeeting")}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowReschedule(null)} data-testid="button-cancel-reschedule">{t("back")}</Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))

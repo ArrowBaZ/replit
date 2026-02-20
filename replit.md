@@ -67,3 +67,9 @@ client/src/
 - Earnings API endpoint for both sellers and resellers
 - Static pages: FAQ, Contact Us, Terms of Service, Privacy Policy (all bilingual)
 - Landing page footer links to static pages
+- Enhanced request creation: multi-step wizard with category badges, condition cards, brands input, preferred meeting dates
+- Item photo uploads: Object Storage integration with presigned URLs, multi-photo upload in add-item dialog
+- Item photo display: thumbnails in request detail and items list pages
+- Items list filtering: search by name/brand, filter by status (pending_approval, approved, listed, sold)
+- Meeting management: cancel and reschedule meetings with notifications to other party
+- API endpoints: PATCH /api/meetings/:id/cancel, PATCH /api/meetings/:id/reschedule

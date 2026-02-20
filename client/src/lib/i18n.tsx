@@ -156,6 +156,9 @@ const translations = {
     // Items
     myItemsTitle: "My Items",
     noItemsYet: "No items yet",
+    noMatchingItems: "No matching items",
+    searchItems: "Search by name or brand...",
+    allStatuses: "All statuses",
     itemsWillAppear: "Items will appear here once a reseller adds them to your requests.",
 
     // Messages
@@ -201,6 +204,8 @@ const translations = {
     assignedReseller: "Assigned Reseller",
     items: "Items",
     addItem: "Add Item",
+    photos: "Photos",
+    photoHint: "Upload photos of the item (max 5)",
     title: "Title",
     brand: "Brand",
     size: "Size",
@@ -212,6 +217,12 @@ const translations = {
     noItemsAdded: "No items added yet.",
     meetingsSection: "Meetings",
     scheduleMeeting: "Schedule Meeting",
+    cancelMeeting: "Cancel Meeting",
+    rescheduleMeeting: "Reschedule",
+    meetingCancelled: "Meeting cancelled",
+    meetingRescheduled: "Meeting rescheduled",
+    newDate: "New Date",
+    newTime: "New Time",
     date: "Date",
     time: "Time",
     location: "Location",
@@ -248,6 +259,17 @@ const translations = {
     // 404
     pageNotFound: "404 Page Not Found",
     pageNotFoundDesc: "The page you're looking for doesn't exist.",
+
+    // Enhanced Request Form
+    step: "Step",
+    itemCategories: "Item Categories",
+    overallCondition: "Overall Condition",
+    brandsOwned: "Brands",
+    brandsPlaceholder: "e.g. Zara, H&M, Nike, Levi's...",
+    preferredDateFrom: "Available From",
+    preferredDateTo: "Available Until",
+    preferredDates: "Preferred Dates",
+    reviewRequest: "Review Your Request",
 
     // Categories
     catTops: "Tops",
@@ -462,6 +484,9 @@ const translations = {
     // Items
     myItemsTitle: "Mes articles",
     noItemsYet: "Aucun article",
+    noMatchingItems: "Aucun article correspondant",
+    searchItems: "Rechercher par nom ou marque...",
+    allStatuses: "Tous les statuts",
     itemsWillAppear: "Les articles apparaitront ici une fois qu'un revendeur les ajoutera a vos demandes.",
 
     // Messages
@@ -507,6 +532,8 @@ const translations = {
     assignedReseller: "Revendeur assigne",
     items: "Articles",
     addItem: "Ajouter un article",
+    photos: "Photos",
+    photoHint: "Ajoutez des photos de l'article (max 5)",
     title: "Titre",
     brand: "Marque",
     size: "Taille",
@@ -518,6 +545,12 @@ const translations = {
     noItemsAdded: "Aucun article ajoute pour le moment.",
     meetingsSection: "Reunions",
     scheduleMeeting: "Planifier une reunion",
+    cancelMeeting: "Annuler la reunion",
+    rescheduleMeeting: "Replanifier",
+    meetingCancelled: "Reunion annulee",
+    meetingRescheduled: "Reunion replanifiee",
+    newDate: "Nouvelle date",
+    newTime: "Nouvelle heure",
     date: "Date",
     time: "Heure",
     location: "Lieu",
@@ -554,6 +587,17 @@ const translations = {
 
     pageNotFound: "404 Page introuvable",
     pageNotFoundDesc: "La page que vous cherchez n'existe pas.",
+
+    // Enhanced Request Form
+    step: "Etape",
+    itemCategories: "Categories d'articles",
+    overallCondition: "Etat general",
+    brandsOwned: "Marques",
+    brandsPlaceholder: "ex. Zara, H&M, Nike, Levi's...",
+    preferredDateFrom: "Disponible a partir du",
+    preferredDateTo: "Disponible jusqu'au",
+    preferredDates: "Dates souhaitees",
+    reviewRequest: "Resumé de votre demande",
 
     // Categories
     catTops: "Hauts",
