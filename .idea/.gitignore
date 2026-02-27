@@ -1,0 +1,56 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+__screenshots__
+playwright-report
+
+# next.js
+/.next/
+/dist/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+.vitest-attachments
+*.log
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# storybook
+storybook-static
+/public
+
+# TypeDoc gen
+/src/domain/*.mdx
+
+# sonar
+.scannerwork
+
+# VS Code settings
+.vscode/*
+.idea/*
