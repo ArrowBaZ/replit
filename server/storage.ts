@@ -24,6 +24,7 @@ export interface IStorage {
   updateRequest(id: number, data: Partial<Request>): Promise<Request | undefined>;
   acceptRequest(requestId: number, reusseId: string): Promise<Request | undefined>;
 
+  getItem(id: number): Promise<Item | undefined>;
   getItems(userId: string, role: string): Promise<Item[]>;
   getItemsByRequest(requestId: number): Promise<Item[]>;
   createItem(data: InsertItem): Promise<Item>;
@@ -116,6 +117,11 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(requests.id, requestId), eq(requests.status, "pending")))
       .returning();
     return request;
+  }
+
+  async getItem(id: number): Promise<Item | undefined> {
+    const [item] = await db.select().from(items).where(eq(items.id, id));
+    return item;
   }
 
   async getItems(userId: string, role: string): Promise<Item[]> {
@@ -257,25 +263,30 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsersWithProfiles(): Promise<any[]> {
     const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
-    const result = [];
-    for (const user of allUsers) {
-      const [profile] = await db.select().from(profiles).where(eq(profiles.userId, user.id));
-      result.push({ ...user, profile: profile || null });
-    }
-    return result;
+    if (allUsers.length === 0) return [];
+
+    const userIds = allUsers.map((u) => u.id);
+    const allProfiles = await db.select().from(profiles).where(inArray(profiles.userId, userIds));
+    const profileMap = new Map(allProfiles.map((p) => [p.userId, p]));
+
+    return allUsers.map((user) => ({
+      ...user,
+      profile: profileMap.get(user.id) || null,
+    }));
   }
 
   async getPendingReusses(): Promise<any[]> {
     const pendingProfiles = await db.select().from(profiles)
       .where(and(eq(profiles.role, "reusse"), eq(profiles.status, "pending")));
-    const result = [];
-    for (const profile of pendingProfiles) {
-      const [user] = await db.select().from(users).where(eq(users.id, profile.userId));
-      if (user) {
-        result.push({ ...user, profile });
-      }
-    }
-    return result;
+    if (pendingProfiles.length === 0) return [];
+
+    const userIds = pendingProfiles.map((p) => p.userId);
+    const pendingUsers = await db.select().from(users).where(inArray(users.id, userIds));
+    const userMap = new Map(pendingUsers.map((u) => [u.id, u]));
+
+    return pendingProfiles
+      .filter((profile) => userMap.has(profile.userId))
+      .map((profile) => ({ ...userMap.get(profile.userId)!, profile }));
   }
 
   async updateProfileStatus(userId: string, status: string): Promise<Profile | undefined> {

@@ -1,8 +1,76 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
+import { z } from "zod";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
+
+function validate(schema: z.ZodSchema) {
+  return (req: any, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      const errors = result.error.issues.map((i) => ({
+        field: i.path.join("."),
+        message: i.message,
+      }));
+      return res.status(400).json({ message: "Validation error", errors });
+    }
+    req.body = result.data;
+    next();
+  };
+}
+
+// Validation schemas for API inputs
+const createProfileBody = z.object({
+  role: z.enum(["seller", "reusse"]),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  postalCode: z.string().optional(),
+  department: z.string().optional(),
+  bio: z.string().optional(),
+  experience: z.string().optional(),
+  siretNumber: z.string().optional(),
+  preferredContactMethod: z.enum(["email", "phone", "sms"]).optional(),
+});
+
+const createRequestBody = z.object({
+  serviceType: z.enum(["classic", "express", "sos_dressing"]),
+  itemCount: z.number().int().min(1),
+  estimatedValue: z.string().or(z.number()).optional(),
+  categories: z.array(z.string()).optional(),
+  condition: z.string().optional(),
+  brands: z.string().optional(),
+  meetingLocation: z.string().optional(),
+  preferredDateStart: z.string().optional(),
+  preferredDateEnd: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+const createItemBody = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  brand: z.string().optional(),
+  size: z.string().optional(),
+  category: z.string().min(1, "Category is required"),
+  condition: z.string().min(1, "Condition is required"),
+  minPrice: z.string().or(z.number()).optional(),
+  maxPrice: z.string().or(z.number()).optional(),
+  photos: z.array(z.string()).optional(),
+});
+
+const createMeetingBody = z.object({
+  scheduledDate: z.string().min(1, "Date is required"),
+  location: z.string().min(1, "Location is required"),
+  notes: z.string().optional(),
+  duration: z.number().int().min(1).optional(),
+});
+
+const createMessageBody = z.object({
+  receiverId: z.string().min(1, "Receiver is required"),
+  content: z.string().min(1, "Content is required"),
+  requestId: z.number().int().optional(),
+});
 
 function requireAuth(req: any, res: Response, next: NextFunction) {
   if (!req.user?.claims?.sub) {
@@ -44,7 +112,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/profile", isAuthenticated, requireAuth, async (req: any, res) => {
+  app.post("/api/profile", isAuthenticated, requireAuth, validate(createProfileBody), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const existing = await storage.getProfile(userId);
@@ -126,9 +194,16 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/requests", isAuthenticated, requireAuth, async (req: any, res) => {
+  app.post("/api/requests", isAuthenticated, requireAuth, validate(createRequestBody), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+
+      // Role check: only sellers can create requests
+      const profile = await storage.getProfile(userId);
+      if (!profile || profile.role !== "seller") {
+        return res.status(403).json({ message: "Only sellers can create requests" });
+      }
+
       const { serviceType, itemCount, estimatedValue, categories, condition, brands, meetingLocation, preferredDateStart, preferredDateEnd, notes } = req.body;
       const request = await storage.createRequest({
         sellerId: userId,
@@ -193,7 +268,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/requests/:id/items", isAuthenticated, requireAuth, async (req: any, res) => {
+  app.post("/api/requests/:id/items", isAuthenticated, requireAuth, validate(createItemBody), async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const requestId = parseInt(req.params.id);
@@ -201,6 +276,12 @@ export async function registerRoutes(
       if (!request) {
         return res.status(404).json({ message: "Request not found" });
       }
+
+      // Role check: only the assigned reusse can add items
+      if (request.reusseId !== userId) {
+        return res.status(403).json({ message: "Only the assigned reseller can add items" });
+      }
+
       const { title, description, brand, size, category, condition, minPrice, maxPrice, photos } = req.body;
       const item = await storage.createItem({
         requestId,
@@ -259,7 +340,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/requests/:id/meetings", isAuthenticated, requireAuth, async (req: any, res) => {
+  app.post("/api/requests/:id/meetings", isAuthenticated, requireAuth, validate(createMeetingBody), async (req: any, res) => {
     try {
       const requestId = parseInt(req.params.id);
       const request = await storage.getRequest(requestId);
@@ -409,7 +490,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/messages", isAuthenticated, requireAuth, async (req: any, res) => {
+  app.post("/api/messages", isAuthenticated, requireAuth, validate(createMessageBody), async (req: any, res) => {
     try {
       const senderId = req.user.claims.sub;
       const { receiverId, content, requestId } = req.body;
@@ -507,6 +588,14 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
+
+      // Ownership check: only the seller can approve
+      const existingItem = await storage.getItem(id);
+      if (!existingItem) return res.status(404).json({ message: "Item not found" });
+      if (existingItem.sellerId !== userId) {
+        return res.status(403).json({ message: "Only the seller can approve item pricing" });
+      }
+
       const item = await storage.updateItem(id, {
         status: "approved",
         priceApprovedBySeller: true,
@@ -533,7 +622,16 @@ export async function registerRoutes(
 
   app.post("/api/items/:id/counter-offer", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
+
+      // Ownership check: only the seller can counter-offer
+      const existingItem = await storage.getItem(id);
+      if (!existingItem) return res.status(404).json({ message: "Item not found" });
+      if (existingItem.sellerId !== userId) {
+        return res.status(403).json({ message: "Only the seller can counter-offer" });
+      }
+
       const { minPrice, maxPrice } = req.body;
       const item = await storage.updateItem(id, {
         status: "pending_approval",
@@ -562,7 +660,16 @@ export async function registerRoutes(
 
   app.post("/api/items/:id/decline", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
+
+      // Ownership check: only the seller can decline
+      const existingItem = await storage.getItem(id);
+      if (!existingItem) return res.status(404).json({ message: "Item not found" });
+      if (existingItem.sellerId !== userId) {
+        return res.status(403).json({ message: "Only the seller can decline items" });
+      }
+
       const item = await storage.updateItem(id, {
         status: "returned",
         priceApprovedBySeller: false,
@@ -588,7 +695,16 @@ export async function registerRoutes(
 
   app.post("/api/items/:id/list", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
+
+      // Ownership check: only the assigned reusse can list
+      const existingItem = await storage.getItem(id);
+      if (!existingItem) return res.status(404).json({ message: "Item not found" });
+      if (existingItem.reusseId !== userId) {
+        return res.status(403).json({ message: "Only the assigned reseller can list items" });
+      }
+
       const { platformListedOn } = req.body;
       const item = await storage.updateItem(id, {
         status: "listed",
@@ -621,7 +737,16 @@ export async function registerRoutes(
 
   app.post("/api/items/:id/mark-sold", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
+
+      // Ownership check: only the assigned reusse can mark as sold
+      const existingItem = await storage.getItem(id);
+      if (!existingItem) return res.status(404).json({ message: "Item not found" });
+      if (existingItem.reusseId !== userId) {
+        return res.status(403).json({ message: "Only the assigned reseller can mark items as sold" });
+      }
+
       const { salePrice } = req.body;
       if (!salePrice || parseFloat(salePrice) <= 0) {
         return res.status(400).json({ message: "Valid sale price required" });
@@ -667,9 +792,15 @@ export async function registerRoutes(
 
   app.patch("/api/requests/:id/cancel", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
       const request = await storage.getRequest(id);
       if (!request) return res.status(404).json({ message: "Request not found" });
+
+      // Ownership check: only the seller (request owner) can cancel
+      if (request.sellerId !== userId) {
+        return res.status(403).json({ message: "Only the request owner can cancel" });
+      }
 
       const updated = await storage.updateRequest(id, { status: "cancelled" });
 
@@ -692,9 +823,15 @@ export async function registerRoutes(
 
   app.patch("/api/requests/:id/complete", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const id = parseInt(req.params.id);
       const request = await storage.getRequest(id);
       if (!request) return res.status(404).json({ message: "Request not found" });
+
+      // Ownership check: only seller or assigned reusse can complete
+      if (request.sellerId !== userId && request.reusseId !== userId) {
+        return res.status(403).json({ message: "Only the seller or assigned reseller can complete this request" });
+      }
 
       const updated = await storage.updateRequest(id, { status: "completed", completedAt: new Date() });
 
