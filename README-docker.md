@@ -18,11 +18,11 @@ docker-compose ps
 # Set the database URL
 export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sellzy"
 
-# Push Drizzle schema to create tables
-npm run db:push
+# Run Prisma migrations to create tables
+npm run db:migrate
 
 # Seed database with sample data
-npm run db:seed-sql
+npm run db:seed
 ```
 
 ### 3. Verify
@@ -32,7 +32,7 @@ npm run db:seed-sql
 psql $DATABASE_URL -c "\dt"
 
 # Expected tables:
-# users, sessions, profiles, requests, items, meetings, messages, notifications, transactions
+# _prisma_migrations, users, sessions, profiles, requests, items, meetings, messages, notifications, transactions
 ```
 
 ## Development Workflow
@@ -57,6 +57,33 @@ docker-compose down
 docker-compose down -v
 ```
 
+## Prisma Commands
+
+| Command | Purpose |
+|---------|---------|
+| `npm run db:migrate` | Apply pending migrations (interactive, dev only) |
+| `npm run db:migrate:reset` | Drop and re-apply all migrations (destructive) |
+| `npm run db:generate` | Regenerate Prisma Client types from schema |
+| `npm run db:studio` | Open Prisma Studio (visual DB browser) |
+| `npm run db:seed` | Run `prisma/seed.ts` to seed the database |
+| `npm run docker:reset` | Full reset: wipe volume, restart container, migrate, seed |
+
+### PrismaClient setup (Prisma 7)
+
+Prisma 7 requires a driver adapter. Use `@prisma/adapter-pg`:
+
+```typescript
+import pg from 'pg'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from '@prisma/client'
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
+const adapter = new PrismaPg(pool)
+export const prisma = new PrismaClient({ adapter })
+```
+
+The `prisma.config.ts` at the project root configures the datasource URL — no `url` field is needed in `prisma/schema.prisma`.
+
 ## Troubleshooting
 
 ### Database not ready?
@@ -80,14 +107,12 @@ psql postgresql://postgres:postgres@localhost:5432/sellzy -c "SELECT 1;"
 
 ```bash
 # WARNING: This deletes all data
-docker-compose down -v
-rm -rf postgres_data
-npm run db:push
+npm run docker:reset
 ```
 
 ## Notes
 
 - Uses PostgreSQL 16 (same as Replit)
 - Data persists in Docker volume `postgres_data`
-- No migrations - uses Drizzle push (`npm run db:push`)
+- Uses Prisma migrations (`npm run db:migrate`) — migration files live in `prisma/migrations/`
 - For production, change credentials in `docker-compose.yml` and `.env`

@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model items {
+  id                           Int            @id @default(autoincrement())
+  request_id                   Int?
+  seller_id                    String         @db.VarChar
+  reusse_id                    String?        @db.VarChar
+  title                        String         @db.VarChar(255)
+  description                  String?
+  brand                        String?        @db.VarChar(100)
+  size                         String?        @db.VarChar(20)
+  category                     String         @db.VarChar(20)
+  condition                    String         @db.VarChar(20)
+  photos                       String[]
+  min_price                    Decimal?       @db.Decimal
+  max_price                    Decimal?       @db.Decimal
+  approved_price               Decimal?       @db.Decimal
+  price_approved_by_seller     Boolean?       @default(false)
+  status                       String         @default("pending_approval") @db.VarChar(20)
+  listed_at                    DateTime?      @db.Timestamp(6)
+  sold_at                      DateTime?      @db.Timestamp(6)
+  sale_price                   Decimal?       @db.Decimal
+  platform_listed_on           String?        @db.VarChar(100)
+  created_at                   DateTime?      @default(now()) @db.Timestamp(6)
+  updated_at                   DateTime?      @default(now()) @db.Timestamp(6)
+  requests                     requests?      @relation(fields: [request_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "items_request_id_requests_id_fk")
+  users_items_reusse_idTousers users?         @relation("items_reusse_idTousers", fields: [reusse_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "items_reusse_id_users_id_fk")
+  users_items_seller_idTousers users          @relation("items_seller_idTousers", fields: [seller_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "items_seller_id_users_id_fk")
+  transactions                 transactions[]
+
+  @@index([reusse_id], map: "idx_items_reusse")
+  @@index([seller_id], map: "idx_items_seller")
+  @@index([status], map: "idx_items_status")
+}
+
+model meetings {
+  id             Int       @id @default(autoincrement())
+  request_id     Int
+  scheduled_date DateTime  @db.Timestamp(6)
+  location       String
+  duration       Int?      @default(60)
+  status         String    @default("scheduled") @db.VarChar(20)
+  notes          String?
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  requests       requests  @relation(fields: [request_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "meetings_request_id_requests_id_fk")
+}
+
+model messages {
+  id                                Int       @id @default(autoincrement())
+  sender_id                         String    @db.VarChar
+  receiver_id                       String    @db.VarChar
+  request_id                        Int?
+  content                           String
+  is_read                           Boolean?  @default(false)
+  created_at                        DateTime? @default(now()) @db.Timestamp(6)
+  users_messages_receiver_idTousers users     @relation("messages_receiver_idTousers", fields: [receiver_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "messages_receiver_id_users_id_fk")
+  requests                          requests? @relation(fields: [request_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "messages_request_id_requests_id_fk")
+  users_messages_sender_idTousers   users     @relation("messages_sender_idTousers", fields: [sender_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "messages_sender_id_users_id_fk")
+
+  @@index([receiver_id], map: "idx_messages_receiver")
+  @@index([request_id], map: "idx_messages_request")
+  @@index([sender_id], map: "idx_messages_sender")
+}
+
+model notifications {
+  id         Int       @id @default(autoincrement())
+  user_id    String    @db.VarChar
+  type       String    @db.VarChar(50)
+  title      String    @db.VarChar(255)
+  message    String
+  link       String?   @db.VarChar(500)
+  is_read    Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "notifications_user_id_users_id_fk")
+
+  @@index([user_id], map: "idx_notifications_user")
+}
+
+model profiles {
+  id                       Int       @id @default(autoincrement())
+  user_id                  String    @unique(map: "profiles_user_id_unique") @db.VarChar
+  role                     String    @db.VarChar(20)
+  phone                    String?   @db.VarChar(20)
+  address                  String?
+  city                     String?   @db.VarChar(100)
+  postal_code              String?   @db.VarChar(10)
+  department               String?   @db.VarChar(100)
+  bio                      String?
+  experience               String?
+  siret_number             String?   @db.VarChar(20)
+  status                   String?   @default("approved") @db.VarChar(20)
+  preferred_contact_method String?   @db.VarChar(20)
+  created_at               DateTime? @default(now()) @db.Timestamp(6)
+  updated_at               DateTime? @default(now()) @db.Timestamp(6)
+  users                    users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "profiles_user_id_users_id_fk")
+}
+
+model requests {
+  id                              Int            @id @default(autoincrement())
+  seller_id                       String         @db.VarChar
+  reusse_id                       String?        @db.VarChar
+  service_type                    String         @db.VarChar(20)
+  status                          String         @default("pending") @db.VarChar(20)
+  item_count                      Int
+  estimated_value                 Decimal?       @db.Decimal
+  categories                      String[]
+  item_condition                  String?        @db.VarChar(20)
+  brands                          String?
+  meeting_location                String?
+  preferred_date_start            DateTime?      @db.Timestamp(6)
+  preferred_date_end              DateTime?      @db.Timestamp(6)
+  notes                           String?
+  created_at                      DateTime?      @default(now()) @db.Timestamp(6)
+  updated_at                      DateTime?      @default(now()) @db.Timestamp(6)
+  completed_at                    DateTime?      @db.Timestamp(6)
+  items                           items[]
+  meetings                        meetings[]
+  messages                        messages[]
+  users_requests_reusse_idTousers users?         @relation("requests_reusse_idTousers", fields: [reusse_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "requests_reusse_id_users_id_fk")
+  users_requests_seller_idTousers users          @relation("requests_seller_idTousers", fields: [seller_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "requests_seller_id_users_id_fk")
+  transactions                    transactions[]
+
+  @@index([reusse_id], map: "idx_requests_reusse")
+  @@index([seller_id], map: "idx_requests_seller")
+  @@index([status], map: "idx_requests_status")
+}
+
+model sessions {
+  sid    String   @id @db.VarChar
+  sess   Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "IDX_session_expire")
+}
+
+model transactions {
+  id                                  Int       @id @default(autoincrement())
+  item_id                             Int?
+  request_id                          Int?
+  seller_id                           String    @db.VarChar
+  reusse_id                           String    @db.VarChar
+  sale_price                          Decimal   @db.Decimal
+  seller_earning                      Decimal   @db.Decimal
+  reusse_earning                      Decimal   @db.Decimal
+  status                              String    @default("completed") @db.VarChar(20)
+  created_at                          DateTime? @default(now()) @db.Timestamp(6)
+  items                               items?    @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_item_id_items_id_fk")
+  requests                            requests? @relation(fields: [request_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_request_id_requests_id_fk")
+  users_transactions_reusse_idTousers users     @relation("transactions_reusse_idTousers", fields: [reusse_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_reusse_id_users_id_fk")
+  users_transactions_seller_idTousers users     @relation("transactions_seller_idTousers", fields: [seller_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "transactions_seller_id_users_id_fk")
+
+  @@index([item_id], map: "idx_transactions_item")
+  @@index([reusse_id], map: "idx_transactions_reusse")
+  @@index([seller_id], map: "idx_transactions_seller")
+}
+
+model users {
+  id                                         String          @id @default(dbgenerated("gen_random_uuid()")) @db.VarChar
+  email                                      String?         @unique(map: "users_email_unique") @db.VarChar
+  first_name                                 String?         @db.VarChar
+  last_name                                  String?         @db.VarChar
+  profile_image_url                          String?         @db.VarChar
+  password                                   String?         @db.VarChar
+  created_at                                 DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at                                 DateTime?       @default(now()) @db.Timestamp(6)
+  items_items_reusse_idTousers               items[]         @relation("items_reusse_idTousers")
+  items_items_seller_idTousers               items[]         @relation("items_seller_idTousers")
+  messages_messages_receiver_idTousers       messages[]      @relation("messages_receiver_idTousers")
+  messages_messages_sender_idTousers         messages[]      @relation("messages_sender_idTousers")
+  notifications                              notifications[]
+  profiles                                   profiles?
+  requests_requests_reusse_idTousers         requests[]      @relation("requests_reusse_idTousers")
+  requests_requests_seller_idTousers         requests[]      @relation("requests_seller_idTousers")
+  transactions_transactions_reusse_idTousers transactions[]  @relation("transactions_reusse_idTousers")
+  transactions_transactions_seller_idTousers transactions[]  @relation("transactions_seller_idTousers")
+}
