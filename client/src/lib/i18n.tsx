@@ -159,6 +159,9 @@ const translations = {
     noMatchingItems: "No matching items",
     searchItems: "Search by name or brand...",
     allStatuses: "All statuses",
+    searchRequests: "Search by type, location...",
+    noMatchingRequests: "No requests match your search",
+    tryDifferentFilter: "Try adjusting your search or filter.",
     itemsWillAppear: "Items will appear here once a reseller adds them to your requests.",
 
     // Messages
@@ -487,6 +490,9 @@ const translations = {
     noMatchingItems: "Aucun article correspondant",
     searchItems: "Rechercher par nom ou marque...",
     allStatuses: "Tous les statuts",
+    searchRequests: "Rechercher par type, lieu...",
+    noMatchingRequests: "Aucune demande ne correspond",
+    tryDifferentFilter: "Essayez d'ajuster votre recherche ou filtre.",
     itemsWillAppear: "Les articles apparaitront ici une fois qu'un revendeur les ajoutera a vos demandes.",
 
     // Messages

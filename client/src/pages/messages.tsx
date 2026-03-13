@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Send, MessageSquare } from "lucide-react";
-import type { Message, User } from "@shared/schema";
+import type { Message } from "@shared/schema";
 
 interface Conversation {
   userId: string;
@@ -25,17 +25,56 @@ export default function MessagesPage() {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messageText, setMessageText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   const { data: conversations, isLoading: convsLoading } = useQuery<Conversation[]>({
     queryKey: ["/api/messages/conversations"],
-    refetchInterval: 5000,
   });
 
   const { data: chatMessages, isLoading: msgsLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages", selectedConversation],
     enabled: !!selectedConversation,
-    refetchInterval: 3000,
   });
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: "auth", userId: user.id }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "new_message" && data.message) {
+          const msg: Message = data.message;
+          const otherUserId = msg.senderId === user.id ? msg.receiverId : msg.senderId;
+          queryClient.setQueryData<Message[]>(
+            ["/api/messages", otherUserId],
+            (prev) => {
+              if (!prev) return [msg];
+              if (prev.some((m) => m.id === msg.id)) return prev;
+              return [...prev, msg];
+            }
+          );
+          queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
+        }
+      } catch {}
+    };
+
+    ws.onclose = () => {
+      wsRef.current = null;
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [user?.id]);
 
   const sendMessage = useMutation({
     mutationFn: async (data: { receiverId: string; content: string }) => {
@@ -43,8 +82,6 @@ export default function MessagesPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/messages", selectedConversation] });
-      queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
       setMessageText("");
     },
   });

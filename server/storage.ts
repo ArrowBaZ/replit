@@ -187,8 +187,8 @@ export class DatabaseStorage implements IStorage {
     }
 
     const conversations = [];
-    for (const [otherUserId, data] of conversationMap) {
-      const sortedMsgs = data.messages.sort((a, b) =>
+    for (const [otherUserId, data] of Array.from(conversationMap.entries())) {
+      const sortedMsgs = data.messages.sort((a: typeof data.messages[0], b: typeof data.messages[0]) =>
         new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
       );
       const [otherUser] = await db.select().from(users).where(eq(users.id, otherUserId));
@@ -202,7 +202,7 @@ export class DatabaseStorage implements IStorage {
             profileImageUrl: otherUser.profileImageUrl,
           },
           lastMessage: sortedMsgs[0],
-          unreadCount: sortedMsgs.filter((m) => m.receiverId === userId && !m.isRead).length,
+          unreadCount: sortedMsgs.filter((m: typeof data.messages[0]) => m.receiverId === userId && !m.isRead).length,
         });
       }
     }

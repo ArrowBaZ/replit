@@ -1,8 +1,22 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
+
+const wsClients = new Map<string, Set<WebSocket>>();
+
+export function broadcastToUser(userId: string, data: unknown) {
+  const clients = wsClients.get(userId);
+  if (!clients) return;
+  const payload = JSON.stringify(data);
+  Array.from(clients).forEach((ws) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(payload);
+    }
+  });
+}
 
 function requireAuth(req: any, res: Response, next: NextFunction) {
   if (!req.user?.claims?.sub) {
@@ -29,6 +43,25 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
   registerObjectStorageRoutes(app);
+
+  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+  wss.on("connection", (ws, req) => {
+    let userId: string | null = null;
+    ws.on("message", (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === "auth" && typeof msg.userId === "string") {
+          userId = msg.userId;
+          const uid = userId as string;
+          if (!wsClients.has(uid)) wsClients.set(uid, new Set());
+          wsClients.get(uid)!.add(ws);
+        }
+      } catch {}
+    });
+    ws.on("close", () => {
+      if (userId) wsClients.get(userId as string)?.delete(ws);
+    });
+  });
 
   app.get("/api/profile", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
@@ -419,6 +452,8 @@ export async function registerRoutes(
         content,
         requestId: requestId || null,
       });
+      broadcastToUser(receiverId, { type: "new_message", message });
+      broadcastToUser(senderId, { type: "new_message", message });
       res.json(message);
     } catch (error) {
       console.error("Error sending message:", error);

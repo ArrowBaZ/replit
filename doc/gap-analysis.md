@@ -92,14 +92,14 @@
 
 ---
 
-## Items That Can Be Fixed Without Your Input
+## Items Fixed (No Input Required)
 
-The following gaps can be resolved immediately without needing decisions from you:
+The following gaps have been resolved:
 
-| # | Item | Effort |
+| # | Item | Status |
 |---|------|--------|
-| 1 | Add search + status filter to the Requests List page (matching what Items List already has) | Small |
-| 2 | Upgrade messaging from polling to WebSocket (blueprint already installed) | Medium |
+| 1 | Add search + status filter to the Requests List page | ✅ Done — search by type/location/notes, filter by status (all/pending/matched/scheduled/in_progress/completed/cancelled) |
+| 2 | Upgrade messaging from polling to WebSocket | ✅ Done — WebSocket server on `/ws` path; messages push instantly to both sender and receiver in real time |
 
 ---
 
