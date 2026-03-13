@@ -74,3 +74,12 @@ client/src/
 - Items list filtering: search by name/brand, filter by status (pending_approval, approved, listed, sold)
 - Meeting management: cancel and reschedule meetings with notifications to other party
 - API endpoints: PATCH /api/meetings/:id/cancel, PATCH /api/meetings/:id/reschedule
+- UX fixes (8 items from gap analysis):
+  1. Seller preferred dates (preferredDateStart/End) shown in request detail for Reusse
+  2. Contact info card (phone, address) shown for the other party once request is matched (GET /api/requests/:id/contact)
+  3. Condition labels use translated values (t("condNew") etc.) instead of raw English strings
+  4. Counter-offer badge shown on item card when sellerCounterOffer=true and status=pending_approval
+  5. Mandatory decline reason inline form (textarea + confirm) replaces direct decline button
+  6. Duplicate article button for Reusse on all item cards (calls POST /api/items/:id/duplicate)
+  7. Declined item shows decline reason in a red callout
+  8. Item sold notification already existed in server; confirmed working

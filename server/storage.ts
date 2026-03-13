@@ -24,6 +24,7 @@ export interface IStorage {
   updateRequest(id: number, data: Partial<Request>): Promise<Request | undefined>;
   acceptRequest(requestId: number, reusseId: string): Promise<Request | undefined>;
 
+  getItem(id: number): Promise<Item | undefined>;
   getItems(userId: string, role: string): Promise<Item[]>;
   getItemsByRequest(requestId: number): Promise<Item[]>;
   createItem(data: InsertItem): Promise<Item>;
@@ -116,6 +117,11 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(requests.id, requestId), eq(requests.status, "pending")))
       .returning();
     return request;
+  }
+
+  async getItem(id: number): Promise<Item | undefined> {
+    const [item] = await db.select().from(items).where(eq(items.id, id));
+    return item;
   }
 
   async getItems(userId: string, role: string): Promise<Item[]> {

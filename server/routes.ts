@@ -1,7 +1,10 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import { eq } from "drizzle-orm";
 import { storage } from "./storage";
+import { db } from "./db";
+import { users } from "../shared/models/auth";
 import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage/routes";
 
@@ -156,6 +159,33 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching request:", error);
       res.status(500).json({ message: "Failed to fetch request" });
+    }
+  });
+
+  app.get("/api/requests/:id/contact", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const request = await storage.getRequest(id);
+      if (!request) return res.status(404).json({ message: "Request not found" });
+      if (userId !== request.sellerId && userId !== request.reusseId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const otherUserId = userId === request.sellerId ? request.reusseId : request.sellerId;
+      if (!otherUserId) return res.json(null);
+      const profile = await storage.getProfile(otherUserId);
+      const [userRow] = await db.select().from(users).where(eq(users.id, otherUserId));
+      res.json({
+        firstName: userRow?.firstName,
+        lastName: userRow?.lastName,
+        phone: profile?.phone,
+        address: profile?.address,
+        city: profile?.city,
+        role: profile?.role,
+      });
+    } catch (error) {
+      console.error("Error fetching contact:", error);
+      res.status(500).json({ message: "Failed to fetch contact" });
     }
   });
 
@@ -575,6 +605,7 @@ export async function registerRoutes(
         minPrice: minPrice || null,
         maxPrice: maxPrice || null,
         priceApprovedBySeller: false,
+        sellerCounterOffer: true,
         updatedAt: new Date(),
       });
       if (!item) return res.status(404).json({ message: "Item not found" });
@@ -583,8 +614,8 @@ export async function registerRoutes(
         await storage.createNotification({
           userId: item.reusseId,
           type: "counter_offer",
-          title: "Counter Offer",
-          message: `Seller suggested a different price for "${item.title}".`,
+          title: "Contre-offre vendeur",
+          message: `Le vendeur a proposé un nouveau prix pour "${item.title}" : ${minPrice} - ${maxPrice} EUR.`,
           link: `/requests/${item.requestId}`,
         });
       }
@@ -598,9 +629,14 @@ export async function registerRoutes(
   app.post("/api/items/:id/decline", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const { reason } = req.body;
+      if (!reason || !reason.trim()) {
+        return res.status(400).json({ message: "A decline reason is required" });
+      }
       const item = await storage.updateItem(id, {
         status: "returned",
         priceApprovedBySeller: false,
+        declineReason: reason.trim(),
         updatedAt: new Date(),
       });
       if (!item) return res.status(404).json({ message: "Item not found" });
@@ -609,8 +645,8 @@ export async function registerRoutes(
         await storage.createNotification({
           userId: item.reusseId,
           type: "item_declined",
-          title: "Item Declined",
-          message: `Seller declined "${item.title}".`,
+          title: "Article refusé",
+          message: `Le vendeur a refusé "${item.title}". Raison : ${reason.trim()}`,
           link: `/requests/${item.requestId}`,
         });
       }
@@ -618,6 +654,36 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error declining item:", error);
       res.status(500).json({ message: "Failed to decline item" });
+    }
+  });
+
+  app.post("/api/items/:id/duplicate", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const original = await storage.getItem(id);
+      if (!original) return res.status(404).json({ message: "Item not found" });
+      if (original.reusseId !== userId) return res.status(403).json({ message: "Not authorized" });
+
+      const duplicate = await storage.createItem({
+        requestId: original.requestId || undefined,
+        sellerId: original.sellerId,
+        reusseId: original.reusseId || undefined,
+        title: original.title,
+        description: original.description || undefined,
+        brand: original.brand || undefined,
+        size: original.size || undefined,
+        category: original.category,
+        condition: original.condition,
+        photos: original.photos || undefined,
+        minPrice: original.minPrice || undefined,
+        maxPrice: original.maxPrice || undefined,
+        status: "pending_approval",
+      });
+      res.json(duplicate);
+    } catch (error) {
+      console.error("Error duplicating item:", error);
+      res.status(500).json({ message: "Failed to duplicate item" });
     }
   });
 

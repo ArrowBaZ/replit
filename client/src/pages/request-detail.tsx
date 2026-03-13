@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Request, Item, Meeting, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle } from "lucide-react";
 import { useState, useRef } from "react";
 import { useUpload } from "@/hooks/use-upload";
 
@@ -34,7 +34,7 @@ const itemStatusColors: Record<string, string> = {
   listed: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
   sold: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   unsold: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-  returned: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+  returned: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
   donated: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
 };
 
@@ -63,6 +63,28 @@ export default function RequestDetailPage() {
     queryKey: ["/api/requests", params.id, "meetings"],
   });
 
+  const { data: contactInfo } = useQuery<{
+    firstName: string | null;
+    lastName: string | null;
+    phone: string | null;
+    address: string | null;
+    city: string | null;
+    role: string | null;
+  } | null>({
+    queryKey: ["/api/requests", params.id, "contact"],
+    enabled: !!request && (!!request.reusseId),
+  });
+
+  const conditionLabel = (cond: string | null): string => {
+    const map: Record<string, string> = {
+      new_with_tags: t("condNew"),
+      like_new: t("condLikeNew"),
+      good: t("condGood"),
+      fair: t("condFair"),
+    };
+    return cond ? (map[cond] || cond.replace(/_/g, " ")) : "";
+  };
+
   const acceptRequest = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/requests/${params.id}/accept`);
@@ -71,7 +93,7 @@ export default function RequestDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/requests"] });
-      toast({ title: "Request accepted!" });
+      toast({ title: t("acceptRequest") });
     },
   });
 
@@ -102,6 +124,21 @@ export default function RequestDetailPage() {
     setItemPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const openAddItemPrefilled = (item: Item) => {
+    setItemForm({
+      title: item.title,
+      description: item.description || "",
+      brand: item.brand || "",
+      size: item.size || "",
+      category: item.category,
+      condition: item.condition,
+      minPrice: item.minPrice || "",
+      maxPrice: item.maxPrice || "",
+    });
+    setItemPhotos(item.photos || []);
+    setShowAddItem(true);
+  };
+
   const addItem = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", `/api/requests/${params.id}/items`, data);
@@ -112,7 +149,7 @@ export default function RequestDetailPage() {
       setShowAddItem(false);
       setItemForm({ title: "", description: "", brand: "", size: "", category: "clothing", condition: "good", minPrice: "", maxPrice: "" });
       setItemPhotos([]);
-      toast({ title: "Item added" });
+      toast({ title: t("addItem") });
     },
   });
 
@@ -127,7 +164,7 @@ export default function RequestDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "meetings"] });
       setShowScheduleMeeting(false);
       setMeetingForm({ date: "", time: "", location: "", notes: "" });
-      toast({ title: "Meeting scheduled" });
+      toast({ title: t("scheduleMeeting") });
     },
   });
 
@@ -140,6 +177,8 @@ export default function RequestDetailPage() {
   const [listPlatform, setListPlatform] = useState("");
   const [showReschedule, setShowReschedule] = useState<number | null>(null);
   const [rescheduleForm, setRescheduleForm] = useState({ date: "", time: "", location: "" });
+  const [showDeclineReason, setShowDeclineReason] = useState<number | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
 
   const approveItem = useMutation({
     mutationFn: async (itemId: number) => {
@@ -167,13 +206,26 @@ export default function RequestDetailPage() {
   });
 
   const declineItem = useMutation({
-    mutationFn: async (itemId: number) => {
-      const res = await apiRequest("POST", `/api/items/${itemId}/decline`, {});
+    mutationFn: async ({ itemId, reason }: { itemId: number; reason: string }) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/decline`, { reason });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      setShowDeclineReason(null);
+      setDeclineReason("");
       toast({ title: t("itemDeclined") });
+    },
+  });
+
+  const duplicateItem = useMutation({
+    mutationFn: async (itemId: number) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/duplicate`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      toast({ title: t("duplicateItem") });
     },
   });
 
@@ -295,6 +347,49 @@ export default function RequestDetailPage() {
   const isAssigned = request.reusseId === user?.id;
   const canAccept = isReusse && request.status === "pending" && !request.reusseId;
 
+  const ItemPhotoUploadArea = () => (
+    <div className="space-y-2">
+      <Label>{t("photos")}</Label>
+      <div className="flex flex-wrap gap-2">
+        {itemPhotos.map((photo, idx) => (
+          <div key={idx} className="relative h-16 w-16 rounded-md overflow-hidden border">
+            <img src={photo} alt="" className="h-full w-full object-cover" />
+            <button
+              type="button"
+              onClick={() => removePhoto(idx)}
+              className="absolute top-0 right-0 bg-black/60 rounded-bl-md p-0.5"
+              data-testid={`button-remove-photo-${idx}`}
+            >
+              <X className="h-3 w-3 text-white" />
+            </button>
+          </div>
+        ))}
+        {itemPhotos.length < MAX_PHOTOS && (
+          <label
+            className="h-16 w-16 rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-[hsl(var(--success))] transition-colors"
+            data-testid="button-upload-photo"
+          >
+            {isUploadingPhoto ? (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            ) : (
+              <Camera className="h-5 w-5 text-muted-foreground" />
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handlePhotoUpload}
+              disabled={isUploadingPhoto}
+            />
+          </label>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">{t("photoHint")}</p>
+    </div>
+  );
+
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
@@ -342,7 +437,7 @@ export default function RequestDetailPage() {
             <MapPin className="h-5 w-5 text-muted-foreground" />
             <div>
               <p className="text-xs text-muted-foreground">{t("location")}</p>
-              <p className="text-sm font-medium truncate">{request.meetingLocation || "Not specified"}</p>
+              <p className="text-sm font-medium truncate">{request.meetingLocation || t("notSpecified")}</p>
             </div>
           </CardContent>
         </Card>
@@ -351,17 +446,58 @@ export default function RequestDetailPage() {
             <Clock className="h-5 w-5 text-muted-foreground" />
             <div>
               <p className="text-xs text-muted-foreground">{t("estimatedValue")}</p>
-              <p className="text-sm font-medium">{request.estimatedValue ? `${request.estimatedValue} EUR` : "Not specified"}</p>
+              <p className="text-sm font-medium">{request.estimatedValue ? `${request.estimatedValue} EUR` : t("notSpecified")}</p>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {(request.preferredDateStart || request.preferredDateEnd) && (
+        <Card>
+          <CardContent className="p-4 flex items-start gap-3">
+            <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">{t("sellerAvailability")}</p>
+              <div className="flex flex-wrap gap-4 text-sm">
+                {request.preferredDateStart && (
+                  <span><span className="text-muted-foreground text-xs">{t("availableFrom")}: </span><span className="font-medium">{new Date(request.preferredDateStart).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long", year: "numeric" })}</span></span>
+                )}
+                {request.preferredDateEnd && (
+                  <span><span className="text-muted-foreground text-xs">{t("availableTo")}: </span><span className="font-medium">{new Date(request.preferredDateEnd).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long", year: "numeric" })}</span></span>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {request.notes && (
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground mb-1">{t("notes")}</p>
             <p className="text-sm">{request.notes}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {contactInfo && (
+        <Card className="border-blue-200 dark:border-blue-800">
+          <CardContent className="p-4 flex items-start gap-3">
+            <Phone className="h-5 w-5 text-blue-500 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="text-xs text-muted-foreground mb-1">
+                {isReusse ? t("sellerContact") : t("reusseContact")}
+              </p>
+              <p className="text-sm font-medium">{contactInfo.firstName} {contactInfo.lastName}</p>
+              {contactInfo.phone ? (
+                <p className="text-sm text-blue-600 dark:text-blue-400">{contactInfo.phone}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">{t("notSpecified")}</p>
+              )}
+              {contactInfo.address && (
+                <p className="text-xs text-muted-foreground">{contactInfo.address}{contactInfo.city ? `, ${contactInfo.city}` : ""}</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -374,13 +510,13 @@ export default function RequestDetailPage() {
 
         <TabsContent value="items" className="space-y-3">
           {(isReusse && isAssigned) && (
-            <Dialog open={showAddItem} onOpenChange={setShowAddItem}>
+            <Dialog open={showAddItem} onOpenChange={(open) => { setShowAddItem(open); if (!open) { setItemForm({ title: "", description: "", brand: "", size: "", category: "clothing", condition: "good", minPrice: "", maxPrice: "" }); setItemPhotos([]); } }}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline" data-testid="button-add-item">
                   <Plus className="h-3.5 w-3.5 mr-1" /> {t("addItem")}
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>{t("addItem")}</DialogTitle></DialogHeader>
                 <form onSubmit={(e) => { e.preventDefault(); addItem.mutate({ ...itemForm, photos: itemPhotos.length > 0 ? itemPhotos : undefined }); }} className="space-y-3">
                   <div className="space-y-2">
@@ -409,6 +545,7 @@ export default function RequestDetailPage() {
                           <SelectItem value="outerwear">{t("catOuterwear")}</SelectItem>
                           <SelectItem value="shoes">{t("catShoes")}</SelectItem>
                           <SelectItem value="accessories">{t("catAccessories")}</SelectItem>
+                          <SelectItem value="clothing">{t("catTops")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -439,48 +576,9 @@ export default function RequestDetailPage() {
                     <Label>{t("description")}</Label>
                     <Textarea value={itemForm.description} onChange={(e) => setItemForm({...itemForm, description: e.target.value})} className="resize-none" rows={2} data-testid="input-item-description" />
                   </div>
-                  <div className="space-y-2">
-                    <Label>{t("photos")}</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {itemPhotos.map((photo, idx) => (
-                        <div key={idx} className="relative h-16 w-16 rounded-md overflow-hidden border">
-                          <img src={photo} alt="" className="h-full w-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => removePhoto(idx)}
-                            className="absolute top-0 right-0 bg-black/60 rounded-bl-md p-0.5"
-                            data-testid={`button-remove-photo-${idx}`}
-                          >
-                            <X className="h-3 w-3 text-white" />
-                          </button>
-                        </div>
-                      ))}
-                      {itemPhotos.length < MAX_PHOTOS && (
-                        <label
-                          className="h-16 w-16 rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer hover:border-[hsl(var(--success))] transition-colors"
-                          data-testid="button-upload-photo"
-                        >
-                          {isUploadingPhoto ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                          ) : (
-                            <Camera className="h-5 w-5 text-muted-foreground" />
-                          )}
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            className="hidden"
-                            onChange={handlePhotoUpload}
-                            disabled={isUploadingPhoto}
-                          />
-                        </label>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{t("photoHint")}</p>
-                  </div>
+                  <ItemPhotoUploadArea />
                   <Button type="submit" className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" disabled={addItem.isPending || isUploadingPhoto} data-testid="button-submit-item">
-                    {addItem.isPending ? "Adding..." : t("addItem")}
+                    {addItem.isPending ? "..." : t("addItem")}
                   </Button>
                 </form>
               </DialogContent>
@@ -509,7 +607,7 @@ export default function RequestDetailPage() {
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                           {item.brand && <span className="text-xs text-muted-foreground">{item.brand}</span>}
                           {item.size && <span className="text-xs text-muted-foreground">{t("size")} {item.size}</span>}
-                          <span className="text-xs text-muted-foreground capitalize">{item.condition?.replace(/_/g, " ")}</span>
+                          <span className="text-xs text-muted-foreground">{conditionLabel(item.condition)}</span>
                         </div>
                         {item.minPrice && item.maxPrice && (
                           <p className="text-xs text-muted-foreground mt-1">{item.minPrice} - {item.maxPrice} EUR</p>
@@ -538,6 +636,19 @@ export default function RequestDetailPage() {
                     </Badge>
                   </div>
 
+                  {(item as any).sellerCounterOffer && item.status === "pending_approval" && isReusse && (
+                    <div className="ml-[4.25rem] flex items-center gap-1.5 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-md px-3 py-1.5 text-xs font-medium">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      {t("sellerCounterOfferBadge")}
+                    </div>
+                  )}
+
+                  {item.status === "returned" && item.declineReason && (
+                    <div className="ml-[4.25rem] text-xs text-muted-foreground bg-red-50 dark:bg-red-900/20 rounded-md px-3 py-1.5">
+                      <span className="font-medium text-red-600 dark:text-red-400">{t("itemDeclinedReason")}</span> {item.declineReason}
+                    </div>
+                  )}
+
                   {isSeller && item.status === "pending_approval" && (
                     <div className="flex flex-wrap gap-2 ml-[4.25rem]">
                       <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approveItem.mutate(item.id)} disabled={approveItem.isPending} data-testid={`button-approve-${item.id}`}>
@@ -546,7 +657,7 @@ export default function RequestDetailPage() {
                       <Button size="sm" variant="outline" onClick={() => setShowCounterOffer(item.id)} data-testid={`button-counter-${item.id}`}>
                         <DollarSign className="h-3.5 w-3.5 mr-1" /> {t("counterOffer")}
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => declineItem.mutate(item.id)} disabled={declineItem.isPending} data-testid={`button-decline-${item.id}`}>
+                      <Button size="sm" variant="destructive" onClick={() => { setShowDeclineReason(item.id); setDeclineReason(""); }} data-testid={`button-decline-${item.id}`}>
                         <ThumbsDown className="h-3.5 w-3.5 mr-1" /> {t("declineItem")}
                       </Button>
                     </div>
@@ -569,6 +680,28 @@ export default function RequestDetailPage() {
                           {t("counterOffer")}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setShowCounterOffer(null)}>{t("back")}</Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {showDeclineReason === item.id && (
+                    <div className="ml-[4.25rem] p-3 bg-red-50 dark:bg-red-900/20 rounded-lg space-y-2 border border-red-200 dark:border-red-800">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-red-700 dark:text-red-400">{t("declineReason")}</Label>
+                        <Textarea
+                          value={declineReason}
+                          onChange={(e) => setDeclineReason(e.target.value)}
+                          placeholder={t("declineReasonPlaceholder")}
+                          className="resize-none text-sm"
+                          rows={2}
+                          data-testid="input-decline-reason"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="destructive" onClick={() => declineItem.mutate({ itemId: item.id, reason: declineReason })} disabled={declineItem.isPending || !declineReason.trim()} data-testid="button-confirm-decline">
+                          {t("declineItem")}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowDeclineReason(null)}>{t("back")}</Button>
                       </div>
                     </div>
                   )}
@@ -624,6 +757,24 @@ export default function RequestDetailPage() {
                       </div>
                     </div>
                   )}
+
+                  {isReusse && isAssigned && (item.status === "returned" || item.status === "sold" || item.status === "listed" || item.status === "approved" || item.status === "pending_approval") && (
+                    <div className="ml-[4.25rem]">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => duplicateItem.mutate(item.id)}
+                        disabled={duplicateItem.isPending}
+                        data-testid={`button-duplicate-${item.id}`}
+                      >
+                        <Copy className="h-3 w-3 mr-1" /> {t("duplicateItem")}
+                      </Button>
+                      {item.status === "returned" && (
+                        <p className="text-xs text-muted-foreground mt-1">{t("declinedItemHint")}</p>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))
@@ -674,7 +825,7 @@ export default function RequestDetailPage() {
                     <Textarea value={meetingForm.notes} onChange={(e) => setMeetingForm({...meetingForm, notes: e.target.value})} className="resize-none" rows={2} data-testid="input-meeting-notes" />
                   </div>
                   <Button type="submit" className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" disabled={scheduleMeeting.isPending} data-testid="button-submit-meeting">
-                    {scheduleMeeting.isPending ? "Scheduling..." : t("scheduleMeeting")}
+                    {scheduleMeeting.isPending ? "..." : t("scheduleMeeting")}
                   </Button>
                 </form>
               </DialogContent>

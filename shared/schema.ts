@@ -76,6 +76,8 @@ export const items = pgTable("items", {
   maxPrice: numeric("max_price"),
   approvedPrice: numeric("approved_price"),
   priceApprovedBySeller: boolean("price_approved_by_seller").default(false),
+  sellerCounterOffer: boolean("seller_counter_offer").default(false),
+  declineReason: text("decline_reason"),
   status: varchar("status", { length: 20 }).notNull().default("pending_approval"),
   listedAt: timestamp("listed_at"),
   soldAt: timestamp("sold_at"),
