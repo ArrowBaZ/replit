@@ -23,6 +23,7 @@ import {
   transactions,
   type Transaction,
   type InsertTransaction,
+  moderationActions,
   type User,
 } from "@shared/schema";
 
@@ -82,6 +83,10 @@ export interface IStorage {
     userId: string,
     role: string,
   ): Promise<{ total: number; transactions: Transaction[] }>;
+
+  getAdminRequests(status?: string): Promise<any[]>;
+  logModerationAction(data: { requestId: number; adminId: string; action: string; reason?: string; metadata?: string }): Promise<any>;
+  getModerationActions(requestId: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -513,6 +518,52 @@ export class DatabaseStorage implements IStorage {
       return sum + (isNaN(earning) ? 0 : earning);
     }, 0);
     return { total, transactions: txns };
+  }
+
+  async getAdminRequests(status?: string): Promise<any[]> {
+    const rows = await db
+      .select({
+        request: requests,
+        sellerProfile: profiles,
+        sellerUser: users,
+      })
+      .from(requests)
+      .leftJoin(profiles, eq(profiles.userId, requests.sellerId))
+      .leftJoin(users, eq(users.id, requests.sellerId))
+      .orderBy(desc(requests.createdAt));
+
+    const filtered = status ? rows.filter(r => r.request.status === status) : rows;
+    return filtered.map(r => ({
+      ...r.request,
+      seller: {
+        firstName: r.sellerUser?.firstName,
+        lastName: r.sellerUser?.lastName,
+        email: r.sellerUser?.email,
+        profileImageUrl: r.sellerUser?.profileImageUrl,
+        phone: r.sellerProfile?.phone,
+        address: r.sellerProfile?.address,
+        city: r.sellerProfile?.city,
+        department: r.sellerProfile?.department,
+      },
+    }));
+  }
+
+  async logModerationAction(data: { requestId: number; adminId: string; action: string; reason?: string; metadata?: string }): Promise<any> {
+    const [row] = await db.insert(moderationActions).values(data).returning();
+    return row;
+  }
+
+  async getModerationActions(requestId: number): Promise<any[]> {
+    const rows = await db
+      .select({ action: moderationActions, admin: users })
+      .from(moderationActions)
+      .leftJoin(users, eq(users.id, moderationActions.adminId))
+      .where(eq(moderationActions.requestId, requestId))
+      .orderBy(desc(moderationActions.createdAt));
+    return rows.map(r => ({
+      ...r.action,
+      adminName: r.admin ? `${r.admin.firstName || ""} ${r.admin.lastName || ""}`.trim() || r.admin.email : "Admin",
+    }));
   }
 }
 

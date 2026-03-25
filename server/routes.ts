@@ -68,22 +68,22 @@ const itemFields = {
 };
 
 const CATEGORY_ALLOWED_FIELDS: Partial<Record<typeof ITEM_CATEGORIES[number], string[]>> = {
-  vetements: ["brand", "size", "condition"],
-  tout_mode: [],
-  montres_bijoux: ["brand", "material", "condition", "certificatePhotos"],
-  accessoires_bagagerie: ["brand", "subcategory", "condition", "certificatePhotos"],
-  ameublement: ["brand", "material", "dimensions", "condition"],
-  electromenager: ["brand", "applianceType", "condition"],
+  all_fashion: [],
+  clothing: ["brand", "size", "condition"],
+  watches_jewelry: ["brand", "material", "condition", "certificatePhotos"],
+  accessories_bags: ["brand", "subcategory", "condition", "certificatePhotos"],
+  furniture: ["brand", "material", "dimensions", "condition"],
+  home_appliances: ["brand", "applianceType", "condition"],
   decoration: ["decorStyle", "material", "condition"],
-  linge_de_maison: ["subcategory", "size", "condition"],
-  electronique: ["brand", "subcategory", "condition"],
-  ordinateurs: ["brand", "ram", "deviceStorage", "condition"],
-  telephones_objets_connectes: ["brand", "model", "deviceStorage", "condition"],
-  livres: ["author", "genre", "language", "condition"],
-  vins: ["subcategory", "vintage", "volume"],
-  instruments_de_musique: ["instrumentType", "brand", "condition"],
-  jeux_jouets: ["ageRange", "brand", "condition"],
-  velos: ["brand", "subcategory", "frameSize", "condition"],
+  home_linen: ["subcategory", "size", "condition"],
+  electronics: ["brand", "subcategory", "condition"],
+  computers: ["brand", "ram", "deviceStorage", "condition"],
+  phones_wearables: ["brand", "model", "deviceStorage", "condition"],
+  books: ["author", "genre", "language", "condition"],
+  wines: ["subcategory", "vintage", "volume"],
+  musical_instruments: ["instrumentType", "brand", "condition"],
+  games_toys: ["ageRange", "brand", "condition"],
+  bicycles: ["brand", "subcategory", "frameSize", "condition"],
 };
 
 const CATEGORY_CONSTRAINED_FIELDS = [
@@ -930,6 +930,81 @@ export async function registerRoutes(
       }
     },
   );
+
+  app.get("/api/admin/requests", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const result = await storage.getAdminRequests(status);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching admin requests:", error);
+      res.status(500).json({ message: "Failed to fetch requests" });
+    }
+  });
+
+  app.post("/api/admin/requests/:id/flag", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const { reason } = req.body;
+      const request = await storage.getRequest(id);
+      if (!request) return res.status(404).json({ message: "Request not found" });
+      const updated = await storage.updateRequest(id, { status: "flagged" });
+      await storage.createNotification({ userId: request.sellerId, type: "moderation_flag", message: `Your request #${id} has been flagged for review.${reason ? ` Reason: ${reason}` : ""}` });
+      await storage.logModerationAction({ requestId: id, adminId, action: "flag", reason });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error flagging request:", error);
+      res.status(500).json({ message: "Failed to flag request" });
+    }
+  });
+
+  app.post("/api/admin/requests/:id/message", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const { message } = req.body;
+      const request = await storage.getRequest(id);
+      if (!request) return res.status(404).json({ message: "Request not found" });
+      const notification = await storage.createNotification({ userId: request.sellerId, type: "admin_message", message: `Admin message for your request #${id}: ${message}` });
+      await storage.logModerationAction({ requestId: id, adminId, action: "message", metadata: message });
+      res.json(notification);
+    } catch (error) {
+      console.error("Error sending admin message:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  app.post("/api/admin/requests/:id/reject", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const { reason } = req.body;
+      const request = await storage.getRequest(id);
+      if (!request) return res.status(404).json({ message: "Request not found" });
+      const updated = await storage.updateRequest(id, { status: "cancelled" });
+      await storage.createNotification({ userId: request.sellerId, type: "moderation_reject", message: `Your request #${id} has been rejected.${reason ? ` Reason: ${reason}` : ""}` });
+      if (request.reusseId) {
+        await storage.createNotification({ userId: request.reusseId, type: "moderation_reject", message: `Request #${id} you were assigned to has been cancelled by an admin.` });
+      }
+      await storage.logModerationAction({ requestId: id, adminId, action: "reject", reason });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error rejecting request:", error);
+      res.status(500).json({ message: "Failed to reject request" });
+    }
+  });
+
+  app.get("/api/admin/requests/:id/moderation", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const actions = await storage.getModerationActions(id);
+      res.json(actions);
+    } catch (error) {
+      console.error("Error fetching moderation history:", error);
+      res.status(500).json({ message: "Failed to fetch moderation history" });
+    }
+  });
 
   app.patch(
     "/api/items/:id",

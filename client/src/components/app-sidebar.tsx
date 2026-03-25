@@ -72,7 +72,7 @@ export function AppSidebar() {
     { title: t("dashboard"), url: "/dashboard", icon: LayoutDashboard },
     { title: t("users"), url: "/admin/users", icon: Users },
     { title: t("applications"), url: "/admin/applications", icon: Shield },
-    { title: t("myRequests"), url: "/requests", icon: ClipboardList },
+    { title: t("adminRequests"), url: "/admin/requests", icon: ClipboardList },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
   ];
 

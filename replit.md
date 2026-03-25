@@ -82,6 +82,7 @@ client/src/
 - Items list filtering: search by name/brand, filter by status (pending_approval, approved, listed, sold)
 - Meeting management: cancel and reschedule meetings with notifications to other party
 - API endpoints: PATCH /api/meetings/:id/cancel, PATCH /api/meetings/:id/reschedule
+- Admin Listing View (PRD 2.6): `moderation_actions` table in schema, admin API endpoints (GET list + filter, POST flag/message/reject, GET moderation history), `/admin/requests` page with search + status filter + Flag/Message/Reject modals with bilingual i18n
 - UX fixes (8 items from gap analysis):
   1. Seller preferred dates (preferredDateStart/End) shown in request detail for Reusse
   2. Contact info card (phone, address) shown for the other party once request is matched (GET /api/requests/:id/contact)

@@ -61,22 +61,22 @@ export const requestsRelations = relations(requests, ({ one, many }) => ({
 }));
 
 export const ITEM_CATEGORIES = [
-  "tout_mode",
-  "vetements",
-  "montres_bijoux",
-  "accessoires_bagagerie",
-  "ameublement",
-  "electromenager",
+  "all_fashion",
+  "clothing",
+  "watches_jewelry",
+  "accessories_bags",
+  "furniture",
+  "home_appliances",
   "decoration",
-  "linge_de_maison",
-  "electronique",
-  "ordinateurs",
-  "telephones_objets_connectes",
-  "livres",
-  "vins",
-  "instruments_de_musique",
-  "jeux_jouets",
-  "velos",
+  "home_linen",
+  "electronics",
+  "computers",
+  "phones_wearables",
+  "books",
+  "wines",
+  "musical_instruments",
+  "games_toys",
+  "bicycles",
 ] as const;
 
 export type ItemCategory = typeof ITEM_CATEGORIES[number];
@@ -211,6 +211,24 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
   reusse: one(users, { fields: [transactions.reusseId], references: [users.id], relationName: "reusseTransactions" }),
 }));
 
+export const moderationActions = pgTable("moderation_actions", {
+  id: serial("id").primaryKey(),
+  requestId: integer("request_id").notNull().references(() => requests.id),
+  adminId: varchar("admin_id").notNull().references(() => users.id),
+  action: varchar("action", { length: 20 }).notNull(),
+  reason: text("reason"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_moderation_request").on(table.requestId),
+  index("idx_moderation_admin").on(table.adminId),
+]);
+
+export const moderationActionsRelations = relations(moderationActions, ({ one }) => ({
+  request: one(requests, { fields: [moderationActions.requestId], references: [requests.id] }),
+  admin: one(users, { fields: [moderationActions.adminId], references: [users.id] }),
+}));
+
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRequestSchema = createInsertSchema(requests).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
 export const insertItemSchema = createInsertSchema(items).omit({ id: true, createdAt: true, updatedAt: true, listedAt: true, soldAt: true });
@@ -233,3 +251,4 @@ export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+export type ModerationAction = typeof moderationActions.$inferSelect;

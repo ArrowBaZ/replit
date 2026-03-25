@@ -23,6 +23,7 @@ import MessagesPage from "@/pages/messages";
 import ItemsListPage from "@/pages/items-list";
 import ProfilePage from "@/pages/profile";
 import SchedulePage from "@/pages/schedule";
+import AdminRequestsPage from "@/pages/admin-requests";
 import FaqPage from "@/pages/faq";
 import ContactPage from "@/pages/contact";
 import TermsPage from "@/pages/terms";
@@ -65,6 +66,7 @@ function AuthenticatedRouter() {
       <Route path="/schedule" component={SchedulePage} />
       <Route path="/admin/users">{() => <AdminDashboard />}</Route>
       <Route path="/admin/applications">{() => <AdminDashboard />}</Route>
+      <Route path="/admin/requests" component={AdminRequestsPage} />
       <Route path="/faq" component={FaqPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/terms" component={TermsPage} />

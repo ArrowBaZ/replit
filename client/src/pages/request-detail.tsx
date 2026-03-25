@@ -99,7 +99,7 @@ export default function RequestDetailPage() {
   });
 
   const emptyItemForm = {
-    title: "", description: "", brand: "", size: "", category: "vetements" as ItemCategory, condition: "good",
+    title: "", description: "", brand: "", size: "", category: "clothing" as ItemCategory, condition: "good",
     minPrice: "", maxPrice: "", material: "", dimensions: "", author: "", genre: "", language: "",
     vintage: "", ageRange: "", model: "", deviceStorage: "", ram: "", volume: "", frameSize: "",
     instrumentType: "", applianceType: "", decorStyle: "", subcategory: "",
@@ -159,7 +159,7 @@ export default function RequestDetailPage() {
       description: item.description || "",
       brand: item.brand || "",
       size: item.size || "",
-      category: (ITEM_CATEGORIES.includes(item.category as ItemCategory) ? item.category : "vetements") as ItemCategory,
+      category: (ITEM_CATEGORIES.includes(item.category as ItemCategory) ? item.category : "clothing") as ItemCategory,
       condition: item.condition || "good",
       minPrice: item.minPrice || "",
       maxPrice: item.maxPrice || "",
@@ -395,44 +395,44 @@ export default function RequestDetailPage() {
   const canAccept = isReusse && request.status === "pending" && !request.reusseId;
 
   const CATEGORY_LABELS: Record<string, string> = {
-    tout_mode: t("catToutMode"),
-    vetements: t("catVetements"),
-    montres_bijoux: t("catMontrsBijoux"),
-    accessoires_bagagerie: t("catAccessoiresBagagerie"),
-    ameublement: t("catAmeublement"),
-    electromenager: t("catElectromenager"),
+    all_fashion: t("catAllFashion"),
+    clothing: t("catClothing"),
+    watches_jewelry: t("catWatchesJewelry"),
+    accessories_bags: t("catAccessoriesBags"),
+    furniture: t("catFurniture"),
+    home_appliances: t("catHomeAppliances"),
     decoration: t("catDecoration"),
-    linge_de_maison: t("catLingeDeMaison"),
-    electronique: t("catElectronique"),
-    ordinateurs: t("catOrdinateurs"),
-    telephones_objets_connectes: t("catTelephonesObjetsConnectes"),
-    livres: t("catLivres"),
-    vins: t("catVins"),
-    instruments_de_musique: t("catInstrumentsDeMsique"),
-    jeux_jouets: t("catJeuxJouets"),
-    velos: t("catVelos"),
+    home_linen: t("catHomeLinen"),
+    electronics: t("catElectronics"),
+    computers: t("catComputers"),
+    phones_wearables: t("catPhonesWearables"),
+    books: t("catBooks"),
+    wines: t("catWines"),
+    musical_instruments: t("catMusicalInstruments"),
+    games_toys: t("catGamesToys"),
+    bicycles: t("catBicycles"),
   };
 
   const CATEGORY_FIELDS: Record<string, string[]> = {
-    tout_mode: [],
-    vetements: ["brand", "size", "condition"],
-    montres_bijoux: ["brand", "material", "condition", "certificatePhotos"],
-    accessoires_bagagerie: ["brand", "subcategory", "condition", "certificatePhotos"],
-    ameublement: ["brand", "material", "dimensions", "condition"],
-    electromenager: ["brand", "applianceType", "condition"],
+    all_fashion: [],
+    clothing: ["brand", "size", "condition"],
+    watches_jewelry: ["brand", "material", "condition", "certificatePhotos"],
+    accessories_bags: ["brand", "subcategory", "condition", "certificatePhotos"],
+    furniture: ["brand", "material", "dimensions", "condition"],
+    home_appliances: ["brand", "applianceType", "condition"],
     decoration: ["decorStyle", "material", "condition"],
-    linge_de_maison: ["subcategory", "size", "condition"],
-    electronique: ["brand", "subcategory", "condition"],
-    ordinateurs: ["brand", "ram", "deviceStorage", "condition"],
-    telephones_objets_connectes: ["brand", "model", "deviceStorage", "condition"],
-    livres: ["author", "genre", "language", "condition"],
-    vins: ["subcategory", "vintage", "volume"],
-    instruments_de_musique: ["instrumentType", "brand", "condition"],
-    jeux_jouets: ["ageRange", "brand", "condition"],
-    velos: ["brand", "subcategory", "frameSize", "condition"],
+    home_linen: ["subcategory", "size", "condition"],
+    electronics: ["brand", "subcategory", "condition"],
+    computers: ["brand", "ram", "deviceStorage", "condition"],
+    phones_wearables: ["brand", "model", "deviceStorage", "condition"],
+    books: ["author", "genre", "language", "condition"],
+    wines: ["subcategory", "vintage", "volume"],
+    musical_instruments: ["instrumentType", "brand", "condition"],
+    games_toys: ["ageRange", "brand", "condition"],
+    bicycles: ["brand", "subcategory", "frameSize", "condition"],
   };
 
-  const showCertPhotos = ["montres_bijoux", "accessoires_bagagerie"].includes(itemForm.category);
+  const showCertPhotos = ["watches_jewelry", "accessories_bags"].includes(itemForm.category);
   const categoryFields = CATEGORY_FIELDS[itemForm.category] || [];
 
   const handleCategoryChange = (newCategory: ItemCategory) => {
