@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users } from "../shared/models/auth";
@@ -11,8 +12,130 @@ import {
   registerAuthRoutes,
 } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { ITEM_CATEGORIES } from "@shared/schema";
 
 const wsClients = new Map<string, Set<WebSocket>>();
+
+function validate(schema: z.ZodType) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ message: "Validation error", errors: result.error.errors });
+    }
+    req.body = result.data;
+    next();
+  };
+}
+
+const createProfileBody = z.object({
+  role: z.string(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  postalCode: z.string().optional(),
+  department: z.string().optional(),
+  bio: z.string().optional(),
+  experience: z.string().optional(),
+  siretNumber: z.string().optional(),
+  preferredContactMethod: z.string().optional(),
+});
+
+const itemFields = {
+  description: z.string().optional(),
+  brand: z.string().optional(),
+  size: z.string().optional(),
+  condition: z.string().optional(),
+  minPrice: z.string().optional(),
+  maxPrice: z.string().optional(),
+  photos: z.array(z.string()).optional(),
+  certificatePhotos: z.array(z.string()).optional(),
+  material: z.string().optional(),
+  dimensions: z.string().optional(),
+  author: z.string().optional(),
+  genre: z.string().optional(),
+  language: z.string().optional(),
+  vintage: z.string().optional(),
+  ageRange: z.string().optional(),
+  model: z.string().optional(),
+  deviceStorage: z.string().optional(),
+  ram: z.string().optional(),
+  volume: z.string().optional(),
+  frameSize: z.string().optional(),
+  instrumentType: z.string().optional(),
+  applianceType: z.string().optional(),
+  decorStyle: z.string().optional(),
+  subcategory: z.string().optional(),
+};
+
+const CATEGORY_ALLOWED_FIELDS: Partial<Record<typeof ITEM_CATEGORIES[number], string[]>> = {
+  vetements: ["brand", "size", "condition"],
+  tout_mode: [],
+  montres_bijoux: ["brand", "material", "condition", "certificatePhotos"],
+  accessoires_bagagerie: ["brand", "subcategory", "condition", "certificatePhotos"],
+  ameublement: ["brand", "material", "dimensions", "condition"],
+  electromenager: ["brand", "applianceType", "condition"],
+  decoration: ["decorStyle", "material", "condition"],
+  linge_de_maison: ["subcategory", "size", "condition"],
+  electronique: ["brand", "subcategory", "condition"],
+  ordinateurs: ["brand", "ram", "deviceStorage", "condition"],
+  telephones_objets_connectes: ["brand", "model", "deviceStorage", "condition"],
+  livres: ["author", "genre", "language", "condition"],
+  vins: ["subcategory", "vintage", "volume"],
+  instruments_de_musique: ["instrumentType", "brand", "condition"],
+  jeux_jouets: ["ageRange", "brand", "condition"],
+  velos: ["brand", "subcategory", "frameSize", "condition"],
+};
+
+const CATEGORY_CONSTRAINED_FIELDS = [
+  "brand", "size", "condition", "subcategory",
+  "material", "dimensions", "author", "genre", "language",
+  "vintage", "ageRange", "model", "deviceStorage", "ram", "volume",
+  "frameSize", "instrumentType", "applianceType", "decorStyle",
+  "certificatePhotos",
+] as const;
+
+function validateCategoryFields(data: { category: string; [key: string]: unknown }, ctx: z.RefinementCtx) {
+  const allowed = CATEGORY_ALLOWED_FIELDS[data.category as typeof ITEM_CATEGORIES[number]];
+  if (!allowed) return;
+  for (const field of CATEGORY_CONSTRAINED_FIELDS) {
+    const value = data[field];
+    const hasValue = Array.isArray(value) ? value.length > 0 : (value !== undefined && value !== null && value !== "");
+    if (hasValue && !allowed.includes(field)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Field '${field}' is not allowed for category '${data.category}'`,
+        path: [field],
+      });
+    }
+  }
+}
+
+const createItemBody = z.object({
+  title: z.string().min(1),
+  category: z.enum(ITEM_CATEGORIES),
+  ...itemFields,
+}).superRefine(validateCategoryFields);
+
+const updateItemBody = z.object({
+  title: z.string().min(1).optional(),
+  category: z.enum(ITEM_CATEGORIES).optional(),
+  ...itemFields,
+}).superRefine((data, ctx) => {
+  if (data.category) validateCategoryFields(data as { category: string; [key: string]: unknown }, ctx);
+});
+
+const createMeetingBody = z.object({
+  scheduledDate: z.string(),
+  location: z.string(),
+  notes: z.string().optional(),
+  duration: z.number().optional(),
+});
+
+const createMessageBody = z.object({
+  receiverId: z.string(),
+  content: z.string().min(1),
+  requestId: z.number().optional(),
+});
 
 export function broadcastToUser(userId: string, data: unknown) {
   const clients = wsClients.get(userId);
@@ -383,6 +506,23 @@ export async function registerRoutes(
           minPrice,
           maxPrice,
           photos,
+          certificatePhotos,
+          material,
+          dimensions,
+          author,
+          genre,
+          language,
+          vintage,
+          ageRange,
+          model,
+          deviceStorage,
+          ram,
+          volume,
+          frameSize,
+          instrumentType,
+          applianceType,
+          decorStyle,
+          subcategory,
         } = req.body;
         const item = await storage.createItem({
           requestId,
@@ -393,11 +533,28 @@ export async function registerRoutes(
           brand: brand || null,
           size: size || null,
           category,
-          condition,
+          condition: condition || null,
           status: "pending_approval",
           minPrice: minPrice || null,
           maxPrice: maxPrice || null,
           photos: photos || null,
+          certificatePhotos: certificatePhotos || null,
+          material: material || null,
+          dimensions: dimensions || null,
+          author: author || null,
+          genre: genre || null,
+          language: language || null,
+          vintage: vintage || null,
+          ageRange: ageRange || null,
+          model: model || null,
+          deviceStorage: deviceStorage || null,
+          ram: ram || null,
+          volume: volume || null,
+          frameSize: frameSize || null,
+          instrumentType: instrumentType || null,
+          applianceType: applianceType || null,
+          decorStyle: decorStyle || null,
+          subcategory: subcategory || null,
         });
 
         await storage.createNotification({
@@ -774,6 +931,73 @@ export async function registerRoutes(
     },
   );
 
+  app.patch(
+    "/api/items/:id",
+    isAuthenticated,
+    requireAuth,
+    validate(updateItemBody),
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const id = parseInt(req.params.id);
+        const existingItem = await storage.getItem(id);
+        if (!existingItem) return res.status(404).json({ message: "Item not found" });
+        if (existingItem.reusseId !== userId) {
+          return res.status(403).json({ message: "Only the assigned reseller can edit this item" });
+        }
+        const {
+          title, description, brand, size, category, condition,
+          minPrice, maxPrice, photos, certificatePhotos,
+          material, dimensions, author, genre, language, vintage,
+          ageRange, model, deviceStorage, ram, volume, frameSize,
+          instrumentType, applianceType, decorStyle, subcategory,
+        } = req.body;
+
+        // Apply category-aware validation using existing item's category when not changing it
+        const effectiveCategory = category || existingItem.category;
+        const categoryIssues: z.ZodIssue[] = [];
+        const collectCtx: z.RefinementCtx = { addIssue: (issue) => categoryIssues.push(issue as z.ZodIssue), path: [] };
+        validateCategoryFields({ ...req.body, category: effectiveCategory }, collectCtx);
+        if (categoryIssues.length > 0) {
+          return res.status(400).json({ message: "Validation error", errors: categoryIssues });
+        }
+        const updated = await storage.updateItem(id, {
+          ...(title !== undefined && { title }),
+          ...(description !== undefined && { description: description || null }),
+          ...(brand !== undefined && { brand: brand || null }),
+          ...(size !== undefined && { size: size || null }),
+          ...(category !== undefined && { category }),
+          ...(condition !== undefined && { condition: condition || null }),
+          ...(minPrice !== undefined && { minPrice: minPrice || null }),
+          ...(maxPrice !== undefined && { maxPrice: maxPrice || null }),
+          ...(photos !== undefined && { photos: photos || null }),
+          ...(certificatePhotos !== undefined && { certificatePhotos: certificatePhotos || null }),
+          ...(material !== undefined && { material: material || null }),
+          ...(dimensions !== undefined && { dimensions: dimensions || null }),
+          ...(author !== undefined && { author: author || null }),
+          ...(genre !== undefined && { genre: genre || null }),
+          ...(language !== undefined && { language: language || null }),
+          ...(vintage !== undefined && { vintage: vintage || null }),
+          ...(ageRange !== undefined && { ageRange: ageRange || null }),
+          ...(model !== undefined && { model: model || null }),
+          ...(deviceStorage !== undefined && { deviceStorage: deviceStorage || null }),
+          ...(ram !== undefined && { ram: ram || null }),
+          ...(volume !== undefined && { volume: volume || null }),
+          ...(frameSize !== undefined && { frameSize: frameSize || null }),
+          ...(instrumentType !== undefined && { instrumentType: instrumentType || null }),
+          ...(applianceType !== undefined && { applianceType: applianceType || null }),
+          ...(decorStyle !== undefined && { decorStyle: decorStyle || null }),
+          ...(subcategory !== undefined && { subcategory: subcategory || null }),
+        });
+        if (!updated) return res.status(404).json({ message: "Item not found" });
+        res.json(updated);
+      } catch (error) {
+        console.error("Error updating item:", error);
+        res.status(500).json({ message: "Failed to update item" });
+      }
+    },
+  );
+
   app.post(
     "/api/items/:id/approve",
     isAuthenticated,
@@ -927,8 +1151,25 @@ export async function registerRoutes(
           brand: original.brand || undefined,
           size: original.size || undefined,
           category: original.category,
-          condition: original.condition,
+          condition: original.condition || undefined,
           photos: original.photos || undefined,
+          certificatePhotos: original.certificatePhotos || undefined,
+          material: original.material || undefined,
+          dimensions: original.dimensions || undefined,
+          author: original.author || undefined,
+          genre: original.genre || undefined,
+          language: original.language || undefined,
+          vintage: original.vintage || undefined,
+          ageRange: original.ageRange || undefined,
+          model: original.model || undefined,
+          deviceStorage: original.deviceStorage || undefined,
+          ram: original.ram || undefined,
+          volume: original.volume || undefined,
+          frameSize: original.frameSize || undefined,
+          instrumentType: original.instrumentType || undefined,
+          applianceType: original.applianceType || undefined,
+          decorStyle: original.decorStyle || undefined,
+          subcategory: original.subcategory || undefined,
           minPrice: original.minPrice || undefined,
           maxPrice: original.maxPrice || undefined,
           status: "pending_approval",

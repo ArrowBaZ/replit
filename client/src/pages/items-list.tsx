@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Item, Profile } from "@shared/schema";
-import { Shirt, Search, Filter } from "lucide-react";
+import { Shirt, Search, Filter, Tag } from "lucide-react";
 import { useState, useMemo } from "react";
 
 const itemStatusColors: Record<string, string> = {
@@ -23,6 +23,7 @@ export default function ItemsListPage() {
   const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
   const { data: profile } = useQuery<Profile>({
     queryKey: ["/api/profile"],
@@ -43,25 +44,55 @@ export default function ItemsListPage() {
   };
 
   const categoryLabels: Record<string, string> = {
+    tout_mode: t("catToutMode"),
+    vetements: t("catVetements"),
+    montres_bijoux: t("catMontrsBijoux"),
+    accessoires_bagagerie: t("catAccessoiresBagagerie"),
+    ameublement: t("catAmeublement"),
+    electromenager: t("catElectromenager"),
+    decoration: t("catDecoration"),
+    linge_de_maison: t("catLingeDeMaison"),
+    electronique: t("catElectronique"),
+    ordinateurs: t("catOrdinateurs"),
+    telephones_objets_connectes: t("catTelephonesObjetsConnectes"),
+    livres: t("catLivres"),
+    vins: t("catVins"),
+    instruments_de_musique: t("catInstrumentsDeMsique"),
+    jeux_jouets: t("catJeuxJouets"),
+    velos: t("catVelos"),
     tops: t("catTops"),
     bottoms: t("catBottoms"),
     dresses: t("catDresses"),
     outerwear: t("catOuterwear"),
     shoes: t("catShoes"),
     accessories: t("catAccessories"),
-    clothing: t("catTops"),
+    clothing: t("catVetements"),
   };
+
+  const usedCategories = useMemo(() => {
+    if (!items) return [];
+    const seen: Record<string, boolean> = {};
+    const cats: string[] = [];
+    for (const item of items) {
+      if (item.category && !seen[item.category]) {
+        seen[item.category] = true;
+        cats.push(item.category);
+      }
+    }
+    return cats;
+  }, [items]);
 
   const filteredItems = useMemo(() => {
     if (!items) return [];
     return items.filter((item) => {
-      const matchesSearch = !search || 
+      const matchesSearch = !search ||
         item.title.toLowerCase().includes(search.toLowerCase()) ||
         (item.brand && item.brand.toLowerCase().includes(search.toLowerCase()));
       const matchesStatus = statusFilter === "all" || item.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
+      return matchesSearch && matchesStatus && matchesCategory;
     });
-  }, [items, search, statusFilter]);
+  }, [items, search, statusFilter, categoryFilter]);
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
@@ -81,6 +112,18 @@ export default function ItemsListPage() {
             data-testid="input-search-items"
           />
         </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-category-filter">
+            <Tag className="h-4 w-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("allCategories")}</SelectItem>
+            {usedCategories.map((cat) => (
+              <SelectItem key={cat} value={cat}>{categoryLabels[cat] || cat}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-status-filter">
             <Filter className="h-4 w-4 mr-2" />
@@ -105,7 +148,7 @@ export default function ItemsListPage() {
       ) : filteredItems.length > 0 ? (
         <div className="space-y-3">
           {filteredItems.map((item) => (
-            <Card key={item.id}>
+            <Card key={item.id} data-testid={`card-item-${item.id}`}>
               <CardContent className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex items-start gap-3 min-w-0">
@@ -123,8 +166,10 @@ export default function ItemsListPage() {
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         {item.brand && <span className="text-xs text-muted-foreground">{item.brand}</span>}
                         {item.size && <span className="text-xs text-muted-foreground">{t("size")} {item.size}</span>}
-                        <span className="text-xs text-muted-foreground">{categoryLabels[item.category] || item.category}</span>
-                        <span className="text-xs text-muted-foreground capitalize">{item.condition?.replace(/_/g, " ")}</span>
+                        <Badge variant="outline" className="text-xs px-1.5 py-0" data-testid={`badge-category-${item.id}`}>
+                          {categoryLabels[item.category] || item.category}
+                        </Badge>
+                        {item.condition && <span className="text-xs text-muted-foreground capitalize">{item.condition?.replace(/_/g, " ")}</span>}
                       </div>
                       <div className="flex flex-wrap items-center gap-3 mt-1">
                         {item.minPrice && item.maxPrice && (

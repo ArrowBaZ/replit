@@ -15,7 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Request, Item, Meeting, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle } from "lucide-react";
+import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award } from "lucide-react";
+import { ITEM_CATEGORIES, type ItemCategory } from "@shared/schema";
 import { useState, useRef } from "react";
 import { useUpload } from "@/hooks/use-upload";
 
@@ -97,18 +98,31 @@ export default function RequestDetailPage() {
     },
   });
 
-  const [itemForm, setItemForm] = useState({
-    title: "", description: "", brand: "", size: "", category: "clothing", condition: "good", minPrice: "", maxPrice: "",
-  });
+  const emptyItemForm = {
+    title: "", description: "", brand: "", size: "", category: "vetements" as ItemCategory, condition: "good",
+    minPrice: "", maxPrice: "", material: "", dimensions: "", author: "", genre: "", language: "",
+    vintage: "", ageRange: "", model: "", deviceStorage: "", ram: "", volume: "", frameSize: "",
+    instrumentType: "", applianceType: "", decorStyle: "", subcategory: "",
+  };
+  const [itemForm, setItemForm] = useState(emptyItemForm);
   const [itemPhotos, setItemPhotos] = useState<string[]>([]);
+  const [certPhotos, setCertPhotos] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const certFileInputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, isUploading: isUploadingPhoto } = useUpload({
     onSuccess: (response) => {
       setItemPhotos((prev) => [...prev, response.objectPath]);
     },
   });
+  const { uploadFile: uploadCertFile, isUploading: isUploadingCert } = useUpload({
+    onSuccess: (response) => {
+      setCertPhotos((prev) => [...prev, response.objectPath]);
+    },
+  });
 
   const MAX_PHOTOS = 5;
+  const MAX_CERT_PHOTOS = 3;
+
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -120,8 +134,23 @@ export default function RequestDetailPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleCertUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const remaining = MAX_CERT_PHOTOS - certPhotos.length;
+    const filesToUpload = Array.from(files).slice(0, remaining);
+    for (const file of filesToUpload) {
+      await uploadCertFile(file);
+    }
+    if (certFileInputRef.current) certFileInputRef.current.value = "";
+  };
+
   const removePhoto = (index: number) => {
     setItemPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeCertPhoto = (index: number) => {
+    setCertPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
   const openAddItemPrefilled = (item: Item) => {
@@ -130,12 +159,29 @@ export default function RequestDetailPage() {
       description: item.description || "",
       brand: item.brand || "",
       size: item.size || "",
-      category: item.category,
-      condition: item.condition,
+      category: (ITEM_CATEGORIES.includes(item.category as ItemCategory) ? item.category : "vetements") as ItemCategory,
+      condition: item.condition || "good",
       minPrice: item.minPrice || "",
       maxPrice: item.maxPrice || "",
+      material: item.material || "",
+      dimensions: item.dimensions || "",
+      author: item.author || "",
+      genre: item.genre || "",
+      language: item.language || "",
+      vintage: item.vintage || "",
+      ageRange: item.ageRange || "",
+      model: item.model || "",
+      deviceStorage: item.deviceStorage || "",
+      ram: item.ram || "",
+      volume: item.volume || "",
+      frameSize: item.frameSize || "",
+      instrumentType: item.instrumentType || "",
+      applianceType: item.applianceType || "",
+      decorStyle: item.decorStyle || "",
+      subcategory: item.subcategory || "",
     });
     setItemPhotos(item.photos || []);
+    setCertPhotos(item.certificatePhotos || []);
     setShowAddItem(true);
   };
 
@@ -147,8 +193,9 @@ export default function RequestDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
       setShowAddItem(false);
-      setItemForm({ title: "", description: "", brand: "", size: "", category: "clothing", condition: "good", minPrice: "", maxPrice: "" });
+      setItemForm(emptyItemForm);
       setItemPhotos([]);
+      setCertPhotos([]);
       toast({ title: t("addItem") });
     },
   });
@@ -347,6 +394,67 @@ export default function RequestDetailPage() {
   const isAssigned = request.reusseId === user?.id;
   const canAccept = isReusse && request.status === "pending" && !request.reusseId;
 
+  const CATEGORY_LABELS: Record<string, string> = {
+    tout_mode: t("catToutMode"),
+    vetements: t("catVetements"),
+    montres_bijoux: t("catMontrsBijoux"),
+    accessoires_bagagerie: t("catAccessoiresBagagerie"),
+    ameublement: t("catAmeublement"),
+    electromenager: t("catElectromenager"),
+    decoration: t("catDecoration"),
+    linge_de_maison: t("catLingeDeMaison"),
+    electronique: t("catElectronique"),
+    ordinateurs: t("catOrdinateurs"),
+    telephones_objets_connectes: t("catTelephonesObjetsConnectes"),
+    livres: t("catLivres"),
+    vins: t("catVins"),
+    instruments_de_musique: t("catInstrumentsDeMsique"),
+    jeux_jouets: t("catJeuxJouets"),
+    velos: t("catVelos"),
+  };
+
+  const CATEGORY_FIELDS: Record<string, string[]> = {
+    tout_mode: [],
+    vetements: ["brand", "size", "condition"],
+    montres_bijoux: ["brand", "material", "condition", "certificatePhotos"],
+    accessoires_bagagerie: ["brand", "subcategory", "condition", "certificatePhotos"],
+    ameublement: ["brand", "material", "dimensions", "condition"],
+    electromenager: ["brand", "applianceType", "condition"],
+    decoration: ["decorStyle", "material", "condition"],
+    linge_de_maison: ["subcategory", "size", "condition"],
+    electronique: ["brand", "subcategory", "condition"],
+    ordinateurs: ["brand", "ram", "deviceStorage", "condition"],
+    telephones_objets_connectes: ["brand", "model", "deviceStorage", "condition"],
+    livres: ["author", "genre", "language", "condition"],
+    vins: ["subcategory", "vintage", "volume"],
+    instruments_de_musique: ["instrumentType", "brand", "condition"],
+    jeux_jouets: ["ageRange", "brand", "condition"],
+    velos: ["brand", "subcategory", "frameSize", "condition"],
+  };
+
+  const showCertPhotos = ["montres_bijoux", "accessoires_bagagerie"].includes(itemForm.category);
+  const categoryFields = CATEGORY_FIELDS[itemForm.category] || [];
+
+  const handleCategoryChange = (newCategory: ItemCategory) => {
+    const allowedFields = CATEGORY_FIELDS[newCategory] || [];
+    const allMetaFields = [
+      "brand", "size", "condition", "subcategory", "material", "dimensions",
+      "author", "genre", "language", "vintage", "ageRange", "model",
+      "deviceStorage", "ram", "volume", "frameSize", "instrumentType",
+      "applianceType", "decorStyle",
+    ] as const;
+    const cleared: Partial<typeof itemForm> = {};
+    for (const field of allMetaFields) {
+      if (!allowedFields.includes(field)) {
+        cleared[field] = "";
+      }
+    }
+    if (!allowedFields.includes("certificatePhotos")) {
+      setCertPhotos([]);
+    }
+    setItemForm({ ...itemForm, category: newCategory, ...cleared });
+  };
+
   const ItemPhotoUploadArea = () => (
     <div className="space-y-2">
       <Label>{t("photos")}</Label>
@@ -387,6 +495,49 @@ export default function RequestDetailPage() {
         )}
       </div>
       <p className="text-xs text-muted-foreground">{t("photoHint")}</p>
+    </div>
+  );
+
+  const CertPhotoUploadArea = () => (
+    <div className="space-y-2">
+      <Label className="flex items-center gap-1.5"><Award className="h-3.5 w-3.5" />{t("certificatePhotos")}</Label>
+      <div className="flex flex-wrap gap-2">
+        {certPhotos.map((photo, idx) => (
+          <div key={idx} className="relative h-16 w-16 rounded-md overflow-hidden border border-amber-300">
+            <img src={photo} alt="" className="h-full w-full object-cover" />
+            <button
+              type="button"
+              onClick={() => removeCertPhoto(idx)}
+              className="absolute top-0 right-0 bg-black/60 rounded-bl-md p-0.5"
+              data-testid={`button-remove-cert-photo-${idx}`}
+            >
+              <X className="h-3 w-3 text-white" />
+            </button>
+          </div>
+        ))}
+        {certPhotos.length < MAX_CERT_PHOTOS && (
+          <label
+            className="h-16 w-16 rounded-md border-2 border-dashed border-amber-300 flex items-center justify-center cursor-pointer hover:border-amber-500 transition-colors"
+            data-testid="button-upload-cert-photo"
+          >
+            {isUploadingCert ? (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            ) : (
+              <Award className="h-5 w-5 text-amber-500" />
+            )}
+            <input
+              ref={certFileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleCertUpload}
+              disabled={isUploadingCert}
+            />
+          </label>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">{t("certificatePhotoHint")}</p>
     </div>
   );
 
@@ -510,7 +661,7 @@ export default function RequestDetailPage() {
 
         <TabsContent value="items" className="space-y-3">
           {(isReusse && isAssigned) && (
-            <Dialog open={showAddItem} onOpenChange={(open) => { setShowAddItem(open); if (!open) { setItemForm({ title: "", description: "", brand: "", size: "", category: "clothing", condition: "good", minPrice: "", maxPrice: "" }); setItemPhotos([]); } }}>
+            <Dialog open={showAddItem} onOpenChange={(open) => { setShowAddItem(open); if (!open) { setItemForm(emptyItemForm); setItemPhotos([]); setCertPhotos([]); } }}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline" data-testid="button-add-item">
                   <Plus className="h-3.5 w-3.5 mr-1" /> {t("addItem")}
@@ -518,41 +669,142 @@ export default function RequestDetailPage() {
               </DialogTrigger>
               <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader><DialogTitle>{t("addItem")}</DialogTitle></DialogHeader>
-                <form onSubmit={(e) => { e.preventDefault(); addItem.mutate({ ...itemForm, photos: itemPhotos.length > 0 ? itemPhotos : undefined }); }} className="space-y-3">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  addItem.mutate({
+                    ...itemForm,
+                    photos: itemPhotos.length > 0 ? itemPhotos : undefined,
+                    certificatePhotos: certPhotos.length > 0 ? certPhotos : undefined,
+                  });
+                }} className="space-y-3">
                   <div className="space-y-2">
                     <Label>{t("title")} *</Label>
                     <Input value={itemForm.title} onChange={(e) => setItemForm({...itemForm, title: e.target.value})} required data-testid="input-item-title" />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>{t("category")}</Label>
+                    <Select value={itemForm.category} onValueChange={(v) => handleCategoryChange(v as ItemCategory)}>
+                      <SelectTrigger data-testid="select-item-category"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {ITEM_CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat}>{CATEGORY_LABELS[cat] || cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {categoryFields.includes("brand") && (
                     <div className="space-y-2">
                       <Label>{t("brand")}</Label>
                       <Input value={itemForm.brand} onChange={(e) => setItemForm({...itemForm, brand: e.target.value})} data-testid="input-item-brand" />
                     </div>
+                  )}
+                  {categoryFields.includes("size") && (
                     <div className="space-y-2">
                       <Label>{t("size")}</Label>
                       <Input value={itemForm.size} onChange={(e) => setItemForm({...itemForm, size: e.target.value})} data-testid="input-item-size" />
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  )}
+                  {categoryFields.includes("material") && (
                     <div className="space-y-2">
-                      <Label>{t("category")}</Label>
-                      <Select value={itemForm.category} onValueChange={(v) => setItemForm({...itemForm, category: v})}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="tops">{t("catTops")}</SelectItem>
-                          <SelectItem value="bottoms">{t("catBottoms")}</SelectItem>
-                          <SelectItem value="dresses">{t("catDresses")}</SelectItem>
-                          <SelectItem value="outerwear">{t("catOuterwear")}</SelectItem>
-                          <SelectItem value="shoes">{t("catShoes")}</SelectItem>
-                          <SelectItem value="accessories">{t("catAccessories")}</SelectItem>
-                          <SelectItem value="clothing">{t("catTops")}</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label>{t("material")}</Label>
+                      <Input value={itemForm.material} onChange={(e) => setItemForm({...itemForm, material: e.target.value})} data-testid="input-item-material" />
                     </div>
+                  )}
+                  {categoryFields.includes("dimensions") && (
+                    <div className="space-y-2">
+                      <Label>{t("dimensions")}</Label>
+                      <Input value={itemForm.dimensions} onChange={(e) => setItemForm({...itemForm, dimensions: e.target.value})} data-testid="input-item-dimensions" />
+                    </div>
+                  )}
+                  {categoryFields.includes("subcategory") && (
+                    <div className="space-y-2">
+                      <Label>{t("subcategory")}</Label>
+                      <Input value={itemForm.subcategory} onChange={(e) => setItemForm({...itemForm, subcategory: e.target.value})} data-testid="input-item-subcategory" />
+                    </div>
+                  )}
+                  {categoryFields.includes("applianceType") && (
+                    <div className="space-y-2">
+                      <Label>{t("applianceType")}</Label>
+                      <Input value={itemForm.applianceType} onChange={(e) => setItemForm({...itemForm, applianceType: e.target.value})} data-testid="input-item-appliance-type" />
+                    </div>
+                  )}
+                  {categoryFields.includes("decorStyle") && (
+                    <div className="space-y-2">
+                      <Label>{t("decorStyle")}</Label>
+                      <Input value={itemForm.decorStyle} onChange={(e) => setItemForm({...itemForm, decorStyle: e.target.value})} data-testid="input-item-decor-style" />
+                    </div>
+                  )}
+                  {categoryFields.includes("author") && (
+                    <div className="space-y-2">
+                      <Label>{t("author")}</Label>
+                      <Input value={itemForm.author} onChange={(e) => setItemForm({...itemForm, author: e.target.value})} data-testid="input-item-author" />
+                    </div>
+                  )}
+                  {categoryFields.includes("genre") && (
+                    <div className="space-y-2">
+                      <Label>{t("genre")}</Label>
+                      <Input value={itemForm.genre} onChange={(e) => setItemForm({...itemForm, genre: e.target.value})} data-testid="input-item-genre" />
+                    </div>
+                  )}
+                  {categoryFields.includes("language") && (
+                    <div className="space-y-2">
+                      <Label>{t("language")}</Label>
+                      <Input value={itemForm.language} onChange={(e) => setItemForm({...itemForm, language: e.target.value})} data-testid="input-item-language" />
+                    </div>
+                  )}
+                  {categoryFields.includes("vintage") && (
+                    <div className="space-y-2">
+                      <Label>{t("vintage")}</Label>
+                      <Input value={itemForm.vintage} onChange={(e) => setItemForm({...itemForm, vintage: e.target.value})} data-testid="input-item-vintage" />
+                    </div>
+                  )}
+                  {categoryFields.includes("volume") && (
+                    <div className="space-y-2">
+                      <Label>{t("volume")}</Label>
+                      <Input value={itemForm.volume} onChange={(e) => setItemForm({...itemForm, volume: e.target.value})} data-testid="input-item-volume" />
+                    </div>
+                  )}
+                  {categoryFields.includes("ageRange") && (
+                    <div className="space-y-2">
+                      <Label>{t("ageRange")}</Label>
+                      <Input value={itemForm.ageRange} onChange={(e) => setItemForm({...itemForm, ageRange: e.target.value})} data-testid="input-item-age-range" />
+                    </div>
+                  )}
+                  {categoryFields.includes("model") && (
+                    <div className="space-y-2">
+                      <Label>{t("model")}</Label>
+                      <Input value={itemForm.model} onChange={(e) => setItemForm({...itemForm, model: e.target.value})} data-testid="input-item-model" />
+                    </div>
+                  )}
+                  {categoryFields.includes("deviceStorage") && (
+                    <div className="space-y-2">
+                      <Label>{t("deviceStorage")}</Label>
+                      <Input value={itemForm.deviceStorage} onChange={(e) => setItemForm({...itemForm, deviceStorage: e.target.value})} data-testid="input-item-device-storage" />
+                    </div>
+                  )}
+                  {categoryFields.includes("ram") && (
+                    <div className="space-y-2">
+                      <Label>{t("ram")}</Label>
+                      <Input value={itemForm.ram} onChange={(e) => setItemForm({...itemForm, ram: e.target.value})} data-testid="input-item-ram" />
+                    </div>
+                  )}
+                  {categoryFields.includes("frameSize") && (
+                    <div className="space-y-2">
+                      <Label>{t("frameSize")}</Label>
+                      <Input value={itemForm.frameSize} onChange={(e) => setItemForm({...itemForm, frameSize: e.target.value})} data-testid="input-item-frame-size" />
+                    </div>
+                  )}
+                  {categoryFields.includes("instrumentType") && (
+                    <div className="space-y-2">
+                      <Label>{t("instrumentType")}</Label>
+                      <Input value={itemForm.instrumentType} onChange={(e) => setItemForm({...itemForm, instrumentType: e.target.value})} data-testid="input-item-instrument-type" />
+                    </div>
+                  )}
+                  {categoryFields.includes("condition") && (
                     <div className="space-y-2">
                       <Label>{t("condition")}</Label>
                       <Select value={itemForm.condition} onValueChange={(v) => setItemForm({...itemForm, condition: v})}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger data-testid="select-item-condition"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="new_with_tags">{t("condNew")}</SelectItem>
                           <SelectItem value="like_new">{t("condLikeNew")}</SelectItem>
@@ -561,7 +813,7 @@ export default function RequestDetailPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
+                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>{t("minPrice")} (EUR)</Label>
@@ -577,7 +829,8 @@ export default function RequestDetailPage() {
                     <Textarea value={itemForm.description} onChange={(e) => setItemForm({...itemForm, description: e.target.value})} className="resize-none" rows={2} data-testid="input-item-description" />
                   </div>
                   <ItemPhotoUploadArea />
-                  <Button type="submit" className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" disabled={addItem.isPending || isUploadingPhoto} data-testid="button-submit-item">
+                  {showCertPhotos && <CertPhotoUploadArea />}
+                  <Button type="submit" className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" disabled={addItem.isPending || isUploadingPhoto || isUploadingCert} data-testid="button-submit-item">
                     {addItem.isPending ? "..." : t("addItem")}
                   </Button>
                 </form>
@@ -607,7 +860,10 @@ export default function RequestDetailPage() {
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                           {item.brand && <span className="text-xs text-muted-foreground">{item.brand}</span>}
                           {item.size && <span className="text-xs text-muted-foreground">{t("size")} {item.size}</span>}
-                          <span className="text-xs text-muted-foreground">{conditionLabel(item.condition)}</span>
+                          <Badge variant="outline" className="text-xs px-1.5 py-0 h-auto" data-testid={`badge-category-${item.id}`}>
+                            {CATEGORY_LABELS[item.category] || item.category}
+                          </Badge>
+                          {item.condition && <span className="text-xs text-muted-foreground">{conditionLabel(item.condition)}</span>}
                         </div>
                         {item.minPrice && item.maxPrice && (
                           <p className="text-xs text-muted-foreground mt-1">{item.minPrice} - {item.maxPrice} EUR</p>
@@ -636,7 +892,7 @@ export default function RequestDetailPage() {
                     </Badge>
                   </div>
 
-                  {(item as any).sellerCounterOffer && item.status === "pending_approval" && isReusse && (
+                  {item.sellerCounterOffer && item.status === "pending_approval" && isReusse && (
                     <div className="ml-[4.25rem] flex items-center gap-1.5 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-md px-3 py-1.5 text-xs font-medium">
                       <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                       {t("sellerCounterOfferBadge")}

@@ -45,6 +45,14 @@ client/src/
   lib/               - Utilities (queryClient, auth-utils)
 ```
 
+## Item Categories (Task #2)
+16 French item categories supported:
+- tout_mode, vetements, montres_bijoux, accessoires_bagagerie, ameublement, electromenager, decoration, linge_de_maison, electronique, ordinateurs, telephones_objets_connectes, livres, vins, instruments_de_musique, jeux_jouets, velos
+- Each category has dynamic filter fields (material, author, vintage, deviceStorage, etc.)
+- Luxury categories (montres_bijoux, accessoires_bagagerie) show certificate photo upload
+- Item cards display category badge
+- Items list has category filter dropdown (shows only categories in user's items)
+
 ## Key Decisions
 - Schema-first approach with Drizzle ORM
 - Dark sidebar with green accent for brand identity
