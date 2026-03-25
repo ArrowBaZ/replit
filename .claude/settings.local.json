@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(obsidian read:*)",
+      "Bash(obsidian files:*)",
+      "Bash(grep -i \"test\\\\|vitest\\\\|jest\\\\|coverage\\\\|regression\" /Users/fabienplart/Projects/local/replit/docs/*.md | head -50)",
+      "WebSearch"
+    ]
+  }
+}
