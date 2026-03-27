@@ -4,7 +4,17 @@
       "Bash(obsidian read:*)",
       "Bash(obsidian files:*)",
       "Bash(grep -i \"test\\\\|vitest\\\\|jest\\\\|coverage\\\\|regression\" /Users/fabienplart/Projects/local/replit/docs/*.md | head -50)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(obsidian search:*)",
+      "Bash(find /Users/fabienplart/Projects/local/replit/docs -type f -name \"*.md\" 2>/dev/null | head -20)",
+      "Bash(find /Users/fabienplart/Projects/local/replit/docs -type f -name *.md)",
+      "Bash(wc -l /Users/fabienplart/Projects/local/replit/client/src/pages/*.tsx)",
+      "Bash(find /Users/fabienplart/Projects/local/replit/client/src -type f -name *admin* -o -name *Dashboard*)",
+      "Bash(find /Users/fabienplart/Projects/local/replit/server/src -type f -name *admin*)",
+      "Bash(find /Users/fabienplart/Projects/local/replit/server/src/routes -type f -name *.ts)",
+      "Bash(grep -r \"i18n\\\\|react-intl\\\\|next-intl\\\\|@fluent\" /Users/fabienplart/Projects/local/replit --include=*.ts --include=*.tsx --include=*.json)",
+      "Bash(xargs ls:*)",
+      "Bash(grep -r 'as const' /Users/fabienplart/Projects/local/replit --include=*.ts --include=*.tsx -l)"
     ]
   }
 }
