@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, or, desc, sql, ne, isNull, inArray } from "drizzle-orm";
+import { eq, and, or, desc, sql, ne, isNull, inArray, gte } from "drizzle-orm";
 import {
   users,
   profiles,
@@ -24,6 +24,9 @@ import {
   type Transaction,
   type InsertTransaction,
   moderationActions,
+  reviews,
+  type Review,
+  type InsertReview,
   type User,
 } from "@shared/schema";
 
@@ -87,6 +90,15 @@ export interface IStorage {
   getAdminRequests(status?: string): Promise<any[]>;
   logModerationAction(data: { requestId: number; adminId: string; action: string; reason?: string; metadata?: string }): Promise<any>;
   getModerationActions(requestId: number): Promise<any[]>;
+
+  getEarningsSummary(userId: string, role: string): Promise<any[]>;
+  getActivityStats(userId: string, role: string): Promise<any>;
+
+  getResellers(): Promise<any[]>;
+  getResellerById(reusseId: string): Promise<any>;
+  getReviews(reusseId: string): Promise<Review[]>;
+  createReview(data: InsertReview): Promise<Review>;
+  reportRequest(requestId: number, reporterId: string, reason: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -564,6 +576,174 @@ export class DatabaseStorage implements IStorage {
       ...r.action,
       adminName: r.admin ? `${r.admin.firstName || ""} ${r.admin.lastName || ""}`.trim() || r.admin.email : "Admin",
     }));
+  }
+
+  async getEarningsSummary(userId: string, role: string): Promise<any[]> {
+    const col = role === "reusse" ? transactions.reusseId : transactions.sellerId;
+    const amountCol = role === "reusse" ? transactions.reusseAmount : transactions.sellerAmount;
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const rows = await db
+      .select({
+        month: sql<string>`to_char(${transactions.createdAt}, 'YYYY-MM')`,
+        total: sql<number>`sum(${amountCol}::numeric)`,
+        count: sql<number>`count(*)`,
+      })
+      .from(transactions)
+      .where(and(eq(col, userId), gte(transactions.createdAt, sixMonthsAgo)))
+      .groupBy(sql`to_char(${transactions.createdAt}, 'YYYY-MM')`)
+      .orderBy(sql`to_char(${transactions.createdAt}, 'YYYY-MM')`);
+    return rows;
+  }
+
+  async getActivityStats(userId: string, role: string): Promise<any> {
+    const firstOfMonth = new Date();
+    firstOfMonth.setDate(1);
+    firstOfMonth.setHours(0, 0, 0, 0);
+
+    const col = role === "reusse" ? requests.reusseId : requests.sellerId;
+    const [activeReqs] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(requests)
+      .where(and(eq(col, userId), inArray(requests.status, ["pending", "matched", "scheduled", "in_progress"])));
+
+    const itemCol = role === "reusse" ? items.reusseId : items.sellerId;
+    const [soldItems] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(items)
+      .where(and(eq(itemCol, userId), eq(items.status, "sold")));
+
+    const [soldThisMonth] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(items)
+      .where(and(eq(itemCol, userId), eq(items.status, "sold"), gte(items.soldAt!, firstOfMonth)));
+
+    const msgCol = role === "reusse" ? messages.senderId : messages.senderId;
+    const [msgsThisMonth] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(messages)
+      .where(and(eq(messages.senderId, userId), gte(messages.createdAt, firstOfMonth)));
+
+    return {
+      activeRequests: Number(activeReqs?.count ?? 0),
+      soldItems: Number(soldItems?.count ?? 0),
+      soldThisMonth: Number(soldThisMonth?.count ?? 0),
+      messagesThisMonth: Number(msgsThisMonth?.count ?? 0),
+    };
+  }
+
+  async getResellers(): Promise<any[]> {
+    const rows = await db
+      .select({
+        user: users,
+        profile: profiles,
+      })
+      .from(profiles)
+      .leftJoin(users, eq(users.id, profiles.userId))
+      .where(and(eq(profiles.role, "reusse"), eq(profiles.status, "approved")));
+
+    const result = await Promise.all(rows.map(async (r) => {
+      const [statsRow] = await db
+        .select({
+          avgRating: sql<number>`coalesce(avg(${reviews.rating}), 0)`,
+          reviewCount: sql<number>`count(${reviews.id})`,
+        })
+        .from(reviews)
+        .where(eq(reviews.reusseId, r.profile.userId));
+      const [completedRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(requests)
+        .where(and(eq(requests.reusseId, r.profile.userId), eq(requests.status, "completed")));
+      const [soldRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(items)
+        .where(and(eq(items.reusseId, r.profile.userId), eq(items.status, "sold")));
+      return {
+        userId: r.profile.userId,
+        firstName: r.user?.firstName,
+        lastName: r.user?.lastName,
+        email: r.user?.email,
+        profileImageUrl: r.user?.profileImageUrl,
+        bio: r.profile.bio,
+        experience: r.profile.experience,
+        department: r.profile.department,
+        city: r.profile.city,
+        avgRating: Number(statsRow?.avgRating ?? 0),
+        reviewCount: Number(statsRow?.reviewCount ?? 0),
+        completedRequests: Number(completedRow?.count ?? 0),
+        soldItems: Number(soldRow?.count ?? 0),
+      };
+    }));
+    return result;
+  }
+
+  async getResellerById(reusseId: string): Promise<any> {
+    const [row] = await db
+      .select({ user: users, profile: profiles })
+      .from(profiles)
+      .leftJoin(users, eq(users.id, profiles.userId))
+      .where(eq(profiles.userId, reusseId));
+    if (!row) return undefined;
+    const [statsRow] = await db
+      .select({
+        avgRating: sql<number>`coalesce(avg(${reviews.rating}), 0)`,
+        reviewCount: sql<number>`count(${reviews.id})`,
+        avgCommunication: sql<number>`coalesce(avg(${reviews.communicationRating}), 0)`,
+        avgReliability: sql<number>`coalesce(avg(${reviews.reliabilityRating}), 0)`,
+        avgHandling: sql<number>`coalesce(avg(${reviews.handlingRating}), 0)`,
+      })
+      .from(reviews)
+      .where(eq(reviews.reusseId, reusseId));
+    const [completedRow] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(requests)
+      .where(and(eq(requests.reusseId, reusseId), eq(requests.status, "completed")));
+    const [soldRow] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(items)
+      .where(and(eq(items.reusseId, reusseId), eq(items.status, "sold")));
+    return {
+      userId: row.profile.userId,
+      firstName: row.user?.firstName,
+      lastName: row.user?.lastName,
+      email: row.user?.email,
+      profileImageUrl: row.user?.profileImageUrl,
+      bio: row.profile.bio,
+      experience: row.profile.experience,
+      department: row.profile.department,
+      city: row.profile.city,
+      avgRating: Number(statsRow?.avgRating ?? 0),
+      reviewCount: Number(statsRow?.reviewCount ?? 0),
+      avgCommunication: Number(statsRow?.avgCommunication ?? 0),
+      avgReliability: Number(statsRow?.avgReliability ?? 0),
+      avgHandling: Number(statsRow?.avgHandling ?? 0),
+      completedRequests: Number(completedRow?.count ?? 0),
+      soldItems: Number(soldRow?.count ?? 0),
+    };
+  }
+
+  async getReviews(reusseId: string): Promise<Review[]> {
+    return db
+      .select()
+      .from(reviews)
+      .where(eq(reviews.reusseId, reusseId))
+      .orderBy(desc(reviews.createdAt));
+  }
+
+  async createReview(data: InsertReview): Promise<Review> {
+    const [review] = await db.insert(reviews).values(data).returning();
+    return review;
+  }
+
+  async reportRequest(requestId: number, reporterId: string, reason: string): Promise<void> {
+    await db.insert(moderationActions).values({
+      requestId,
+      adminId: reporterId,
+      action: "reported",
+      reason,
+      metadata: JSON.stringify({ reportedBy: reporterId }),
+    });
+    await db.update(requests).set({ status: "flagged" }).where(eq(requests.id, requestId));
   }
 }
 

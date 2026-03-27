@@ -30,7 +30,8 @@ Hello world
 ## Project Structure
 ```
 shared/
-  schema.ts          - All data models (profiles, requests, items, meetings, messages, notifications)
+  schema.ts          - All data models (profiles, requests, items, meetings, messages, notifications, reviews)
+  constants.ts       - Centralized constants (ITEM_CATEGORIES, ITEM_CONDITIONS, SERVICE_TYPES, etc.)
   models/auth.ts     - Auth models (users, sessions)
 server/
   routes.ts          - All API endpoints
@@ -39,10 +40,10 @@ server/
   replit_integrations/ - Auth + Object Storage integrations
 client/src/
   App.tsx            - Main app with routing
-  pages/             - All page components
+  pages/             - All page components (incl. resellers.tsx, reseller-detail.tsx)
   components/        - Reusable components (sidebar, theme)
   hooks/             - Custom hooks (auth, toast, upload)
-  lib/               - Utilities (queryClient, auth-utils)
+  lib/               - Utilities (queryClient, auth-utils, i18n)
 ```
 
 ## Item Categories (Task #2)
@@ -83,6 +84,30 @@ client/src/
 - Meeting management: cancel and reschedule meetings with notifications to other party
 - API endpoints: PATCH /api/meetings/:id/cancel, PATCH /api/meetings/:id/reschedule
 - Admin Listing View (PRD 2.6): `moderation_actions` table in schema, admin API endpoints (GET list + filter, POST flag/message/reject, GET moderation history), `/admin/requests` page with search + status filter + Flag/Message/Reject modals with bilingual i18n
+- Constants foundation (PRD refactor Phase 1):
+  - `shared/constants.ts` created with all centralized constants (ITEM_CATEGORIES, ITEM_CONDITIONS, SERVICE_TYPES, REQUEST_STATUSES, ITEM_STATUSES, USER_ROLES, CATEGORY_ALLOWED_FIELDS, i18n key maps)
+  - routes.ts, storage.ts, create-request.tsx import from `@shared/constants`
+  - Schema.ts re-exports ITEM_CATEGORIES from constants
+- Reseller Dashboard Enhancement (PRD 2.4):
+  - GET /api/earnings-summary: monthly earnings breakdown (last 6 months) for reusse/seller
+  - GET /api/stats/activity: active requests, sold items, sold this month, messages this month
+  - reusse-dashboard.tsx: recharts BarChart for monthly earnings + activity stats cards
+- Reseller Discovery (PRD 2.5):
+  - `reviews` table: seller→reusse ratings (overall, communication, reliability, handling)
+  - GET /api/resellers: list approved resellers with aggregated stats
+  - GET /api/resellers/:id: reseller detail + multi-dimensional ratings
+  - GET /api/resellers/:id/reviews: all reviews for a reseller
+  - POST /api/requests/:id/review: submit review (sellers only, completed requests)
+  - /resellers page: search + sort, reseller cards with ratings
+  - /resellers/:id page: reseller profile with StarPicker review form
+  - Seller sidebar has "Discover Resellers" nav link to /resellers
+- Request Flagging (PRD 2.2 simplified):
+  - POST /api/requests/:id/report: resellers report suspicious requests
+  - Report button + inline form in request-detail for resellers (pending/matched/in_progress requests)
+  - Flags request as "flagged" and sends notifications to all admins
+- Photo Upload Guidance (PRD 2.3):
+  - Inline tips panel in ItemPhotoUploadArea in request-detail add-item dialog
+  - Shows tips: natural light, brand label, defects, angles (bilingual)
 - UX fixes (8 items from gap analysis):
   1. Seller preferred dates (preferredDateStart/End) shown in request detail for Reusse
   2. Contact info card (phone, address) shown for the other party once request is matched (GET /api/requests/:id/contact)

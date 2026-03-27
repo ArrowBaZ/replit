@@ -13,8 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { isUnauthorizedError } from "@/lib/auth-utils";
 import { ArrowLeft, ArrowRight, Package, Zap, Sparkles, Check } from "lucide-react";
 
-const CATEGORIES = ["tops", "bottoms", "dresses", "outerwear", "shoes", "accessories"] as const;
-const CONDITIONS = ["new_with_tags", "like_new", "good", "fair"] as const;
+import { ITEM_CONDITIONS as CONDITIONS, ITEM_CATEGORIES as CATEGORIES } from "@shared/constants";
 
 export default function CreateRequestPage() {
   const { toast } = useToast();

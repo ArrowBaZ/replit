@@ -6,6 +6,9 @@ import { z } from "zod";
 export * from "./models/auth";
 import { users } from "./models/auth";
 
+export { ITEM_CATEGORIES } from "./constants";
+export type { ItemCategory } from "./constants";
+
 export const profiles = pgTable("profiles", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id).unique(),
@@ -59,27 +62,6 @@ export const requestsRelations = relations(requests, ({ one, many }) => ({
   meetings: many(meetings),
   messages: many(messages),
 }));
-
-export const ITEM_CATEGORIES = [
-  "all_fashion",
-  "clothing",
-  "watches_jewelry",
-  "accessories_bags",
-  "furniture",
-  "home_appliances",
-  "decoration",
-  "home_linen",
-  "electronics",
-  "computers",
-  "phones_wearables",
-  "books",
-  "wines",
-  "musical_instruments",
-  "games_toys",
-  "bicycles",
-] as const;
-
-export type ItemCategory = typeof ITEM_CATEGORIES[number];
 
 export const items = pgTable("items", {
   id: serial("id").primaryKey(),
@@ -229,6 +211,29 @@ export const moderationActionsRelations = relations(moderationActions, ({ one })
   admin: one(users, { fields: [moderationActions.adminId], references: [users.id] }),
 }));
 
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  requestId: integer("request_id").notNull().references(() => requests.id),
+  sellerId: varchar("seller_id").notNull().references(() => users.id),
+  reusseId: varchar("reusse_id").notNull().references(() => users.id),
+  rating: integer("rating").notNull(),
+  comment: text("comment"),
+  communicationRating: integer("communication_rating"),
+  reliabilityRating: integer("reliability_rating"),
+  handlingRating: integer("handling_rating"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_reviews_reusse").on(table.reusseId),
+  index("idx_reviews_seller").on(table.sellerId),
+  index("idx_reviews_request").on(table.requestId),
+]);
+
+export const reviewsRelations = relations(reviews, ({ one }) => ({
+  request: one(requests, { fields: [reviews.requestId], references: [requests.id] }),
+  seller: one(users, { fields: [reviews.sellerId], references: [users.id], relationName: "sellerReviews" }),
+  reusse: one(users, { fields: [reviews.reusseId], references: [users.id], relationName: "reusseReviews" }),
+}));
+
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRequestSchema = createInsertSchema(requests).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
 export const insertItemSchema = createInsertSchema(items).omit({ id: true, createdAt: true, updatedAt: true, listedAt: true, soldAt: true });
@@ -236,6 +241,7 @@ export const insertMeetingSchema = createInsertSchema(meetings).omit({ id: true,
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true, isRead: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, isRead: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true });
+export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, createdAt: true });
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
@@ -252,3 +258,5 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type ModerationAction = typeof moderationActions.$inferSelect;
+export type Review = typeof reviews.$inferSelect;
+export type InsertReview = z.infer<typeof insertReviewSchema>;

@@ -24,6 +24,8 @@ import ItemsListPage from "@/pages/items-list";
 import ProfilePage from "@/pages/profile";
 import SchedulePage from "@/pages/schedule";
 import AdminRequestsPage from "@/pages/admin-requests";
+import ResellersPage from "@/pages/resellers";
+import ResellerDetailPage from "@/pages/reseller-detail";
 import FaqPage from "@/pages/faq";
 import ContactPage from "@/pages/contact";
 import TermsPage from "@/pages/terms";
@@ -67,6 +69,8 @@ function AuthenticatedRouter() {
       <Route path="/admin/users">{() => <AdminDashboard />}</Route>
       <Route path="/admin/applications">{() => <AdminDashboard />}</Route>
       <Route path="/admin/requests" component={AdminRequestsPage} />
+      <Route path="/resellers/:id" component={ResellerDetailPage} />
+      <Route path="/resellers" component={ResellersPage} />
       <Route path="/faq" component={FaqPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/terms" component={TermsPage} />

@@ -1,13 +1,14 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import type { Request, Item, Profile } from "@shared/schema";
-import { Package, Shirt, TrendingUp, Calendar, ArrowRight, MapPin, Clock } from "lucide-react";
+import { Package, Shirt, TrendingUp, Calendar, ArrowRight, MapPin, Clock, BarChart3, MessageSquare, CheckCircle } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
@@ -38,9 +39,22 @@ export default function ReusseDashboard() {
     queryKey: ["/api/items"],
   });
 
+  const { data: earningsSummary } = useQuery<any[]>({
+    queryKey: ["/api/earnings-summary"],
+  });
+
+  const { data: activityStats } = useQuery<any>({
+    queryKey: ["/api/stats/activity"],
+  });
+
   const activeAssignments = myRequests?.filter((r) => !["completed", "cancelled"].includes(r.status)) || [];
   const soldItems = items?.filter((i) => i.status === "sold") || [];
   const totalEarnings = soldItems.reduce((sum, i) => sum + (parseFloat(i.salePrice || "0") * 0.2), 0);
+
+  const chartData = (earningsSummary || []).map((row: any) => ({
+    month: row.month?.slice(5) || row.month,
+    total: Number(row.total || 0),
+  }));
 
   const serviceTypeLabels: Record<string, string> = {
     classic: t("classic"),
@@ -144,6 +158,77 @@ export default function ReusseDashboard() {
             </Card>
           </>
         )}
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-6 mt-2">
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              {t("earningsChart")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {chartData.length === 0 ? (
+              <div className="h-32 flex items-center justify-center text-xs text-muted-foreground text-center px-4" data-testid="text-no-earnings-data">
+                {t("noEarningsData")}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 6 }}
+                    formatter={(v: number) => [`${v.toFixed(2)} EUR`, t("monthlyEarnings")]}
+                  />
+                  <Bar dataKey="total" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold">{t("activityStats")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Package className="h-3.5 w-3.5" />{t("activeRequests")}
+              </span>
+              <span className="text-sm font-semibold" data-testid="stat-active-requests">
+                {activityStats?.activeRequests ?? activeAssignments.length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <CheckCircle className="h-3.5 w-3.5 text-[hsl(var(--success))]" />{t("soldThisMonth")}
+              </span>
+              <span className="text-sm font-semibold" data-testid="stat-sold-month">
+                {activityStats?.soldThisMonth ?? 0}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5" />{t("totalSoldItems")}
+              </span>
+              <span className="text-sm font-semibold" data-testid="stat-total-sold">
+                {activityStats?.soldItems ?? soldItems.length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <MessageSquare className="h-3.5 w-3.5" />{t("messagesThisMonth")}
+              </span>
+              <span className="text-sm font-semibold" data-testid="stat-messages-month">
+                {activityStats?.messagesThisMonth ?? 0}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

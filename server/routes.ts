@@ -12,7 +12,7 @@ import {
   registerAuthRoutes,
 } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
-import { ITEM_CATEGORIES } from "@shared/schema";
+import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS } from "@shared/constants";
 
 const wsClients = new Map<string, Set<WebSocket>>();
 
@@ -44,7 +44,7 @@ const itemFields = {
   description: z.string().optional(),
   brand: z.string().optional(),
   size: z.string().optional(),
-  condition: z.string().optional(),
+  condition: z.enum(ITEM_CONDITIONS).optional(),
   minPrice: z.string().optional(),
   maxPrice: z.string().optional(),
   photos: z.array(z.string()).optional(),
@@ -65,25 +65,6 @@ const itemFields = {
   applianceType: z.string().optional(),
   decorStyle: z.string().optional(),
   subcategory: z.string().optional(),
-};
-
-const CATEGORY_ALLOWED_FIELDS: Partial<Record<typeof ITEM_CATEGORIES[number], string[]>> = {
-  all_fashion: [],
-  clothing: ["brand", "size", "condition"],
-  watches_jewelry: ["brand", "material", "condition", "certificatePhotos"],
-  accessories_bags: ["brand", "subcategory", "condition", "certificatePhotos"],
-  furniture: ["brand", "material", "dimensions", "condition"],
-  home_appliances: ["brand", "applianceType", "condition"],
-  decoration: ["decorStyle", "material", "condition"],
-  home_linen: ["subcategory", "size", "condition"],
-  electronics: ["brand", "subcategory", "condition"],
-  computers: ["brand", "ram", "deviceStorage", "condition"],
-  phones_wearables: ["brand", "model", "deviceStorage", "condition"],
-  books: ["author", "genre", "language", "condition"],
-  wines: ["subcategory", "vintage", "volume"],
-  musical_instruments: ["instrumentType", "brand", "condition"],
-  games_toys: ["ageRange", "brand", "condition"],
-  bicycles: ["brand", "subcategory", "frameSize", "condition"],
 };
 
 const CATEGORY_CONSTRAINED_FIELDS = [
@@ -1479,6 +1460,179 @@ export async function registerRoutes(
       } catch (error) {
         console.error("Error fetching earnings:", error);
         res.status(500).json({ message: "Failed to fetch earnings" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/earnings-summary",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const profile = await storage.getProfile(userId);
+        if (!profile) return res.status(400).json({ message: "Profile required" });
+        const summary = await storage.getEarningsSummary(userId, profile.role);
+        res.json(summary);
+      } catch (error) {
+        console.error("Error fetching earnings summary:", error);
+        res.status(500).json({ message: "Failed to fetch earnings summary" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/stats/activity",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const profile = await storage.getProfile(userId);
+        if (!profile) return res.status(400).json({ message: "Profile required" });
+        const stats = await storage.getActivityStats(userId, profile.role);
+        res.json(stats);
+      } catch (error) {
+        console.error("Error fetching activity stats:", error);
+        res.status(500).json({ message: "Failed to fetch activity stats" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/resellers",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const resellers = await storage.getResellers();
+        res.json(resellers);
+      } catch (error) {
+        console.error("Error fetching resellers:", error);
+        res.status(500).json({ message: "Failed to fetch resellers" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/resellers/:id",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const reseller = await storage.getResellerById(req.params.id);
+        if (!reseller) return res.status(404).json({ message: "Reseller not found" });
+        res.json(reseller);
+      } catch (error) {
+        console.error("Error fetching reseller:", error);
+        res.status(500).json({ message: "Failed to fetch reseller" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/resellers/:id/reviews",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const revs = await storage.getReviews(req.params.id);
+        res.json(revs);
+      } catch (error) {
+        console.error("Error fetching reviews:", error);
+        res.status(500).json({ message: "Failed to fetch reviews" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/requests/:id/review",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const userId = req.user.claims.sub;
+        const profile = await storage.getProfile(userId);
+        if (!profile || profile.role !== "seller")
+          return res.status(403).json({ message: "Only sellers can leave reviews" });
+        const request = await storage.getRequest(id);
+        if (!request || request.sellerId !== userId)
+          return res.status(403).json({ message: "Not your request" });
+        if (request.status !== "completed")
+          return res.status(400).json({ message: "Request must be completed to review" });
+        if (!request.reusseId)
+          return res.status(400).json({ message: "No reseller assigned" });
+        const schema = z.object({
+          rating: z.number().int().min(1).max(5),
+          comment: z.string().optional(),
+          communicationRating: z.number().int().min(1).max(5).optional(),
+          reliabilityRating: z.number().int().min(1).max(5).optional(),
+          handlingRating: z.number().int().min(1).max(5).optional(),
+        });
+        const parsed = schema.safeParse(req.body);
+        if (!parsed.success)
+          return res.status(400).json({ message: "Invalid review data" });
+        const review = await storage.createReview({
+          requestId: id,
+          sellerId: userId,
+          reusseId: request.reusseId,
+          ...parsed.data,
+        });
+        await storage.createNotification({
+          userId: request.reusseId,
+          type: "review_received",
+          title: "Avis reçu",
+          message: `Un vendeur a laissé un avis ${parsed.data.rating}/5 pour la demande #${id}.`,
+          link: `/requests/${id}`,
+        });
+        res.json(review);
+      } catch (error) {
+        console.error("Error creating review:", error);
+        res.status(500).json({ message: "Failed to create review" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/requests/:id/report",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const userId = req.user.claims.sub;
+        const profile = await storage.getProfile(userId);
+        if (!profile || profile.role !== "reusse")
+          return res.status(403).json({ message: "Only resellers can report requests" });
+        const request = await storage.getRequest(id);
+        if (!request)
+          return res.status(404).json({ message: "Request not found" });
+        const schema = z.object({ reason: z.string().min(1) });
+        const parsed = schema.safeParse(req.body);
+        if (!parsed.success)
+          return res.status(400).json({ message: "Reason required" });
+        await storage.reportRequest(id, userId, parsed.data.reason);
+        const admins = await storage.getAllUsersWithProfiles();
+        const adminIds = admins
+          .filter((u: any) => u.profile?.role === "admin")
+          .map((u: any) => u.id);
+        await Promise.all(
+          adminIds.map((adminId: string) =>
+            storage.createNotification({
+              userId: adminId,
+              type: "request_flagged",
+              title: "Demande signalée",
+              message: `La demande #${id} a été signalée par un revendeur : ${parsed.data.reason}`,
+              link: `/admin/requests`,
+            })
+          )
+        );
+        res.json({ message: "Request reported" });
+      } catch (error) {
+        console.error("Error reporting request:", error);
+        res.status(500).json({ message: "Failed to report request" });
       }
     },
   );

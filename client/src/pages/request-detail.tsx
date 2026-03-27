@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Request, Item, Meeting, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award } from "lucide-react";
+import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag } from "lucide-react";
 import { ITEM_CATEGORIES, type ItemCategory } from "@shared/schema";
 import { useState, useRef } from "react";
 import { useUpload } from "@/hooks/use-upload";
@@ -225,6 +225,8 @@ export default function RequestDetailPage() {
   const [showReschedule, setShowReschedule] = useState<number | null>(null);
   const [rescheduleForm, setRescheduleForm] = useState({ date: "", time: "", location: "" });
   const [showDeclineReason, setShowDeclineReason] = useState<number | null>(null);
+  const [showReport, setShowReport] = useState(false);
+  const [reportReason, setReportReason] = useState("");
   const [declineReason, setDeclineReason] = useState("");
 
   const approveItem = useMutation({
@@ -347,6 +349,19 @@ export default function RequestDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/requests"] });
       toast({ title: t("requestCompleted") });
+    },
+  });
+
+  const reportRequestMutation = useMutation({
+    mutationFn: async (data: { reason: string }) => {
+      const res = await apiRequest("POST", `/api/requests/${params.id}/report`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id] });
+      setShowReport(false);
+      setReportReason("");
+      toast({ title: t("reportSuccess") });
     },
   });
 
@@ -495,6 +510,19 @@ export default function RequestDetailPage() {
         )}
       </div>
       <p className="text-xs text-muted-foreground">{t("photoHint")}</p>
+      <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 space-y-1.5">
+        <p className="text-xs font-medium text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+          <Camera className="h-3.5 w-3.5" />{t("photoGuidanceTitle")}
+        </p>
+        <ul className="space-y-1">
+          {[t("photoGuidanceLight"), t("photoGuidanceBrand"), t("photoGuidanceDefects"), t("photoGuidanceAngles")].map((tip, i) => (
+            <li key={i} className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
+              <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+              {tip}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 
@@ -651,6 +679,53 @@ export default function RequestDetailPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {isReusse && isAssigned && ["pending", "matched", "scheduled", "in_progress"].includes(request.status) && (
+        showReport ? (
+          <Card className="border-red-200 dark:border-red-800">
+            <CardContent className="p-4 space-y-3">
+              <p className="text-sm font-semibold text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                <Flag className="h-4 w-4" />{t("reportRequest")}
+              </p>
+              <div className="space-y-2">
+                <Label className="text-xs">{t("reportReason")}</Label>
+                <Textarea
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  rows={2}
+                  placeholder={t("reportReasonPlaceholder")}
+                  data-testid="input-report-reason"
+                  className="resize-none"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={!reportReason.trim() || reportRequestMutation.isPending}
+                  onClick={() => reportRequestMutation.mutate({ reason: reportReason })}
+                  data-testid="button-submit-report"
+                >
+                  {t("reportSubmit")}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setShowReport(false); setReportReason(""); }} data-testid="button-cancel-report">
+                  {t("cancel")}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+            onClick={() => setShowReport(true)}
+            data-testid="button-report-request"
+          >
+            <Flag className="h-3.5 w-3.5 mr-1" />{t("reportRequest")}
+          </Button>
+        )
       )}
 
       <Tabs defaultValue="items" className="space-y-4">
