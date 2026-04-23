@@ -12,6 +12,7 @@ import {
   registerAuthRoutes,
 } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS } from "@shared/constants";
 
 const wsClients = new Map<string, Set<WebSocket>>();
@@ -1591,6 +1592,247 @@ export async function registerRoutes(
       } catch (error) {
         console.error("Error creating review:", error);
         res.status(500).json({ message: "Failed to create review" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/items/:id/documents",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const itemId = parseInt(req.params.id);
+        const item = await storage.getItem(itemId);
+        if (!item) return res.status(404).json({ message: "Item not found" });
+        const profile = await storage.getProfile(userId);
+        const isAdmin = profile?.role === "admin";
+        if (!isAdmin && item.sellerId !== userId && item.reusseId !== userId) {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+        const docs = await storage.getItemDocuments(itemId);
+        res.json(docs.map(({ fileUrl: _omit, ...rest }) => rest));
+      } catch (error) {
+        console.error("Error fetching item documents:", error);
+        res.status(500).json({ message: "Failed to fetch documents" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/items/:id/documents",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const itemId = parseInt(req.params.id);
+        const item = await storage.getItem(itemId);
+        if (!item) return res.status(404).json({ message: "Item not found" });
+        const profile = await storage.getProfile(userId);
+        const isAdmin = profile?.role === "admin";
+        if (!isAdmin && item.sellerId !== userId && item.reusseId !== userId) {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+        const ALLOWED_EXTENSIONS = /\.(jpe?g|png|webp|gif|pdf)$/i;
+        const MAX_PHOTO_SIZE = 10 * 1024 * 1024;
+        const MAX_CERT_SIZE = 5 * 1024 * 1024;
+
+        const schema = z.object({
+          fileName: z.string().min(1).refine(
+            (name) => ALLOWED_EXTENSIONS.test(name),
+            { message: "Only image files (JPG, PNG, WebP, GIF) and PDFs are allowed" }
+          ),
+          fileUrl: z.string().min(1),
+          fileType: z.enum(["photo", "certificate"]),
+          fileSize: z.number().positive({ message: "fileSize is required and must be a positive number" }),
+        });
+        const parsed = schema.safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(400).json({ message: "Invalid document data", errors: parsed.error.errors });
+        }
+        const { fileSize, fileType, fileName } = parsed.data;
+        if (fileType === "photo" && /\.pdf$/i.test(fileName)) {
+          return res.status(400).json({ message: "PDF files cannot be uploaded as photos. Select 'Certificate' type for PDFs." });
+        }
+        const maxSize = fileType === "photo" ? MAX_PHOTO_SIZE : MAX_CERT_SIZE;
+        if (fileSize > maxSize) {
+          const limitMB = maxSize / (1024 * 1024);
+          return res.status(400).json({ message: `File too large. ${fileType === "photo" ? "Photos" : "Documents"} must be under ${limitMB}MB.` });
+        }
+        if (!parsed.data.fileUrl.startsWith("/objects/")) {
+          return res.status(400).json({ message: "Invalid file URL: must be an uploaded object path" });
+        }
+
+        const existingDocs = await storage.getItemDocuments(itemId);
+        const MAX_PHOTOS_PER_ITEM = 5;
+        const MAX_CERTS_PER_ITEM = 3;
+        if (parsed.data.fileType === "photo") {
+          const photoCount = existingDocs.filter((d) => d.fileType === "photo").length;
+          if (photoCount >= MAX_PHOTOS_PER_ITEM) {
+            return res.status(400).json({ message: `Maximum of ${MAX_PHOTOS_PER_ITEM} photos allowed per item.` });
+          }
+        } else {
+          const certCount = existingDocs.filter((d) => d.fileType === "certificate").length;
+          if (certCount >= MAX_CERTS_PER_ITEM) {
+            return res.status(400).json({ message: `Maximum of ${MAX_CERTS_PER_ITEM} certificates allowed per item.` });
+          }
+        }
+
+        const doc = await storage.createItemDocument({
+          itemId,
+          uploaderUserId: userId,
+          fileName: parsed.data.fileName,
+          fileUrl: parsed.data.fileUrl,
+          fileType: parsed.data.fileType,
+          fileSize: parsed.data.fileSize || null,
+        });
+
+        const notifyUserId = userId === item.sellerId ? item.reusseId : item.sellerId;
+        if (notifyUserId) {
+          await storage.createNotification({
+            userId: notifyUserId,
+            type: "new_document",
+            title: "New Document Uploaded",
+            message: `A new document "${parsed.data.fileName}" was uploaded for item "${item.title}".`,
+            link: `/requests/${item.requestId}`,
+          });
+          broadcastToUser(notifyUserId, {
+            type: "new_document",
+            itemId,
+            fileName: parsed.data.fileName,
+            itemTitle: item.title,
+          });
+        }
+
+        res.json(doc);
+      } catch (error) {
+        console.error("Error creating item document:", error);
+        res.status(500).json({ message: "Failed to save document" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/items/:id/document-request",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const itemId = parseInt(req.params.id);
+        const item = await storage.getItem(itemId);
+        if (!item) return res.status(404).json({ message: "Item not found" });
+        const profile = await storage.getProfile(userId);
+        if (!profile || profile.role !== "reusse") {
+          return res.status(403).json({ message: "Only resellers can request documents" });
+        }
+        if (item.reusseId !== userId) {
+          return res.status(403).json({ message: "Not assigned to this item" });
+        }
+        const existing = await storage.getDocumentRequestStatus(itemId, userId);
+        if (existing) {
+          return res.status(409).json({ message: "Document request already sent for this item", alreadyRequested: true });
+        }
+        try {
+          await storage.createDocumentRequest(itemId, userId);
+        } catch (err: any) {
+          if (err?.code === "23505") {
+            return res.status(409).json({ message: "Document request already sent for this item", alreadyRequested: true });
+          }
+          throw err;
+        }
+        const content = `📄 I'd like to request additional documentation for "${item.title}". Please upload authenticity certificates, purchase receipts, or any relevant documents.`;
+        const message = await storage.createMessage({
+          senderId: userId,
+          receiverId: item.sellerId,
+          content,
+          requestId: item.requestId || null,
+        });
+        broadcastToUser(item.sellerId, { type: "new_message", message });
+        broadcastToUser(userId, { type: "new_message", message });
+        await storage.createNotification({
+          userId: item.sellerId,
+          type: "document_request",
+          title: "Document Request",
+          message: `Your reseller is requesting additional documentation for "${item.title}".`,
+          link: `/messages`,
+        });
+        broadcastToUser(item.sellerId, {
+          type: "document_request",
+          itemId,
+          itemTitle: item.title,
+        });
+        res.json({ success: true, message });
+      } catch (error) {
+        console.error("Error sending document request:", error);
+        res.status(500).json({ message: "Failed to send document request" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/items/:id/document-request-status",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const itemId = parseInt(req.params.id);
+        const item = await storage.getItem(itemId);
+        if (!item) return res.status(404).json({ message: "Item not found" });
+        const profile = await storage.getProfile(userId);
+        const isAdmin = profile?.role === "admin";
+        if (!isAdmin && item.sellerId !== userId && item.reusseId !== userId) {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+        const requestUserId = profile?.role === "reusse" ? userId : item.reusseId;
+        const existing = requestUserId
+          ? await storage.getDocumentRequestStatus(itemId, requestUserId)
+          : null;
+        res.json({ requested: !!existing, requestedAt: existing?.createdAt || null });
+      } catch (error) {
+        console.error("Error checking document request status:", error);
+        res.status(500).json({ message: "Failed to check status" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/items/:id/documents/:docId/download",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const itemId = parseInt(req.params.id);
+        const docId = parseInt(req.params.docId);
+        const item = await storage.getItem(itemId);
+        if (!item) return res.status(404).json({ message: "Item not found" });
+        const profile = await storage.getProfile(userId);
+        const isAdmin = profile?.role === "admin";
+        if (!isAdmin && item.sellerId !== userId && item.reusseId !== userId) {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+        const doc = await storage.getItemDocument(docId);
+        if (!doc || doc.itemId !== itemId) {
+          return res.status(404).json({ message: "Document not found" });
+        }
+        const objectStorageService = new ObjectStorageService();
+        const objectFile = await objectStorageService.getObjectEntityFile(doc.fileUrl);
+        await objectStorageService.downloadObject(objectFile, res, 0);
+      } catch (error: any) {
+        const isNotFound =
+          error?.code === "NOT_FOUND" ||
+          error?.message?.toLowerCase().includes("not found") ||
+          error?.message?.toLowerCase().includes("no such object") ||
+          error?.statusCode === 404;
+        if (isNotFound) {
+          return res.status(404).json({ message: "Document file not found in storage" });
+        }
+        console.error("Error serving document:", error);
+        res.status(500).json({ message: "Failed to serve document" });
       }
     },
   );

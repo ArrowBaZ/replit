@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, numeric, serial, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, numeric, serial, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -111,10 +111,46 @@ export const items = pgTable("items", {
   index("idx_items_status").on(table.status),
 ]);
 
-export const itemsRelations = relations(items, ({ one }) => ({
+export const itemsRelations = relations(items, ({ one, many }) => ({
   request: one(requests, { fields: [items.requestId], references: [requests.id] }),
   seller: one(users, { fields: [items.sellerId], references: [users.id], relationName: "sellerItems" }),
   reusse: one(users, { fields: [items.reusseId], references: [users.id], relationName: "reusseItems" }),
+  documents: many(itemDocuments),
+}));
+
+export const itemDocuments = pgTable("item_documents", {
+  id: serial("id").primaryKey(),
+  itemId: integer("item_id").notNull().references(() => items.id),
+  uploaderUserId: varchar("uploader_user_id").notNull().references(() => users.id),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: varchar("file_type", { length: 20 }).notNull(),
+  fileSize: integer("file_size"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_item_documents_item").on(table.itemId),
+  index("idx_item_documents_uploader").on(table.uploaderUserId),
+]);
+
+export const itemDocumentsRelations = relations(itemDocuments, ({ one }) => ({
+  item: one(items, { fields: [itemDocuments.itemId], references: [items.id] }),
+  uploader: one(users, { fields: [itemDocuments.uploaderUserId], references: [users.id] }),
+}));
+
+export const itemDocumentRequests = pgTable("item_document_requests", {
+  id: serial("id").primaryKey(),
+  itemId: integer("item_id").notNull().references(() => items.id),
+  reusseId: varchar("reusse_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_item_doc_requests_item").on(table.itemId),
+  index("idx_item_doc_requests_reusse").on(table.reusseId),
+  uniqueIndex("uq_item_doc_request_item_reusse").on(table.itemId, table.reusseId),
+]);
+
+export const itemDocumentRequestsRelations = relations(itemDocumentRequests, ({ one }) => ({
+  item: one(items, { fields: [itemDocumentRequests.itemId], references: [items.id] }),
+  reusse: one(users, { fields: [itemDocumentRequests.reusseId], references: [users.id] }),
 }));
 
 export const meetings = pgTable("meetings", {
@@ -234,6 +270,7 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
   reusse: one(users, { fields: [reviews.reusseId], references: [users.id], relationName: "reusseReviews" }),
 }));
 
+export const insertItemDocumentSchema = createInsertSchema(itemDocuments).omit({ id: true, createdAt: true });
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRequestSchema = createInsertSchema(requests).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
 export const insertItemSchema = createInsertSchema(items).omit({ id: true, createdAt: true, updatedAt: true, listedAt: true, soldAt: true });
@@ -260,3 +297,8 @@ export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type ModerationAction = typeof moderationActions.$inferSelect;
 export type Review = typeof reviews.$inferSelect;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
+export type ItemDocument = typeof itemDocuments.$inferSelect;
+export type InsertItemDocument = z.infer<typeof insertItemDocumentSchema>;
+export const insertItemDocumentRequestSchema = createInsertSchema(itemDocumentRequests).omit({ id: true, createdAt: true });
+export type ItemDocumentRequest = typeof itemDocumentRequests.$inferSelect;
+export type InsertItemDocumentRequest = z.infer<typeof insertItemDocumentRequestSchema>;

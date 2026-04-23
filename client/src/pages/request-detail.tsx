@@ -15,9 +15,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Request, Item, Meeting, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag } from "lucide-react";
+import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag, FileText } from "lucide-react";
+import { ItemDocumentsSection } from "@/components/item-documents-section";
 import { ITEM_CATEGORIES, type ItemCategory } from "@shared/schema";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useUpload } from "@/hooks/use-upload";
 
 const statusColors: Record<string, string> = {
@@ -120,6 +121,40 @@ export default function RequestDetailPage() {
     },
   });
 
+  const [pendingDocs, setPendingDocs] = useState<Array<{ fileName: string; fileUrl: string; fileType: "photo" | "certificate"; fileSize: number }>>([]);
+  const [docUploadType, setDocUploadType] = useState<"photo" | "certificate">("certificate");
+  const docFileInputRef = useRef<HTMLInputElement>(null);
+  const { uploadFile: uploadDocFile, isUploading: isUploadingDoc } = useUpload();
+
+  const MAX_DOCS = 3;
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const remaining = MAX_DOCS - pendingDocs.length;
+    const filesToUpload = Array.from(files).slice(0, remaining);
+    const maxSize = docUploadType === "photo" ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+    const limitMB = maxSize / (1024 * 1024);
+    for (const file of filesToUpload) {
+      if (file.size > maxSize) {
+        toast({ title: "File too large", description: `"${file.name}" exceeds the ${limitMB}MB limit for ${docUploadType === "photo" ? "photos" : "certificates"}.`, variant: "destructive" });
+        continue;
+      }
+      const result = await uploadDocFile(file);
+      if (result) {
+        setPendingDocs((prev) => [...prev, {
+          fileName: file.name,
+          fileUrl: result.objectPath,
+          fileType: docUploadType,
+          fileSize: file.size,
+        }]);
+      }
+    }
+    if (docFileInputRef.current) docFileInputRef.current.value = "";
+  };
+
+  const removeDoc = (index: number) => setPendingDocs((prev) => prev.filter((_, i) => i !== index));
+
   const MAX_PHOTOS = 5;
   const MAX_CERT_PHOTOS = 3;
 
@@ -128,7 +163,12 @@ export default function RequestDetailPage() {
     if (!files) return;
     const remaining = MAX_PHOTOS - itemPhotos.length;
     const filesToUpload = Array.from(files).slice(0, remaining);
+    const MAX_PHOTO_SIZE = 10 * 1024 * 1024;
     for (const file of filesToUpload) {
+      if (file.size > MAX_PHOTO_SIZE) {
+        toast({ title: "Photo too large", description: `"${file.name}" exceeds the 10MB limit for photos.`, variant: "destructive" });
+        continue;
+      }
       await uploadFile(file);
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -188,15 +228,34 @@ export default function RequestDetailPage() {
   const addItem = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", `/api/requests/${params.id}/items`, data);
-      return res.json();
+      const item = await res.json();
+      let docFailCount = 0;
+      for (const doc of pendingDocs) {
+        try {
+          await apiRequest("POST", `/api/items/${item.id}/documents`, doc);
+        } catch (err) {
+          console.error("Failed to save document:", err);
+          docFailCount++;
+        }
+      }
+      return { item, docFailCount };
     },
-    onSuccess: () => {
+    onSuccess: ({ docFailCount }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
       setShowAddItem(false);
       setItemForm(emptyItemForm);
       setItemPhotos([]);
       setCertPhotos([]);
-      toast({ title: t("addItem") });
+      setPendingDocs([]);
+      if (docFailCount > 0) {
+        toast({
+          title: t("addItem"),
+          description: `Item added, but ${docFailCount} document${docFailCount > 1 ? "s" : ""} failed to upload. You can retry from the item card.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: t("addItem") });
+      }
     },
   });
 
@@ -364,6 +423,37 @@ export default function RequestDetailPage() {
       toast({ title: t("reportSuccess") });
     },
   });
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: "auth", userId: user.id }));
+    };
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "new_document") {
+          toast({
+            title: "New Document Uploaded",
+            description: `"${data.fileName}" was added to item "${data.itemTitle}".`,
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/items", data.itemId, "documents"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        } else if (data.type === "document_request") {
+          toast({
+            title: "Document Request",
+            description: `Additional documentation was requested for "${data.itemTitle}".`,
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        }
+      } catch {}
+    };
+    return () => {
+      ws.close();
+    };
+  }, [user?.id]);
 
   const serviceTypeLabels: Record<string, string> = {
     classic: t("classic"),
@@ -905,7 +995,54 @@ export default function RequestDetailPage() {
                   </div>
                   <ItemPhotoUploadArea />
                   {showCertPhotos && <CertPhotoUploadArea />}
-                  <Button type="submit" className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" disabled={addItem.isPending || isUploadingPhoto || isUploadingCert} data-testid="button-submit-item">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" />Documents (up to 3)</Label>
+                    <div className="flex gap-1.5" data-testid="doc-type-selector">
+                      <button
+                        type="button"
+                        onClick={() => setDocUploadType("certificate")}
+                        className={`flex-1 text-xs px-2 py-1 rounded border transition-colors ${docUploadType === "certificate" ? "bg-primary text-primary-foreground border-primary" : "border-input bg-background hover:bg-muted"}`}
+                        data-testid="doc-type-certificate"
+                      >
+                        Certificate / PDF (5MB)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDocUploadType("photo")}
+                        className={`flex-1 text-xs px-2 py-1 rounded border transition-colors ${docUploadType === "photo" ? "bg-primary text-primary-foreground border-primary" : "border-input bg-background hover:bg-muted"}`}
+                        data-testid="doc-type-photo"
+                      >
+                        Additional Photo (10MB)
+                      </button>
+                    </div>
+                    <div className="space-y-1.5">
+                      {pendingDocs.map((doc, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs rounded-md border bg-muted/30 px-2 py-1.5">
+                          <FileText className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                          <span className="flex-1 truncate">{doc.fileName}</span>
+                          <span className="text-muted-foreground shrink-0 capitalize">{doc.fileType}</span>
+                          <span className="text-muted-foreground shrink-0">{doc.fileSize < 1024 * 1024 ? `${(doc.fileSize / 1024).toFixed(1)} KB` : `${(doc.fileSize / (1024 * 1024)).toFixed(1)} MB`}</span>
+                          <button type="button" onClick={() => removeDoc(idx)} className="shrink-0" data-testid={`button-remove-doc-${idx}`}>
+                            <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                          </button>
+                        </div>
+                      ))}
+                      {pendingDocs.length < MAX_DOCS && (
+                        <label className="flex items-center gap-2 rounded-md border-2 border-dashed px-3 py-2 cursor-pointer hover:border-[hsl(var(--success))] transition-colors" data-testid="button-upload-doc">
+                          {isUploadingDoc ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          ) : (
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            {docUploadType === "certificate" ? "Add certificate / PDF (max 5MB)" : "Add photo (max 10MB)"}
+                          </span>
+                          <input ref={docFileInputRef} type="file" accept="image/*,.pdf" multiple className="hidden" onChange={handleDocUpload} disabled={isUploadingDoc} />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" disabled={addItem.isPending || isUploadingPhoto || isUploadingCert || isUploadingDoc} data-testid="button-submit-item">
                     {addItem.isPending ? "..." : t("addItem")}
                   </Button>
                 </form>
@@ -1106,6 +1243,11 @@ export default function RequestDetailPage() {
                       )}
                     </div>
                   )}
+                  <ItemDocumentsSection
+                    item={item}
+                    profile={profile}
+                    userId={user?.id}
+                  />
                 </CardContent>
               </Card>
             ))

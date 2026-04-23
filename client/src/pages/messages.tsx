@@ -63,6 +63,10 @@ export default function MessagesPage() {
             }
           );
           queryClient.invalidateQueries({ queryKey: ["/api/messages/conversations"] });
+        } else if (data.type === "new_document") {
+          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        } else if (data.type === "document_request") {
+          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
         }
       } catch {}
     };

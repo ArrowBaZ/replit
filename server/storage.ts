@@ -28,6 +28,11 @@ import {
   type Review,
   type InsertReview,
   type User,
+  itemDocuments,
+  type ItemDocument,
+  type InsertItemDocument,
+  itemDocumentRequests,
+  type ItemDocumentRequest,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -99,6 +104,12 @@ export interface IStorage {
   getReviews(reusseId: string): Promise<Review[]>;
   createReview(data: InsertReview): Promise<Review>;
   reportRequest(requestId: number, reporterId: string, reason: string): Promise<void>;
+
+  getItemDocuments(itemId: number): Promise<any[]>;
+  getItemDocument(docId: number): Promise<ItemDocument | undefined>;
+  createItemDocument(data: InsertItemDocument): Promise<ItemDocument>;
+  getDocumentRequestStatus(itemId: number, reusseId: string): Promise<ItemDocumentRequest | undefined>;
+  createDocumentRequest(itemId: number, reusseId: string): Promise<ItemDocumentRequest>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -744,6 +755,47 @@ export class DatabaseStorage implements IStorage {
       metadata: JSON.stringify({ reportedBy: reporterId }),
     });
     await db.update(requests).set({ status: "flagged" }).where(eq(requests.id, requestId));
+  }
+
+  async getItemDocument(docId: number): Promise<ItemDocument | undefined> {
+    const [doc] = await db.select().from(itemDocuments).where(eq(itemDocuments.id, docId));
+    return doc;
+  }
+
+  async getItemDocuments(itemId: number): Promise<any[]> {
+    const rows = await db
+      .select({
+        doc: itemDocuments,
+        uploader: users,
+      })
+      .from(itemDocuments)
+      .leftJoin(users, eq(users.id, itemDocuments.uploaderUserId))
+      .where(eq(itemDocuments.itemId, itemId))
+      .orderBy(desc(itemDocuments.createdAt));
+    return rows.map((r) => ({
+      ...r.doc,
+      uploaderName: r.uploader
+        ? `${r.uploader.firstName || ""} ${r.uploader.lastName || ""}`.trim() || r.uploader.email
+        : "Unknown",
+    }));
+  }
+
+  async createItemDocument(data: InsertItemDocument): Promise<ItemDocument> {
+    const [doc] = await db.insert(itemDocuments).values(data).returning();
+    return doc;
+  }
+
+  async getDocumentRequestStatus(itemId: number, reusseId: string): Promise<ItemDocumentRequest | undefined> {
+    const [req] = await db
+      .select()
+      .from(itemDocumentRequests)
+      .where(and(eq(itemDocumentRequests.itemId, itemId), eq(itemDocumentRequests.reusseId, reusseId)));
+    return req;
+  }
+
+  async createDocumentRequest(itemId: number, reusseId: string): Promise<ItemDocumentRequest> {
+    const [req] = await db.insert(itemDocumentRequests).values({ itemId, reusseId }).returning();
+    return req;
   }
 }
 

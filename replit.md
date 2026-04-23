@@ -59,6 +59,9 @@ client/src/
 - Dark sidebar with green accent for brand identity
 - Replit Auth only (no custom authentication)
 - Subscription/Stripe deferred to Phase 2
+- **File upload pattern (intentional)**: All file uploads use a presigned URL flow — client calls `POST /api/uploads/request-url` to get a GCS presigned URL, uploads the file directly from the browser to GCS, then sends only metadata (fileName, fileUrl, fileSize, fileType) to the backend API (e.g. `POST /api/items/:id/documents`). The backend never handles raw file bytes. This is enforced app-wide via the `useUpload` hook (`client/src/hooks/use-upload.ts`).
+  - fileUrl is stored server-side only; the document list API (`GET /api/items/:id/documents`) strips it from responses.
+  - Document downloads go through an authenticated proxy (`GET /api/items/:id/documents/:docId/download`) that fetches from object storage server-side, never exposing raw GCS URLs to clients.
 
 ## Recent Changes
 - Initial MVP build: complete frontend + backend
@@ -117,3 +120,13 @@ client/src/
   6. Duplicate article button for Reusse on all item cards (calls POST /api/items/:id/duplicate)
   7. Declined item shows decline reason in a red callout
   8. Item sold notification already existed in server; confirmed working
+- Seller Documentation & Media Hub (Task #3):
+  - `item_documents` table: per-item document records (photo/certificate) with uploader, filename, fileUrl (private), fileType, fileSize, createdAt
+  - `item_document_requests` table: idempotent per-reseller-per-item document requests
+  - GET /api/items/:id/documents — auth-gated (seller/reusse/admin); fileUrl stripped from response
+  - POST /api/items/:id/documents — validates extension, file size (photos 10MB / certs 5MB), fileUrl origin (/objects/), per-item count limits (5 photos / 3 certs), sends notification + WS event
+  - POST /api/items/:id/document-request — idempotent (409 on duplicate), persists to DB, sends chat message + notification + WS event
+  - GET /api/items/:id/document-request-status — returns {requested, requestedAt}; checks item participant/admin auth
+  - GET /api/items/:id/documents/:docId/download — authenticated file proxy (streams from object storage, never exposes raw GCS URLs)
+  - ItemDocumentsSection component: photo 3-col gallery + per-photo audit row (filename/uploader/date/size/download); certificate list; Photo/Certificate type selector in upload dialog; reseller "Request Documents" button with server-persisted state
+  - Item creation form: explicit certificate/photo type selector in doc upload area
