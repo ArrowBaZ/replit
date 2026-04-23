@@ -824,8 +824,9 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
+        const userId = req.user.claims.sub;
         const id = parseInt(req.params.id);
-        await storage.markNotificationRead(id);
+        await storage.markNotificationRead(id, userId);
         res.json({ success: true });
       } catch (error) {
         console.error("Error marking notification read:", error);
