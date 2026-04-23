@@ -834,6 +834,22 @@ export async function registerRoutes(
     },
   );
 
+  app.patch(
+    "/api/notifications/read-all",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        await storage.markAllNotificationsRead(userId);
+        res.json({ success: true });
+      } catch (error) {
+        console.error("Error marking all notifications read:", error);
+        res.status(500).json({ message: "Failed to update notifications" });
+      }
+    },
+  );
+
   app.get(
     "/api/admin/users",
     isAuthenticated,
@@ -1757,7 +1773,7 @@ export async function registerRoutes(
           type: "document_request",
           title: "Document Request",
           message: `Your reseller is requesting additional documentation for "${item.title}".`,
-          link: `/messages`,
+          link: item.requestId ? `/requests/${item.requestId}` : `/items`,
         });
         broadcastToUser(item.sellerId, {
           type: "document_request",

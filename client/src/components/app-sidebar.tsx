@@ -1,9 +1,11 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useI18n } from "@/lib/i18n";
-import type { Profile } from "@shared/schema";
+import type { Profile, Notification } from "@shared/schema";
 import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
+import { useEffect, useRef } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -18,10 +20,11 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   LayoutDashboard,
   Package,
-  ShoppingBag,
   MessageSquare,
   User,
   LogOut,
@@ -32,12 +35,157 @@ import {
   Calendar,
   Shirt,
   Star,
+  Bell,
+  FileText,
+  Check,
 } from "lucide-react";
 
 function getInitials(firstName?: string | null, lastName?: string | null): string {
   const f = firstName?.[0] || "";
   const l = lastName?.[0] || "";
   return (f + l).toUpperCase() || "U";
+}
+
+function timeAgo(date: string | Date): string {
+  const now = Date.now();
+  const then = new Date(date).getTime();
+  const diff = Math.floor((now - then) / 1000);
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
+
+function NotificationIcon({ type }: { type: string }) {
+  if (type === "document_request") return <FileText className="h-4 w-4 text-blue-500" />;
+  if (type === "new_document") return <FileText className="h-4 w-4 text-green-500" />;
+  return <Bell className="h-4 w-4 text-muted-foreground" />;
+}
+
+function NotificationBell({ userId }: { userId: string }) {
+  const { t } = useI18n();
+  const [, navigate] = useLocation();
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const { data: notifs = [] } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications"],
+    refetchInterval: 60000,
+  });
+
+  const unreadCount = notifs.filter((n) => !n.isRead).length;
+
+  const markRead = useMutation({
+    mutationFn: (id: number) => apiRequest("PATCH", `/api/notifications/${id}/read`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications"] }),
+  });
+
+  const markAllRead = useMutation({
+    mutationFn: () => apiRequest("PATCH", "/api/notifications/read-all"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/notifications"] }),
+  });
+
+  useEffect(() => {
+    if (!userId) return;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    wsRef.current = ws;
+    ws.onopen = () => ws.send(JSON.stringify({ type: "auth", userId }));
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (
+          data.type === "document_request" ||
+          data.type === "new_document" ||
+          data.type === "new_notification"
+        ) {
+          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        }
+      } catch {}
+    };
+    ws.onclose = () => { wsRef.current = null; };
+    return () => { ws.close(); };
+  }, [userId]);
+
+  const handleNotifClick = (notif: Notification) => {
+    if (!notif.isRead) markRead.mutate(notif.id);
+    if (notif.link) navigate(notif.link);
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="relative"
+          data-testid="button-notifications"
+        >
+          <Bell className="h-4 w-4" />
+          {unreadCount > 0 && (
+            <span
+              className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none"
+              data-testid="badge-notification-count"
+            >
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        side="right"
+        className="w-80 p-0"
+        data-testid="panel-notifications"
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <span className="text-sm font-semibold">{t("notifications")}</span>
+          {unreadCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-6 px-2"
+              onClick={() => markAllRead.mutate()}
+              data-testid="button-mark-all-read"
+            >
+              <Check className="h-3 w-3 mr-1" />
+              {t("markAllRead")}
+            </Button>
+          )}
+        </div>
+        {notifs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground text-sm" data-testid="text-no-notifications">
+            <Bell className="h-8 w-8 mb-2 opacity-30" />
+            {t("noNotifications")}
+          </div>
+        ) : (
+          <ScrollArea className="max-h-80">
+            {notifs.slice(0, 15).map((notif) => (
+              <button
+                key={notif.id}
+                className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-muted/50 border-b last:border-b-0 transition-colors ${!notif.isRead ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}`}
+                onClick={() => handleNotifClick(notif)}
+                data-testid={`notif-item-${notif.id}`}
+              >
+                <div className="mt-0.5 shrink-0">
+                  <NotificationIcon type={notif.type} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium leading-tight truncate">{notif.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notif.message}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className="text-[10px] text-muted-foreground">{notif.createdAt ? timeAgo(notif.createdAt) : ""}</span>
+                  {!notif.isRead && (
+                    <span className="h-2 w-2 rounded-full bg-blue-500" data-testid={`notif-unread-dot-${notif.id}`} />
+                  )}
+                </div>
+              </button>
+            ))}
+          </ScrollArea>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function AppSidebar() {
@@ -122,7 +270,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-3">
-        <div className="flex items-center gap-3 px-2 py-2">
+        <div className="flex items-center gap-2 px-2 py-2">
           <Avatar className="h-8 w-8">
             <AvatarImage src={user?.profileImageUrl || undefined} />
             <AvatarFallback className="text-xs bg-muted">
@@ -137,6 +285,7 @@ export function AppSidebar() {
               {role === "reusse" ? t("reusse") : role === "admin" ? "Admin" : t("seller")}
             </p>
           </div>
+          {user?.id && <NotificationBell userId={user.id} />}
           <Button
             size="icon"
             variant="ghost"

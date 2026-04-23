@@ -472,6 +472,12 @@ const translations = {
     roleSeller: "Seller",
     roleReseller: "Reseller",
     roleAdmin: "Admin",
+
+    // Notifications bell
+    notifications: "Notifications",
+    noNotifications: "No notifications",
+    markAllRead: "Mark all as read",
+    notifDocRequest: "Document request",
   },
   fr: {
     // Nav
@@ -942,6 +948,12 @@ const translations = {
     roleSeller: "Vendeur",
     roleReseller: "Revendeur",
     roleAdmin: "Administrateur",
+
+    // Notifications bell
+    notifications: "Notifications",
+    noNotifications: "Aucune notification",
+    markAllRead: "Tout marquer comme lu",
+    notifDocRequest: "Demande de documents",
   },
 } as const;
 
