@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, or, desc, sql, ne, isNull, inArray, gte } from "drizzle-orm";
+import { eq, and, or, desc, sql, ne, isNull, inArray, gte, lte, isNotNull } from "drizzle-orm";
 import {
   users,
   profiles,
@@ -39,6 +39,11 @@ import {
   agreementSignatures,
   type AgreementSignature,
   type InsertAgreementSignature,
+  feeTiers,
+  type FeeTier,
+  type InsertFeeTier,
+  feeTierChangelog,
+  type FeeTierChangelog,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -93,6 +98,7 @@ export interface IStorage {
   getAdminStats(): Promise<any>;
 
   createTransaction(data: InsertTransaction): Promise<Transaction>;
+  updateTransaction(id: number, data: Partial<InsertTransaction>): Promise<Transaction | undefined>;
   getTransactionByItemId(itemId: number): Promise<Transaction | undefined>;
   getTransactions(userId: string, role: string): Promise<Transaction[]>;
   getEarnings(
@@ -130,6 +136,16 @@ export interface IStorage {
   createAgreementSignature(data: InsertAgreementSignature): Promise<AgreementSignature>;
   getAgreementSignatures(agreementId: number): Promise<AgreementSignature[]>;
   getAgreementSignature(agreementId: number, userId: string): Promise<AgreementSignature | undefined>;
+
+  getFeeTiers(activeOnly?: boolean): Promise<FeeTier[]>;
+  getFeeTier(id: number): Promise<FeeTier | undefined>;
+  createFeeTier(data: InsertFeeTier): Promise<FeeTier>;
+  updateFeeTier(id: number, data: Partial<InsertFeeTier>): Promise<FeeTier | undefined>;
+  deleteFeeTier(id: number): Promise<void>;
+  getTierForPrice(price: number): Promise<FeeTier | undefined>;
+  logTierChange(data: { feeTierId: number | null; adminId: string; action: string; previousValues?: unknown; newValues?: unknown }): Promise<FeeTierChangelog>;
+  getFeeTierChangelog(): Promise<any[]>;
+  seedDefaultFeeTiers(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -540,6 +556,11 @@ export class DatabaseStorage implements IStorage {
     return transaction;
   }
 
+  async updateTransaction(id: number, data: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+    const [row] = await db.update(transactions).set(data).where(eq(transactions.id, id)).returning();
+    return row;
+  }
+
   async getTransactionByItemId(itemId: number): Promise<Transaction | undefined> {
     const [row] = await db.select().from(transactions).where(eq(transactions.itemId, itemId)).limit(1);
     return row;
@@ -623,7 +644,7 @@ export class DatabaseStorage implements IStorage {
 
   async getEarningsSummary(userId: string, role: string): Promise<any[]> {
     const col = role === "reusse" ? transactions.reusseId : transactions.sellerId;
-    const amountCol = role === "reusse" ? transactions.reusseAmount : transactions.sellerAmount;
+    const amountCol = role === "reusse" ? transactions.reusseEarning : transactions.sellerEarning;
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     const rows = await db
@@ -935,6 +956,85 @@ export class DatabaseStorage implements IStorage {
       and(eq(agreementSignatures.agreementId, agreementId), eq(agreementSignatures.userId, userId))
     );
     return sig;
+  }
+
+  async getFeeTiers(activeOnly = false): Promise<FeeTier[]> {
+    if (activeOnly) {
+      return db.select().from(feeTiers).where(eq(feeTiers.isActive, true)).orderBy(feeTiers.minPrice);
+    }
+    return db.select().from(feeTiers).orderBy(feeTiers.minPrice);
+  }
+
+  async getFeeTier(id: number): Promise<FeeTier | undefined> {
+    const [tier] = await db.select().from(feeTiers).where(eq(feeTiers.id, id));
+    return tier;
+  }
+
+  async createFeeTier(data: InsertFeeTier): Promise<FeeTier> {
+    const [tier] = await db.insert(feeTiers).values(data).returning();
+    return tier;
+  }
+
+  async updateFeeTier(id: number, data: Partial<InsertFeeTier>): Promise<FeeTier | undefined> {
+    const [tier] = await db.update(feeTiers).set(data).where(eq(feeTiers.id, id)).returning();
+    return tier;
+  }
+
+  async deleteFeeTier(id: number): Promise<void> {
+    await db.update(feeTiers).set({ isActive: false }).where(eq(feeTiers.id, id));
+  }
+
+  async getTierForPrice(price: number): Promise<FeeTier | undefined> {
+    const [tier] = await db.select().from(feeTiers)
+      .where(
+        and(
+          eq(feeTiers.isActive, true),
+          lte(feeTiers.minPrice, String(price)),
+          or(isNull(feeTiers.maxPrice), gte(feeTiers.maxPrice, String(price)))
+        )
+      )
+      .orderBy(desc(feeTiers.minPrice))
+      .limit(1);
+    return tier;
+  }
+
+  async logTierChange(data: { feeTierId: number | null; adminId: string; action: string; previousValues?: unknown; newValues?: unknown }): Promise<FeeTierChangelog> {
+    const [entry] = await db.insert(feeTierChangelog).values({
+      feeTierId: data.feeTierId || null,
+      adminId: data.adminId,
+      action: data.action,
+      previousValues: data.previousValues || null,
+      newValues: data.newValues || null,
+    }).returning();
+    return entry;
+  }
+
+  async getFeeTierChangelog(): Promise<any[]> {
+    const rows = await db
+      .select({ log: feeTierChangelog, admin: users, tier: feeTiers })
+      .from(feeTierChangelog)
+      .leftJoin(users, eq(users.id, feeTierChangelog.adminId))
+      .leftJoin(feeTiers, eq(feeTiers.id, feeTierChangelog.feeTierId))
+      .orderBy(desc(feeTierChangelog.changedAt));
+    return rows.map((r) => ({
+      ...r.log,
+      adminName: r.admin ? `${r.admin.firstName || ""} ${r.admin.lastName || ""}`.trim() || r.admin.email : "Admin",
+      tierLabel: r.tier?.label || null,
+    }));
+  }
+
+  async seedDefaultFeeTiers(): Promise<void> {
+    const existing = await db.select({ id: feeTiers.id }).from(feeTiers).limit(1);
+    if (existing.length > 0) return;
+    const defaults = [
+      { label: "Entry (€0–€150)", minPrice: "0", maxPrice: "150", sellerPercent: "50", resellerPercent: "40", platformPercent: "10", isActive: true },
+      { label: "Standard (€150.01–€500)", minPrice: "150.01", maxPrice: "500", sellerPercent: "55", resellerPercent: "35", platformPercent: "10", isActive: true },
+      { label: "Premium (€500.01+)", minPrice: "500.01", maxPrice: null, sellerPercent: "60", resellerPercent: "30", platformPercent: "10", isActive: true },
+    ];
+    for (const tier of defaults) {
+      await db.insert(feeTiers).values(tier);
+    }
+    console.log("[fee-tiers] Seeded 3 default fee tiers.");
   }
 }
 

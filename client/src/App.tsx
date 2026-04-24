@@ -32,6 +32,8 @@ import FaqPage from "@/pages/faq";
 import ContactPage from "@/pages/contact";
 import TermsPage from "@/pages/terms";
 import PrivacyPage from "@/pages/privacy";
+import AdminFeeTiersPage from "@/pages/admin-fee-tiers";
+import FeeStructurePage from "@/pages/fee-structure";
 import { Loader2 } from "lucide-react";
 
 function DashboardRoute() {
@@ -72,6 +74,8 @@ function AuthenticatedRouter() {
       <Route path="/admin/users">{() => <AdminDashboard />}</Route>
       <Route path="/admin/applications">{() => <AdminDashboard />}</Route>
       <Route path="/admin/requests" component={AdminRequestsPage} />
+      <Route path="/admin/fee-tiers" component={AdminFeeTiersPage} />
+      <Route path="/fee-structure" component={FeeStructurePage} />
       <Route path="/agreements/:id" component={AgreementDetailPage} />
       <Route path="/resellers/:id" component={ResellerDetailPage} />
       <Route path="/resellers" component={ResellersPage} />

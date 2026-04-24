@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, numeric, serial, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, numeric, serial, index, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -206,6 +206,43 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),
 }));
 
+export const feeTiers = pgTable("fee_tiers", {
+  id: serial("id").primaryKey(),
+  label: varchar("label", { length: 100 }).notNull(),
+  minPrice: numeric("min_price").notNull(),
+  maxPrice: numeric("max_price"),
+  sellerPercent: numeric("seller_percent").notNull(),
+  resellerPercent: numeric("reseller_percent").notNull(),
+  platformPercent: numeric("platform_percent").notNull(),
+  currencyNote: varchar("currency_note", { length: 50 }).default("EUR/CHF"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_fee_tiers_active").on(table.isActive),
+]);
+
+export const feeTiersRelations = relations(feeTiers, ({ many }) => ({
+  changelog: many(feeTierChangelog),
+}));
+
+export const feeTierChangelog = pgTable("fee_tier_changelog", {
+  id: serial("id").primaryKey(),
+  feeTierId: integer("fee_tier_id").references(() => feeTiers.id),
+  adminId: varchar("admin_id").notNull().references(() => users.id),
+  action: varchar("action", { length: 20 }).notNull(),
+  previousValues: jsonb("previous_values"),
+  newValues: jsonb("new_values"),
+  changedAt: timestamp("changed_at").defaultNow(),
+}, (table) => [
+  index("idx_fee_tier_changelog_tier").on(table.feeTierId),
+  index("idx_fee_tier_changelog_admin").on(table.adminId),
+]);
+
+export const feeTierChangelogRelations = relations(feeTierChangelog, ({ one }) => ({
+  tier: one(feeTiers, { fields: [feeTierChangelog.feeTierId], references: [feeTiers.id] }),
+  admin: one(users, { fields: [feeTierChangelog.adminId], references: [users.id] }),
+}));
+
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   itemId: integer("item_id").references(() => items.id),
@@ -215,6 +252,11 @@ export const transactions = pgTable("transactions", {
   salePrice: numeric("sale_price").notNull(),
   sellerEarning: numeric("seller_earning").notNull(),
   reusseEarning: numeric("reusse_earning").notNull(),
+  platformEarning: numeric("platform_earning"),
+  feeTierId: integer("fee_tier_id").references(() => feeTiers.id),
+  sellerPercent: numeric("seller_percent"),
+  resellerPercent: numeric("reseller_percent"),
+  platformPercent: numeric("platform_percent"),
   status: varchar("status", { length: 20 }).notNull().default("completed"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
@@ -228,6 +270,7 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
   request: one(requests, { fields: [transactions.requestId], references: [requests.id] }),
   seller: one(users, { fields: [transactions.sellerId], references: [users.id], relationName: "sellerTransactions" }),
   reusse: one(users, { fields: [transactions.reusseId], references: [users.id], relationName: "reusseTransactions" }),
+  feeTier: one(feeTiers, { fields: [transactions.feeTierId], references: [feeTiers.id] }),
 }));
 
 export const moderationActions = pgTable("moderation_actions", {
@@ -325,6 +368,8 @@ export const insertMessageSchema = createInsertSchema(messages).omit({ id: true,
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, isRead: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true });
 export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, createdAt: true });
+export const insertFeeTierSchema = createInsertSchema(feeTiers).omit({ id: true, createdAt: true });
+export const insertFeeTierChangelogSchema = createInsertSchema(feeTierChangelog).omit({ id: true, changedAt: true });
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
@@ -352,3 +397,7 @@ export type Agreement = typeof agreements.$inferSelect;
 export type InsertAgreement = z.infer<typeof insertAgreementSchema>;
 export type AgreementSignature = typeof agreementSignatures.$inferSelect;
 export type InsertAgreementSignature = z.infer<typeof insertAgreementSignatureSchema>;
+export type FeeTier = typeof feeTiers.$inferSelect;
+export type InsertFeeTier = z.infer<typeof insertFeeTierSchema>;
+export type FeeTierChangelog = typeof feeTierChangelog.$inferSelect;
+export type InsertFeeTierChangelog = z.infer<typeof insertFeeTierChangelogSchema>;

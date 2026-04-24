@@ -14,19 +14,46 @@ import {
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS } from "@shared/constants";
-import { calculateFees } from "@shared/feeCalculator";
-import type { Item } from "@shared/schema";
+import type { Item, Transaction } from "@shared/schema";
 
 function resolveItemPrice(i: Pick<Item, "approvedPrice" | "salePrice" | "maxPrice" | "minPrice">): number {
   return parseFloat(i.approvedPrice || i.salePrice || i.maxPrice || i.minPrice || "0");
 }
 
-function buildAgreementSnapshot(items: Item[]): { itemsSnapshot: string; feeBreakdown: string; totalValue: string } {
-  const snapItems = items.map((i) => {
+interface TierResolution {
+  sellerPct: number;
+  resellerPct: number;
+  platformPct: number;
+  tierId: number | null;
+}
+
+async function resolveFeePercentages(price: number): Promise<TierResolution> {
+  const tier = await storage.getTierForPrice(price);
+  if (tier) {
+    return {
+      sellerPct: parseFloat(tier.sellerPercent as string),
+      resellerPct: parseFloat(tier.resellerPercent as string),
+      platformPct: parseFloat(tier.platformPercent as string),
+      tierId: tier.id,
+    };
+  }
+  throw Object.assign(new Error(`No fee tier covers price €${price}. Please configure a fee tier that includes this price range.`), { statusCode: 400 });
+}
+
+async function buildAgreementSnapshot(items: Item[]): Promise<{ itemsSnapshot: string; feeBreakdown: string; totalValue: string }> {
+  const snapItems = await Promise.all(items.map(async (i) => {
     const price = resolveItemPrice(i);
-    const fees = calculateFees(price);
+    const feeRes = await resolveFeePercentages(price);
+    const fees = {
+      sellerAmount: parseFloat(((price * feeRes.sellerPct) / 100).toFixed(2)),
+      resellerAmount: parseFloat(((price * feeRes.resellerPct) / 100).toFixed(2)),
+      platformAmount: parseFloat((price - parseFloat(((price * feeRes.sellerPct) / 100).toFixed(2)) - parseFloat(((price * feeRes.resellerPct) / 100).toFixed(2))).toFixed(2)),
+      sellerPct: feeRes.sellerPct,
+      resellerPct: feeRes.resellerPct,
+      platformPct: feeRes.platformPct,
+    };
     return { id: i.id, title: i.title, approvedPrice: price, fees };
-  });
+  }));
   const totalValue = snapItems.reduce((sum, it) => sum + it.approvedPrice, 0);
   return {
     itemsSnapshot: JSON.stringify(snapItems),
@@ -974,7 +1001,7 @@ export async function registerRoutes(
       const request = await storage.getRequest(id);
       if (!request) return res.status(404).json({ message: "Request not found" });
       const updated = await storage.updateRequest(id, { status: "flagged" });
-      await storage.createNotification({ userId: request.sellerId, type: "moderation_flag", message: `Your request #${id} has been flagged for review.${reason ? ` Reason: ${reason}` : ""}` });
+      await storage.createNotification({ userId: request.sellerId, title: "Request Flagged", type: "moderation_flag", message: `Your request #${id} has been flagged for review.${reason ? ` Reason: ${reason}` : ""}` });
       await storage.logModerationAction({ requestId: id, adminId, action: "flag", reason });
       res.json(updated);
     } catch (error) {
@@ -990,7 +1017,7 @@ export async function registerRoutes(
       const { message } = req.body;
       const request = await storage.getRequest(id);
       if (!request) return res.status(404).json({ message: "Request not found" });
-      const notification = await storage.createNotification({ userId: request.sellerId, type: "admin_message", message: `Admin message for your request #${id}: ${message}` });
+      const notification = await storage.createNotification({ userId: request.sellerId, title: "Admin Message", type: "admin_message", message: `Admin message for your request #${id}: ${message}` });
       await storage.logModerationAction({ requestId: id, adminId, action: "message", metadata: message });
       res.json(notification);
     } catch (error) {
@@ -1007,9 +1034,9 @@ export async function registerRoutes(
       const request = await storage.getRequest(id);
       if (!request) return res.status(404).json({ message: "Request not found" });
       const updated = await storage.updateRequest(id, { status: "cancelled" });
-      await storage.createNotification({ userId: request.sellerId, type: "moderation_reject", message: `Your request #${id} has been rejected.${reason ? ` Reason: ${reason}` : ""}` });
+      await storage.createNotification({ userId: request.sellerId, title: "Request Rejected", type: "moderation_reject", message: `Your request #${id} has been rejected.${reason ? ` Reason: ${reason}` : ""}` });
       if (request.reusseId) {
-        await storage.createNotification({ userId: request.reusseId, type: "moderation_reject", message: `Request #${id} you were assigned to has been cancelled by an admin.` });
+        await storage.createNotification({ userId: request.reusseId, title: "Request Cancelled", type: "moderation_reject", message: `Request #${id} you were assigned to has been cancelled by an admin.` });
       }
       await storage.logModerationAction({ requestId: id, adminId, action: "reject", reason });
       res.json(updated);
@@ -1148,7 +1175,7 @@ export async function registerRoutes(
               const allItems = await storage.getItemsByRequest(item.requestId);
               const allApproved = allItems.length > 0 && allItems.every((i) => i.status === "approved");
               if (allApproved) {
-                const { itemsSnapshot, feeBreakdown, totalValue } = buildAgreementSnapshot(allItems);
+                const { itemsSnapshot, feeBreakdown, totalValue } = await buildAgreementSnapshot(allItems);
                 const agreement = await storage.createAgreement({
                   requestId: item.requestId,
                   sellerId: request.sellerId,
@@ -1181,7 +1208,8 @@ export async function registerRoutes(
         }
 
         res.json(item);
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.statusCode === 400) return res.status(400).json({ message: error.message });
         console.error("Error approving item:", error);
         res.status(500).json({ message: "Failed to approve item" });
       }
@@ -1414,15 +1442,12 @@ export async function registerRoutes(
 
         const salePriceNum = parseFloat(salePrice);
 
-        // If a signed agreement already covers this item, transactions were created
-        // at signing time using the tiered model — skip creating a duplicate.
-        let signedAgreementExists = false;
-        if (existingItem.requestId) {
-          const relatedAgreement = await storage.getAgreementByRequest(existingItem.requestId);
-          if (relatedAgreement && relatedAgreement.status === "fully_signed") {
-            signedAgreementExists = true;
-          }
-        }
+        // Resolve fee tier BEFORE mutating item state — if no tier covers this
+        // price the route returns 400 and the item is left untouched.
+        const feeRes = await resolveFeePercentages(salePriceNum);
+        const sellerAmt = parseFloat(((salePriceNum * feeRes.sellerPct) / 100).toFixed(2));
+        const resellerAmt = parseFloat(((salePriceNum * feeRes.resellerPct) / 100).toFixed(2));
+        const platformAmt = parseFloat((salePriceNum - sellerAmt - resellerAmt).toFixed(2));
 
         const item = await storage.updateItem(id, {
           status: "sold",
@@ -1432,25 +1457,42 @@ export async function registerRoutes(
         });
         if (!item) return res.status(404).json({ message: "Item not found" });
 
-        let transaction = null;
-        if (!signedAgreementExists) {
-          // No signed agreement — use tiered fee calculator
-          const fees = calculateFees(salePriceNum);
+        // Check if a signed agreement already has a transaction for this item.
+        // If so, update that transaction with the actual sale price + live tier snapshot.
+        // Otherwise create a new transaction.
+        let transaction: Transaction | null = null;
+        const existingTxn = await storage.getTransactionByItemId(id);
+        if (existingTxn) {
+          transaction = (await storage.updateTransaction(existingTxn.id, {
+            salePrice: salePrice.toString(),
+            sellerEarning: sellerAmt.toString(),
+            reusseEarning: resellerAmt.toString(),
+            platformEarning: platformAmt.toString(),
+            feeTierId: feeRes.tierId,
+            sellerPercent: feeRes.sellerPct.toString(),
+            resellerPercent: feeRes.resellerPct.toString(),
+            platformPercent: feeRes.platformPct.toString(),
+            status: "completed",
+          })) ?? null;
+        } else {
           transaction = await storage.createTransaction({
             itemId: item.id,
             requestId: item.requestId || null,
             sellerId: item.sellerId,
             reusseId: item.reusseId || req.user.claims.sub,
             salePrice: salePrice.toString(),
-            sellerEarning: fees.sellerAmount.toString(),
-            reusseEarning: fees.resellerAmount.toString(),
+            sellerEarning: sellerAmt.toString(),
+            reusseEarning: resellerAmt.toString(),
+            platformEarning: platformAmt.toString(),
+            feeTierId: feeRes.tierId,
+            sellerPercent: feeRes.sellerPct.toString(),
+            resellerPercent: feeRes.resellerPct.toString(),
+            platformPercent: feeRes.platformPct.toString(),
             status: "completed",
           });
         }
 
-        const sellerEarning = transaction
-          ? transaction.sellerEarning
-          : calculateFees(salePriceNum).sellerAmount.toFixed(2);
+        const sellerEarning = transaction ? transaction.sellerEarning : sellerAmt.toFixed(2);
 
         await storage.createNotification({
           userId: item.sellerId,
@@ -1461,7 +1503,10 @@ export async function registerRoutes(
         });
 
         res.json({ item, transaction });
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.statusCode === 400) {
+          return res.status(400).json({ message: error.message });
+        }
         console.error("Error marking item sold:", error);
         res.status(500).json({ message: "Failed to mark item as sold" });
       }
@@ -2029,7 +2074,7 @@ export async function registerRoutes(
         if (allApproved) {
           const existingAgreement = await storage.getAgreementByRequest(id);
           if (!existingAgreement) {
-            const { itemsSnapshot, feeBreakdown, totalValue } = buildAgreementSnapshot(items);
+            const { itemsSnapshot, feeBreakdown, totalValue } = await buildAgreementSnapshot(items);
             const agreement = await storage.createAgreement({
               requestId: id,
               sellerId: request.sellerId,
@@ -2060,7 +2105,8 @@ export async function registerRoutes(
         }
 
         res.json(updated);
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.statusCode === 400) return res.status(400).json({ message: error.message });
         console.error("Error finalizing list:", error);
         res.status(500).json({ message: "Failed to finalize list" });
       }
@@ -2125,7 +2171,7 @@ export async function registerRoutes(
         if (!allApproved) {
           return res.status(400).json({ message: "Not all items are approved yet" });
         }
-        const { itemsSnapshot, feeBreakdown, totalValue } = buildAgreementSnapshot(items);
+        const { itemsSnapshot, feeBreakdown, totalValue } = await buildAgreementSnapshot(items);
         const agreement = await storage.createAgreement({
           requestId,
           sellerId: request.sellerId,
@@ -2153,7 +2199,8 @@ export async function registerRoutes(
         broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId });
         broadcastToUser(request.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId });
         res.json(agreement);
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.statusCode === 400) return res.status(400).json({ message: error.message });
         console.error("Error generating agreement:", error);
         res.status(500).json({ message: "Failed to generate agreement" });
       }
@@ -2244,19 +2291,27 @@ export async function registerRoutes(
           const parsedItems = JSON.parse(agreement.itemsSnapshot);
           for (const snapItem of parsedItems) {
             const price = snapItem.approvedPrice;
-            const fees = calculateFees(price);
             const matchingItem = requestItems.find((i) => i.id === snapItem.id);
             if (matchingItem) {
               const existingTxn = await storage.getTransactionByItemId(matchingItem.id);
               if (!existingTxn) {
+                const feeRes = await resolveFeePercentages(price);
+                const sellerAmt = parseFloat(((price * feeRes.sellerPct) / 100).toFixed(2));
+                const resellerAmt = parseFloat(((price * feeRes.resellerPct) / 100).toFixed(2));
+                const platformAmt = parseFloat((price - sellerAmt - resellerAmt).toFixed(2));
                 await storage.createTransaction({
                   itemId: matchingItem.id,
                   requestId: agreement.requestId,
                   sellerId: agreement.sellerId,
                   reusseId: agreement.reusseId,
                   salePrice: price.toString(),
-                  sellerEarning: fees.sellerAmount.toString(),
-                  reusseEarning: fees.resellerAmount.toString(),
+                  sellerEarning: sellerAmt.toString(),
+                  reusseEarning: resellerAmt.toString(),
+                  platformEarning: platformAmt.toString(),
+                  feeTierId: feeRes.tierId,
+                  sellerPercent: feeRes.sellerPct.toString(),
+                  resellerPercent: feeRes.resellerPct.toString(),
+                  platformPercent: feeRes.platformPct.toString(),
                   status: "completed",
                 });
               }
@@ -2266,7 +2321,10 @@ export async function registerRoutes(
 
         const updated = await storage.getAgreementWithDetails(id);
         res.json(updated);
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.statusCode === 400) {
+          return res.status(400).json({ message: error.message });
+        }
         console.error("Error signing agreement:", error);
         res.status(500).json({ message: "Failed to sign agreement" });
       }
@@ -2287,6 +2345,185 @@ export async function registerRoutes(
       }
     },
   );
+
+  const feeTierSchema = z.object({
+    label: z.string().min(1),
+    minPrice: z.string().min(1),
+    maxPrice: z.string().optional().nullable(),
+    sellerPercent: z.string().min(1),
+    resellerPercent: z.string().min(1),
+    platformPercent: z.string().min(1),
+    currencyNote: z.string().optional(),
+    isActive: z.boolean().optional(),
+  }).superRefine((data, ctx) => {
+    const minP = parseFloat(data.minPrice);
+    if (isNaN(minP) || minP < 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "minPrice must be a non-negative number", path: ["minPrice"] });
+    }
+    if (data.maxPrice && data.maxPrice.trim() !== "") {
+      const maxP = parseFloat(data.maxPrice);
+      if (isNaN(maxP) || maxP < 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "maxPrice must be a non-negative number", path: ["maxPrice"] });
+      } else if (!isNaN(minP) && maxP <= minP) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "maxPrice must be greater than minPrice", path: ["maxPrice"] });
+      }
+    }
+    const s = parseFloat(data.sellerPercent);
+    const r = parseFloat(data.resellerPercent);
+    const p = parseFloat(data.platformPercent);
+    if (isNaN(s) || s < 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "sellerPercent must be a non-negative number", path: ["sellerPercent"] });
+    if (isNaN(r) || r < 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "resellerPercent must be a non-negative number", path: ["resellerPercent"] });
+    if (isNaN(p) || p < 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "platformPercent must be a non-negative number", path: ["platformPercent"] });
+    const total = s + r + p;
+    if (Math.abs(total - 100) > 0.01) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Percentages must sum to 100 (currently ${total.toFixed(2)})`, path: ["platformPercent"] });
+    }
+  });
+
+  async function checkTierOverlap(minPrice: string, maxPrice: string | null | undefined, excludeId?: number): Promise<string | null> {
+    const newMin = parseFloat(minPrice);
+    const newMax = maxPrice && maxPrice.trim() !== "" ? parseFloat(maxPrice) : Infinity;
+    const allActive = await storage.getFeeTiers(true);
+    for (const t of allActive) {
+      if (excludeId !== undefined && t.id === excludeId) continue;
+      const eMin = parseFloat(t.minPrice as string);
+      const eMax = t.maxPrice ? parseFloat(t.maxPrice as string) : Infinity;
+      const overlaps = !(newMax < eMin || eMax < newMin);
+      if (overlaps) {
+        return `Price range overlaps with active tier "${t.label}" (${eMin}–${t.maxPrice ?? "∞"})`;
+      }
+    }
+    return null;
+  }
+
+  app.get("/api/admin/fee-tiers", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const tiers = await storage.getFeeTiers();
+      res.json(tiers);
+    } catch (error) {
+      console.error("Error fetching fee tiers:", error);
+      res.status(500).json({ message: "Failed to fetch fee tiers" });
+    }
+  });
+
+  app.post("/api/admin/fee-tiers", isAuthenticated, requireAdmin, validate(feeTierSchema), async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const { label, minPrice, maxPrice, sellerPercent, resellerPercent, platformPercent, currencyNote } = req.body;
+      const overlapError = await checkTierOverlap(minPrice, maxPrice);
+      if (overlapError) return res.status(400).json({ message: overlapError });
+      const tier = await storage.createFeeTier({
+        label,
+        minPrice,
+        maxPrice: maxPrice || null,
+        sellerPercent,
+        resellerPercent,
+        platformPercent,
+        currencyNote: currencyNote || "EUR/CHF",
+        isActive: true,
+      });
+      await storage.logTierChange({
+        feeTierId: tier.id,
+        adminId,
+        action: "create",
+        newValues: tier,
+      });
+      res.json(tier);
+    } catch (error) {
+      console.error("Error creating fee tier:", error);
+      res.status(500).json({ message: "Failed to create fee tier" });
+    }
+  });
+
+  app.patch("/api/admin/fee-tiers/:id", isAuthenticated, requireAdmin, validate(feeTierSchema), async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const existing = await storage.getFeeTier(id);
+      if (!existing) return res.status(404).json({ message: "Fee tier not found" });
+      const { label, minPrice, maxPrice, sellerPercent, resellerPercent, platformPercent, currencyNote, isActive } = req.body;
+      const willBeActive = isActive !== undefined ? isActive : existing.isActive;
+      if (willBeActive) {
+        const overlapError = await checkTierOverlap(minPrice, maxPrice, id);
+        if (overlapError) return res.status(400).json({ message: overlapError });
+      }
+      const updated = await storage.updateFeeTier(id, {
+        label,
+        minPrice,
+        maxPrice: maxPrice || null,
+        sellerPercent,
+        resellerPercent,
+        platformPercent,
+        currencyNote: currencyNote || "EUR/CHF",
+        isActive: isActive !== undefined ? isActive : existing.isActive,
+      });
+      await storage.logTierChange({
+        feeTierId: id,
+        adminId,
+        action: "update",
+        previousValues: existing,
+        newValues: updated,
+      });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating fee tier:", error);
+      res.status(500).json({ message: "Failed to update fee tier" });
+    }
+  });
+
+  app.delete("/api/admin/fee-tiers/:id", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const existing = await storage.getFeeTier(id);
+      if (!existing) return res.status(404).json({ message: "Fee tier not found" });
+      await storage.deleteFeeTier(id);
+      await storage.logTierChange({
+        feeTierId: id,
+        adminId,
+        action: "delete",
+        previousValues: existing,
+      });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting fee tier:", error);
+      res.status(500).json({ message: "Failed to delete fee tier" });
+    }
+  });
+
+  app.get("/api/admin/fee-tiers/changelog", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const log = await storage.getFeeTierChangelog();
+      res.json(log);
+    } catch (error) {
+      console.error("Error fetching fee tier changelog:", error);
+      res.status(500).json({ message: "Failed to fetch changelog" });
+    }
+  });
+
+  app.get("/api/fee-tiers", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const tiers = await storage.getFeeTiers(true);
+      res.json(tiers);
+    } catch (error) {
+      console.error("Error fetching fee tiers:", error);
+      res.status(500).json({ message: "Failed to fetch fee tiers" });
+    }
+  });
+
+  app.get("/api/fee-tiers/for-price", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const amount = parseFloat(req.query.amount as string);
+      if (isNaN(amount) || amount < 0) {
+        return res.status(400).json({ message: "Valid amount required" });
+      }
+      const tier = await storage.getTierForPrice(amount);
+      res.json(tier || null);
+    } catch (error) {
+      console.error("Error fetching tier for price:", error);
+      res.status(500).json({ message: "Failed to fetch tier" });
+    }
+  });
 
   app.post(
     "/api/requests/:id/report",

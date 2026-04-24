@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { createServer } from "http";
+import { storage } from "./storage";
 
 declare module "http" {
   interface IncomingMessage {
@@ -60,6 +61,8 @@ export async function createApp() {
   });
 
   await registerRoutes(httpServer, app);
+
+  await storage.seedDefaultFeeTiers();
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

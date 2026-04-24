@@ -46,6 +46,15 @@ client/src/
   lib/               - Utilities (queryClient, auth-utils, i18n)
 ```
 
+## Fee Tier System (Task #5)
+Database-driven tiered fee structure replaces hardcoded logic.
+- `shared/schema.ts` — `feeTiers` and `feeTierChangelog` tables; transactions extended with snapshot fields
+- `server/storage.ts` — `getFeeTiers`, `getFeeTier`, `createFeeTier`, `updateFeeTier`, `deleteFeeTier`, `getTierForPrice`, `logTierChange`, `getFeeTierChangelog`
+- `server/routes.ts` — Admin CRUD routes (`/api/admin/fee-tiers/*`) + public read routes (`/api/fee-tiers`, `/api/fee-tiers/for-price`) + updated mark-sold and agreement-signing to use DB tiers
+- `client/src/pages/admin-fee-tiers.tsx` — Admin tier management page with changelog tab
+- `client/src/pages/fee-structure.tsx` — Earnings calculator + tier overview for all users
+- Sidebar: "Fee Tiers" link for admins, "Fee Structure" for sellers/resellers
+
 ## Item Categories (Task #2)
 16 French item categories supported:
 - tout_mode, vetements, montres_bijoux, accessoires_bagagerie, ameublement, electromenager, decoration, linge_de_maison, electronique, ordinateurs, telephones_objets_connectes, livres, vins, instruments_de_musique, jeux_jouets, velos

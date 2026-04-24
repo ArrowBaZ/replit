@@ -18,9 +18,25 @@ import type { Request, Item, Meeting, Profile } from "@shared/schema";
 import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag, FileText, FileSignature, Lock } from "lucide-react";
 import { ItemDocumentsSection } from "@/components/item-documents-section";
 import { ITEM_CATEGORIES, type ItemCategory } from "@shared/schema";
-import { calculateFees } from "@shared/feeCalculator";
+import type { FeeTier } from "@shared/schema";
+import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
 import { useState, useRef, useEffect } from "react";
 import { useUpload } from "@/hooks/use-upload";
+
+function ItemFeePreview({ price }: { price: number }) {
+  const { data: tier, isLoading } = useQuery<FeeTier | null>({
+    queryKey: [`/api/fee-tiers/for-price?amount=${price}`],
+    enabled: price > 0,
+  });
+  if (!price || price <= 0) return null;
+  if (isLoading) return <div className="text-xs text-muted-foreground">Loading fee breakdown...</div>;
+  if (!tier) return (
+    <p className="text-xs text-amber-600" data-testid="text-no-tier-warning">
+      No active fee tier covers this price — contact an admin to configure one.
+    </p>
+  );
+  return <FeeBreakdownCard price={price} tier={tier} />;
+}
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
@@ -277,6 +293,9 @@ export default function RequestDetailPage() {
 
   const [showMarkSold, setShowMarkSold] = useState<number | null>(null);
   const [soldPrice, setSoldPrice] = useState("");
+
+  const soldPriceNum = parseFloat(soldPrice);
+
   const [showCounterOffer, setShowCounterOffer] = useState<number | null>(null);
   const [counterMin, setCounterMin] = useState("");
   const [counterMax, setCounterMax] = useState("");
@@ -1195,6 +1214,11 @@ export default function RequestDetailPage() {
                         {item.salePrice && (
                           <p className="text-xs font-medium text-emerald-600 mt-1">{t("salePrice")}: {item.salePrice} EUR</p>
                         )}
+                        {item.approvedPrice && !item.salePrice && (["approved", "listed"].includes(item.status || "")) && (
+                          <div className="mt-2" data-testid={`fee-preview-item-${item.id}`}>
+                            <ItemFeePreview price={parseFloat(item.approvedPrice)} />
+                          </div>
+                        )}
                         {item.photos && item.photos.length > 1 && (
                           <div className="flex gap-1 mt-1.5">
                             {item.photos.slice(1, 4).map((photo: string, idx: number) => (
@@ -1323,14 +1347,9 @@ export default function RequestDetailPage() {
                         <Label className="text-xs">{t("salePrice")} (EUR)</Label>
                         <Input type="number" step="0.01" value={soldPrice} onChange={(e) => setSoldPrice(e.target.value)} placeholder={t("enterSalePrice")} data-testid="input-sale-price" />
                       </div>
-                      {soldPrice && parseFloat(soldPrice) > 0 && (
-                        <div className="text-xs space-y-1">
-                          {(() => { const fees = calculateFees(parseFloat(soldPrice)); return (
-                            <>
-                              <p>{t("sellerEarning")}: <span className="font-medium text-emerald-600">{fees.sellerAmount.toFixed(2)} EUR</span></p>
-                              <p>{t("reusseEarning")}: <span className="font-medium text-blue-600">{fees.resellerAmount.toFixed(2)} EUR</span></p>
-                            </>
-                          ); })()}
+                      {soldPrice && soldPriceNum > 0 && (
+                        <div data-testid="div-fee-preview">
+                          <ItemFeePreview price={soldPriceNum} />
                         </div>
                       )}
                       <div className="flex gap-2">

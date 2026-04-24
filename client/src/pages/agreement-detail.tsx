@@ -11,8 +11,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, FileSignature, CheckCircle, Clock, User, Package, Printer } from "lucide-react";
 import { useState } from "react";
-import { calculateFees } from "@shared/feeCalculator";
 import type { Request } from "@shared/schema";
+
+interface SnapshotFees {
+  sellerAmount: number;
+  resellerAmount: number;
+  platformAmount: number;
+  sellerPct?: number;
+  resellerPct?: number;
+  platformPct?: number;
+}
 
 interface AgreementDetail {
   id: number;
@@ -106,7 +114,7 @@ export default function AgreementDetailPage() {
     id: number;
     title: string;
     approvedPrice: number;
-    fees: ReturnType<typeof calculateFees>;
+    fees: SnapshotFees;
   }>;
 
   const totalValue = parseFloat(agreement.totalValue);
@@ -206,7 +214,9 @@ export default function AgreementDetailPage() {
                     </td>
                     <td className="text-right py-2 pl-2 text-muted-foreground">
                       €{item.fees.platformAmount.toFixed(2)}
-                      <span className="text-xs ml-1">(10%)</span>
+                      {item.fees.platformPct != null && (
+                        <span className="text-xs ml-1">({item.fees.platformPct}%)</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -223,12 +233,24 @@ export default function AgreementDetailPage() {
             </table>
           </div>
 
-          <div className="mt-2 p-3 rounded-md bg-muted/50 text-xs text-muted-foreground">
-            <p className="font-medium mb-1">Fee Tiers:</p>
-            <p>€60–€150 → Seller 50% / Reseller 40% / Platform 10%</p>
-            <p>€151–€500 → Seller 55% / Reseller 35% / Platform 10%</p>
-            <p>€501+ → Seller 60% / Reseller 30% / Platform 10%</p>
-          </div>
+          {(() => {
+            const splits = Array.from(
+              new Map(
+                items
+                  .filter((it) => it.fees.sellerPct != null && it.fees.resellerPct != null && it.fees.platformPct != null)
+                  .map((it) => [`${it.fees.sellerPct}-${it.fees.resellerPct}-${it.fees.platformPct}`, it.fees] as [string, SnapshotFees])
+              ).values()
+            );
+            if (splits.length === 0) return null;
+            return (
+              <div className="mt-2 p-3 rounded-md bg-muted/50 text-xs text-muted-foreground" data-testid="div-fee-tiers-note">
+                <p className="font-medium mb-1">Fee splits applied in this agreement:</p>
+                {splits.map((f, i) => (
+                  <p key={i}>Seller {f.sellerPct}% / Reseller {f.resellerPct}% / Platform {f.platformPct}%</p>
+                ))}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

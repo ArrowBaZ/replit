@@ -39,6 +39,7 @@ import {
   FileText,
   Check,
   FolderOpen,
+  Percent,
 } from "lucide-react";
 
 function getInitials(firstName?: string | null, lastName?: string | null): string {
@@ -208,6 +209,7 @@ export function AppSidebar() {
     { title: "My Documents", url: "/documents", icon: FolderOpen },
     { title: t("discoverResellers"), url: "/resellers", icon: Star },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
+    { title: "Fee Structure", url: "/fee-structure", icon: Percent },
     { title: t("profile"), url: "/profile", icon: User },
   ];
 
@@ -217,6 +219,7 @@ export function AppSidebar() {
     { title: t("myAssignments"), url: "/requests", icon: ClipboardList },
     { title: t("schedule"), url: "/schedule", icon: Calendar },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
+    { title: "Fee Structure", url: "/fee-structure", icon: Percent },
     { title: t("profile"), url: "/profile", icon: User },
   ];
 
@@ -225,6 +228,7 @@ export function AppSidebar() {
     { title: t("users"), url: "/admin/users", icon: Users },
     { title: t("applications"), url: "/admin/applications", icon: Shield },
     { title: t("adminRequests"), url: "/admin/requests", icon: ClipboardList },
+    { title: "Fee Tiers", url: "/admin/fee-tiers", icon: Percent },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
   ];
 

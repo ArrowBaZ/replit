@@ -50,8 +50,20 @@ export function createMockStorage(
     }),
 
     createTransaction: vi.fn().mockResolvedValue({ id: 1 }),
+    updateTransaction: vi.fn().mockResolvedValue({ id: 1 }),
+    getTransactionByItemId: vi.fn().mockResolvedValue(undefined),
     getTransactions: vi.fn().mockResolvedValue([]),
     getEarnings: vi.fn().mockResolvedValue({ total: 0, transactions: [] }),
+
+    getFeeTiers: vi.fn().mockResolvedValue([]),
+    getFeeTier: vi.fn().mockResolvedValue(undefined),
+    createFeeTier: vi.fn().mockResolvedValue({ id: 1 }),
+    updateFeeTier: vi.fn().mockResolvedValue(undefined),
+    deleteFeeTier: vi.fn().mockResolvedValue(undefined),
+    getTierForPrice: vi.fn().mockResolvedValue(undefined),
+    logTierChange: vi.fn().mockResolvedValue({ id: 1 }),
+    getFeeTierChangelog: vi.fn().mockResolvedValue([]),
+    seedDefaultFeeTiers: vi.fn().mockResolvedValue(undefined),
   };
 
   return { ...defaults, ...overrides } as IStorage;
