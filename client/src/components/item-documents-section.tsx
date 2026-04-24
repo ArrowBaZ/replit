@@ -1,12 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, FileText, Upload, FileImage, Download, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, FileText, Upload, FileImage, Download, MessageSquare, ChevronDown, ChevronUp, X, ExternalLink, ZoomIn } from "lucide-react";
 import type { Item, Profile } from "@shared/schema";
 
 interface ItemDocument {
@@ -33,12 +32,93 @@ function formatBytes(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function isPdf(fileName: string) {
+  return fileName.split(".").pop()?.toLowerCase() === "pdf";
+}
+
+function isImageFile(fileName: string) {
+  const ext = fileName.split(".").pop()?.toLowerCase() || "";
+  return ["jpg", "jpeg", "png", "webp", "gif"].includes(ext);
+}
+
 function DocIcon({ fileType, fileName }: { fileType: string; fileName: string }) {
   const ext = fileName.split(".").pop()?.toLowerCase() || "";
   if (fileType === "photo" || ["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
     return <FileImage className="h-4 w-4 text-blue-500" />;
   }
   return <FileText className="h-4 w-4 text-amber-500" />;
+}
+
+interface LightboxProps {
+  url: string;
+  fileName: string;
+  onClose: () => void;
+}
+
+function Lightbox({ url, fileName, onClose }: LightboxProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+      data-testid="lightbox-overlay"
+    >
+      <div
+        className="relative max-w-4xl max-h-[90vh] w-full mx-4 flex flex-col items-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between w-full mb-2 px-1">
+          <p className="text-white text-sm font-medium truncate flex-1 pr-2" data-testid="lightbox-filename">
+            {fileName}
+          </p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/80 hover:text-white transition-colors p-1 rounded"
+              title="Open in new tab"
+              data-testid="lightbox-open-tab"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+            <a
+              href={url}
+              download={fileName}
+              className="text-white/80 hover:text-white transition-colors p-1 rounded"
+              title="Download"
+              data-testid="lightbox-download"
+            >
+              <Download className="h-4 w-4" />
+            </a>
+            <button
+              onClick={onClose}
+              className="text-white/80 hover:text-white transition-colors p-1 rounded"
+              title="Close"
+              data-testid="lightbox-close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+        <div className="w-full flex items-center justify-center rounded-lg overflow-hidden bg-black/40">
+          <img
+            src={url}
+            alt={fileName}
+            className="max-w-full max-h-[80vh] object-contain rounded-lg"
+            data-testid="lightbox-image"
+          />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const MAX_PHOTO_SIZE = 10 * 1024 * 1024;
@@ -51,6 +131,7 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
   const [docRequestSent, setDocRequestSent] = useState(false);
   const [uploadType, setUploadType] = useState<"photo" | "certificate">("photo");
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const [lightboxDoc, setLightboxDoc] = useState<{ url: string; fileName: string } | null>(null);
 
   const canView =
     profile?.role === "admin" ||
@@ -174,6 +255,14 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
 
   return (
     <div className="ml-[4.25rem] mt-2 space-y-2">
+      {lightboxDoc && (
+        <Lightbox
+          url={lightboxDoc.url}
+          fileName={lightboxDoc.fileName}
+          onClose={() => setLightboxDoc(null)}
+        />
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
@@ -305,46 +394,53 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
                   <p className="text-xs text-muted-foreground mb-1.5">Photos</p>
                   <div className="space-y-2" data-testid={`photo-gallery-${item.id}`}>
                     <div className="grid grid-cols-3 gap-1.5">
-                      {documents.filter((d) => d.fileType === "photo").map((doc) => (
-                        <a
-                          key={doc.id}
-                          href={`/api/items/${item.id}/documents/${doc.id}/download`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="relative aspect-square rounded overflow-hidden border bg-muted group"
-                          data-testid={`doc-photo-${doc.id}`}
-                          title={doc.fileName}
-                        >
-                          <img
-                            src={`/api/items/${item.id}/documents/${doc.id}/download`}
-                            alt={doc.fileName}
-                            className="w-full h-full object-cover transition-opacity group-hover:opacity-80"
-                            loading="lazy"
-                          />
-                        </a>
-                      ))}
+                      {documents.filter((d) => d.fileType === "photo").map((doc) => {
+                        const docUrl = `/api/items/${item.id}/documents/${doc.id}/download`;
+                        return (
+                          <button
+                            key={doc.id}
+                            onClick={() => setLightboxDoc({ url: docUrl, fileName: doc.fileName })}
+                            className="relative aspect-square rounded overflow-hidden border bg-muted group cursor-zoom-in"
+                            data-testid={`doc-photo-${doc.id}`}
+                            title={`Preview ${doc.fileName}`}
+                          >
+                            <img
+                              src={docUrl}
+                              alt={doc.fileName}
+                              className="w-full h-full object-cover transition-opacity group-hover:opacity-80"
+                              loading="lazy"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+                              <ZoomIn className="h-5 w-5 text-white drop-shadow" />
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                     {/* Audit log for photo entries */}
                     <div className="space-y-1">
-                      {documents.filter((d) => d.fileType === "photo").map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between text-xs text-muted-foreground" data-testid={`doc-audit-${doc.id}`}>
-                          <span className="truncate flex-1">
-                            <span className="font-medium text-foreground">{doc.fileName}</span>
-                            {" · "}{doc.uploaderName}
-                            {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("fr-FR")}` : ""}
-                            {doc.fileSize ? ` · ${formatBytes(doc.fileSize)}` : ""}
-                          </span>
-                          <a
-                            href={`/api/items/${item.id}/documents/${doc.id}/download`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="ml-1 p-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
-                            data-testid={`doc-download-${doc.id}`}
-                          >
-                            <Download className="h-3 w-3" />
-                          </a>
-                        </div>
-                      ))}
+                      {documents.filter((d) => d.fileType === "photo").map((doc) => {
+                        const docUrl = `/api/items/${item.id}/documents/${doc.id}/download`;
+                        return (
+                          <div key={doc.id} className="flex items-center justify-between text-xs text-muted-foreground" data-testid={`doc-audit-${doc.id}`}>
+                            <span className="truncate flex-1">
+                              <span className="font-medium text-foreground">{doc.fileName}</span>
+                              {" · "}{doc.uploaderName}
+                              {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("fr-FR")}` : ""}
+                              {doc.fileSize ? ` · ${formatBytes(doc.fileSize)}` : ""}
+                            </span>
+                            <a
+                              href={docUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ml-1 p-0.5 rounded hover:bg-muted transition-colors flex-shrink-0"
+                              data-testid={`doc-download-${doc.id}`}
+                            >
+                              <Download className="h-3 w-3" />
+                            </a>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -357,32 +453,61 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
                     <p className="text-xs text-muted-foreground mb-1.5">Certificates & Documents</p>
                   )}
                   <div className="space-y-1.5">
-                    {documents.filter((d) => d.fileType === "certificate").map((doc) => (
-                      <div
-                        key={doc.id}
-                        className="flex items-center gap-2 p-2 rounded-md bg-background border text-xs"
-                        data-testid={`doc-item-${doc.id}`}
-                      >
-                        <DocIcon fileType={doc.fileType} fileName={doc.fileName} />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate" data-testid={`doc-name-${doc.id}`}>{doc.fileName}</p>
-                          <p className="text-muted-foreground">
-                            {doc.uploaderName}
-                            {doc.fileSize ? ` · ${formatBytes(doc.fileSize)}` : ""}
-                            {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("fr-FR")}` : ""}
-                          </p>
-                        </div>
-                        <a
-                          href={`/api/items/${item.id}/documents/${doc.id}/download`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1 rounded hover:bg-muted transition-colors"
-                          data-testid={`doc-download-${doc.id}`}
+                    {documents.filter((d) => d.fileType === "certificate").map((doc) => {
+                      const docUrl = `/api/items/${item.id}/documents/${doc.id}/download`;
+                      const isDocPdf = isPdf(doc.fileName);
+                      const isDocImage = isImageFile(doc.fileName);
+                      return (
+                        <div
+                          key={doc.id}
+                          className="flex items-center gap-2 p-2 rounded-md bg-background border text-xs"
+                          data-testid={`doc-item-${doc.id}`}
                         >
-                          <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                        </a>
-                      </div>
-                    ))}
+                          <DocIcon fileType={doc.fileType} fileName={doc.fileName} />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate" data-testid={`doc-name-${doc.id}`}>{doc.fileName}</p>
+                            <p className="text-muted-foreground">
+                              {doc.uploaderName}
+                              {doc.fileSize ? ` · ${formatBytes(doc.fileSize)}` : ""}
+                              {doc.createdAt ? ` · ${new Date(doc.createdAt).toLocaleDateString("fr-FR")}` : ""}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {isDocPdf && (
+                              <a
+                                href={docUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-500 hover:text-blue-600 hover:underline flex items-center gap-0.5 px-1 py-0.5 rounded hover:bg-muted transition-colors"
+                                data-testid={`doc-view-pdf-${doc.id}`}
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                View PDF
+                              </a>
+                            )}
+                            {isDocImage && (
+                              <button
+                                onClick={() => setLightboxDoc({ url: docUrl, fileName: doc.fileName })}
+                                className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                                title="Preview image"
+                                data-testid={`doc-preview-${doc.id}`}
+                              >
+                                <ZoomIn className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            <a
+                              href={docUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 rounded hover:bg-muted transition-colors"
+                              data-testid={`doc-download-${doc.id}`}
+                            >
+                              <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
