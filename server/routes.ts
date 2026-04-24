@@ -1854,6 +1854,49 @@ export async function registerRoutes(
     },
   );
 
+  app.get(
+    "/api/documents",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const docs = await storage.getDocumentsByUser(userId);
+        res.json(docs.map(({ fileUrl: _omit, ...rest }) => rest));
+      } catch (error) {
+        console.error("Error fetching user documents:", error);
+        res.status(500).json({ message: "Failed to fetch documents" });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/items/:id/documents/:docId",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const itemId = parseInt(req.params.id);
+        const docId = parseInt(req.params.docId);
+        const doc = await storage.getItemDocument(docId);
+        if (!doc || doc.itemId !== itemId) {
+          return res.status(404).json({ message: "Document not found" });
+        }
+        const profile = await storage.getProfile(userId);
+        const isAdmin = profile?.role === "admin";
+        if (!isAdmin && doc.uploaderUserId !== userId) {
+          return res.status(403).json({ message: "Not authorized to delete this document" });
+        }
+        await storage.deleteItemDocument(docId);
+        res.json({ message: "Document deleted" });
+      } catch (error) {
+        console.error("Error deleting document:", error);
+        res.status(500).json({ message: "Failed to delete document" });
+      }
+    },
+  );
+
   app.post(
     "/api/requests/:id/report",
     isAuthenticated,

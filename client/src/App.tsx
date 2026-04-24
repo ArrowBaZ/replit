@@ -26,6 +26,7 @@ import SchedulePage from "@/pages/schedule";
 import AdminRequestsPage from "@/pages/admin-requests";
 import ResellersPage from "@/pages/resellers";
 import ResellerDetailPage from "@/pages/reseller-detail";
+import MyDocumentsPage from "@/pages/my-documents";
 import FaqPage from "@/pages/faq";
 import ContactPage from "@/pages/contact";
 import TermsPage from "@/pages/terms";
@@ -63,6 +64,7 @@ function AuthenticatedRouter() {
       <Route path="/requests" component={RequestsListPage} />
       <Route path="/available" component={RequestsListPage} />
       <Route path="/items" component={ItemsListPage} />
+      <Route path="/documents" component={MyDocumentsPage} />
       <Route path="/messages" component={MessagesPage} />
       <Route path="/profile" component={ProfilePage} />
       <Route path="/schedule" component={SchedulePage} />

@@ -109,6 +109,8 @@ export interface IStorage {
   getItemDocuments(itemId: number): Promise<any[]>;
   getItemDocument(docId: number): Promise<ItemDocument | undefined>;
   createItemDocument(data: InsertItemDocument): Promise<ItemDocument>;
+  deleteItemDocument(docId: number): Promise<void>;
+  getDocumentsByUser(userId: string): Promise<any[]>;
   getDocumentRequestStatus(itemId: number, reusseId: string): Promise<ItemDocumentRequest | undefined>;
   createDocumentRequest(itemId: number, reusseId: string): Promise<ItemDocumentRequest>;
 }
@@ -791,6 +793,31 @@ export class DatabaseStorage implements IStorage {
   async createItemDocument(data: InsertItemDocument): Promise<ItemDocument> {
     const [doc] = await db.insert(itemDocuments).values(data).returning();
     return doc;
+  }
+
+  async deleteItemDocument(docId: number): Promise<void> {
+    await db.delete(itemDocuments).where(eq(itemDocuments.id, docId));
+  }
+
+  async getDocumentsByUser(userId: string): Promise<any[]> {
+    const rows = await db
+      .select({
+        doc: itemDocuments,
+        item: items,
+        request: requests,
+      })
+      .from(itemDocuments)
+      .innerJoin(items, eq(items.id, itemDocuments.itemId))
+      .leftJoin(requests, eq(requests.id, items.requestId))
+      .where(eq(itemDocuments.uploaderUserId, userId))
+      .orderBy(desc(itemDocuments.createdAt));
+
+    return rows.map((r) => ({
+      ...r.doc,
+      itemTitle: r.item.title,
+      itemId: r.item.id,
+      requestId: r.request?.id ?? null,
+    }));
   }
 
   async getDocumentRequestStatus(itemId: number, reusseId: string): Promise<ItemDocumentRequest | undefined> {

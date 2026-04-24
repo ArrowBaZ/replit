@@ -38,6 +38,7 @@ import {
   Bell,
   FileText,
   Check,
+  FolderOpen,
 } from "lucide-react";
 
 function getInitials(firstName?: string | null, lastName?: string | null): string {
@@ -204,6 +205,7 @@ export function AppSidebar() {
     { title: t("dashboard"), url: "/dashboard", icon: LayoutDashboard },
     { title: t("myRequests"), url: "/requests", icon: ClipboardList },
     { title: t("myItems"), url: "/items", icon: Shirt },
+    { title: "My Documents", url: "/documents", icon: FolderOpen },
     { title: t("discoverResellers"), url: "/resellers", icon: Star },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
     { title: t("profile"), url: "/profile", icon: User },
