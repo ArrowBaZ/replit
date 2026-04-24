@@ -27,6 +27,7 @@ import AdminRequestsPage from "@/pages/admin-requests";
 import ResellersPage from "@/pages/resellers";
 import ResellerDetailPage from "@/pages/reseller-detail";
 import MyDocumentsPage from "@/pages/my-documents";
+import AgreementDetailPage from "@/pages/agreement-detail";
 import FaqPage from "@/pages/faq";
 import ContactPage from "@/pages/contact";
 import TermsPage from "@/pages/terms";
@@ -71,6 +72,7 @@ function AuthenticatedRouter() {
       <Route path="/admin/users">{() => <AdminDashboard />}</Route>
       <Route path="/admin/applications">{() => <AdminDashboard />}</Route>
       <Route path="/admin/requests" component={AdminRequestsPage} />
+      <Route path="/agreements/:id" component={AgreementDetailPage} />
       <Route path="/resellers/:id" component={ResellerDetailPage} />
       <Route path="/resellers" component={ResellersPage} />
       <Route path="/faq" component={FaqPage} />

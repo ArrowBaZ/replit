@@ -120,6 +120,20 @@ client/src/
   6. Duplicate article button for Reusse on all item cards (calls POST /api/items/:id/duplicate)
   7. Declined item shows decline reason in a red callout
   8. Item sold notification already existed in server; confirmed working
+- Smart Agreement Generation & Digital Signing (Task #4):
+  - `agreements` table: id, requestId, sellerId, reusseId, status (pending/seller_signed/reseller_signed/fully_signed), itemsSnapshot (JSONB), feeBreakdown (JSONB), totalValue, generatedAt
+  - `agreement_signatures` table: id, agreementId, userId, role (seller/reseller), agreedAt
+  - `shared/feeCalculator.ts`: tiered fee logic — €60–€150 (50/40/10), €151–€500 (55/35/10), €501+ (60/30/10)
+  - `listReadyAt` column added to `requests` table for tracking when reseller finalizes item list
+  - POST /api/requests/:id/finalize-list — locks item list (sets listReadyAt), restricted to assigned reseller
+  - GET /api/requests/:id/agreement — returns agreement summary for the request
+  - GET /api/agreements/:id — full agreement detail with items snapshot and fee breakdown
+  - POST /api/agreements/:id/sign — digital sign with { agreed: true } checkbox; auto-creates transactions when fully signed
+  - GET /api/admin/agreements — admin list of all agreements with signature counts
+  - Auto-generation: when all items in a finalized list are approved (POST /api/items/:id/approve), agreement is auto-generated
+  - `/agreements/:id` page: full agreement with items table, fee breakdown per item, signing section with checkbox
+  - request-detail.tsx: "Finalize Item List" button (reseller only, when items > 0 and list not yet finalized); agreement CTA card when agreement exists; "Add Item" hidden after list finalized
+  - Admin dashboard: new "Agreements" tab showing all agreements with status badges
 - Seller Documentation & Media Hub (Task #3):
   - `item_documents` table: per-item document records (photo/certificate) with uploader, filename, fileUrl (private), fileType, fileSize, createdAt
   - `item_document_requests` table: idempotent per-reseller-per-item document requests

@@ -14,6 +14,26 @@ import {
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS } from "@shared/constants";
+import { calculateFees } from "@shared/feeCalculator";
+import type { Item } from "@shared/schema";
+
+function resolveItemPrice(i: Pick<Item, "approvedPrice" | "salePrice" | "maxPrice" | "minPrice">): number {
+  return parseFloat(i.approvedPrice || i.salePrice || i.maxPrice || i.minPrice || "0");
+}
+
+function buildAgreementSnapshot(items: Item[]): { itemsSnapshot: string; feeBreakdown: string; totalValue: string } {
+  const snapItems = items.map((i) => {
+    const price = resolveItemPrice(i);
+    const fees = calculateFees(price);
+    return { id: i.id, title: i.title, approvedPrice: price, fees };
+  });
+  const totalValue = snapItems.reduce((sum, it) => sum + it.approvedPrice, 0);
+  return {
+    itemsSnapshot: JSON.stringify(snapItems),
+    feeBreakdown: JSON.stringify(snapItems.map((it) => ({ itemId: it.id, title: it.title, salePrice: it.approvedPrice, fees: it.fees }))),
+    totalValue: totalValue.toFixed(2),
+  };
+}
 
 const wsClients = new Map<string, Set<WebSocket>>();
 
@@ -476,6 +496,11 @@ export async function registerRoutes(
           return res
             .status(403)
             .json({ message: "Only the assigned reseller can add items" });
+        }
+
+        // List lock check: cannot add items after finalization
+        if (request.listReadyAt) {
+          return res.status(400).json({ message: "Item list is finalized and locked — no further changes allowed" });
         }
 
         const {
@@ -1019,6 +1044,12 @@ export async function registerRoutes(
         if (existingItem.reusseId !== userId) {
           return res.status(403).json({ message: "Only the assigned reseller can edit this item" });
         }
+        if (existingItem.requestId) {
+          const parentRequest = await storage.getRequest(existingItem.requestId);
+          if (parentRequest?.listReadyAt) {
+            return res.status(400).json({ message: "Item list is finalized and locked — no further changes allowed" });
+          }
+        }
         const {
           title, description, brand, size, category, condition,
           minPrice, maxPrice, photos, certificatePhotos,
@@ -1108,6 +1139,47 @@ export async function registerRoutes(
             link: `/requests/${item.requestId}`,
           });
         }
+
+        if (item.requestId && item.reusseId) {
+          const request = await storage.getRequest(item.requestId);
+          if (request && request.listReadyAt) {
+            const existingAgreement = await storage.getAgreementByRequest(item.requestId);
+            if (!existingAgreement) {
+              const allItems = await storage.getItemsByRequest(item.requestId);
+              const allApproved = allItems.length > 0 && allItems.every((i) => i.status === "approved");
+              if (allApproved) {
+                const { itemsSnapshot, feeBreakdown, totalValue } = buildAgreementSnapshot(allItems);
+                const agreement = await storage.createAgreement({
+                  requestId: item.requestId,
+                  sellerId: request.sellerId,
+                  reusseId: item.reusseId,
+                  status: "pending",
+                  itemCount: allItems.length,
+                  totalValue,
+                  itemsSnapshot,
+                  feeBreakdown,
+                });
+                await storage.createNotification({
+                  userId: request.sellerId,
+                  type: "agreement_ready",
+                  title: "Agreement Ready to Sign",
+                  message: `An agreement for request #${item.requestId} is ready for your signature.`,
+                  link: `/agreements/${agreement.id}`,
+                });
+                await storage.createNotification({
+                  userId: item.reusseId,
+                  type: "agreement_ready",
+                  title: "Agreement Ready to Sign",
+                  message: `An agreement for request #${item.requestId} is ready for your signature.`,
+                  link: `/agreements/${agreement.id}`,
+                });
+                broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
+                broadcastToUser(item.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
+              }
+            }
+          }
+        }
+
         res.json(item);
       } catch (error) {
         console.error("Error approving item:", error);
@@ -1215,6 +1287,12 @@ export async function registerRoutes(
           return res.status(404).json({ message: "Item not found" });
         if (original.reusseId !== userId)
           return res.status(403).json({ message: "Not authorized" });
+        if (original.requestId) {
+          const parentRequest = await storage.getRequest(original.requestId);
+          if (parentRequest?.listReadyAt) {
+            return res.status(400).json({ message: "Item list is finalized and locked — no further changes allowed" });
+          }
+        }
 
         const duplicate = await storage.createItem({
           requestId: original.requestId || undefined,
@@ -1335,8 +1413,16 @@ export async function registerRoutes(
         }
 
         const salePriceNum = parseFloat(salePrice);
-        const sellerEarning = (salePriceNum * 0.8).toFixed(2);
-        const reusseEarning = (salePriceNum * 0.2).toFixed(2);
+
+        // If a signed agreement already covers this item, transactions were created
+        // at signing time using the tiered model — skip creating a duplicate.
+        let signedAgreementExists = false;
+        if (existingItem.requestId) {
+          const relatedAgreement = await storage.getAgreementByRequest(existingItem.requestId);
+          if (relatedAgreement && relatedAgreement.status === "fully_signed") {
+            signedAgreementExists = true;
+          }
+        }
 
         const item = await storage.updateItem(id, {
           status: "sold",
@@ -1346,16 +1432,25 @@ export async function registerRoutes(
         });
         if (!item) return res.status(404).json({ message: "Item not found" });
 
-        const transaction = await storage.createTransaction({
-          itemId: item.id,
-          requestId: item.requestId || null,
-          sellerId: item.sellerId,
-          reusseId: item.reusseId || req.user.claims.sub,
-          salePrice: salePrice.toString(),
-          sellerEarning,
-          reusseEarning,
-          status: "completed",
-        });
+        let transaction = null;
+        if (!signedAgreementExists) {
+          // No signed agreement — use tiered fee calculator
+          const fees = calculateFees(salePriceNum);
+          transaction = await storage.createTransaction({
+            itemId: item.id,
+            requestId: item.requestId || null,
+            sellerId: item.sellerId,
+            reusseId: item.reusseId || req.user.claims.sub,
+            salePrice: salePrice.toString(),
+            sellerEarning: fees.sellerAmount.toString(),
+            reusseEarning: fees.resellerAmount.toString(),
+            status: "completed",
+          });
+        }
+
+        const sellerEarning = transaction
+          ? transaction.sellerEarning
+          : calculateFees(salePriceNum).sellerAmount.toFixed(2);
 
         await storage.createNotification({
           userId: item.sellerId,
@@ -1893,6 +1988,302 @@ export async function registerRoutes(
       } catch (error) {
         console.error("Error deleting document:", error);
         res.status(500).json({ message: "Failed to delete document" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/requests/:id/finalize-list",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const id = parseInt(req.params.id);
+        const profile = await storage.getProfile(userId);
+        if (!profile || profile.role !== "reusse") {
+          return res.status(403).json({ message: "Only resellers can finalize the item list" });
+        }
+        const request = await storage.getRequest(id);
+        if (!request) return res.status(404).json({ message: "Request not found" });
+        if (request.reusseId !== userId) return res.status(403).json({ message: "Not assigned to this request" });
+        if (request.listReadyAt) return res.status(409).json({ message: "List already finalized" });
+
+        const existingItems = await storage.getItemsByRequest(id);
+        if (existingItems.length === 0) {
+          return res.status(400).json({ message: "Cannot finalize an empty item list" });
+        }
+
+        const updated = await storage.updateRequest(id, { listReadyAt: new Date() });
+
+        await storage.createNotification({
+          userId: request.sellerId,
+          type: "list_finalized",
+          title: "Item List Finalized",
+          message: `The reseller has finalized the item list for request #${id}. Please review and approve all items.`,
+          link: `/requests/${id}`,
+        });
+
+        const items = await storage.getItemsByRequest(id);
+        const allApproved = items.length > 0 && items.every((i) => i.status === "approved");
+        if (allApproved) {
+          const existingAgreement = await storage.getAgreementByRequest(id);
+          if (!existingAgreement) {
+            const { itemsSnapshot, feeBreakdown, totalValue } = buildAgreementSnapshot(items);
+            const agreement = await storage.createAgreement({
+              requestId: id,
+              sellerId: request.sellerId,
+              reusseId: userId,
+              status: "pending",
+              itemCount: items.length,
+              totalValue,
+              itemsSnapshot,
+              feeBreakdown,
+            });
+            await storage.createNotification({
+              userId: request.sellerId,
+              type: "agreement_ready",
+              title: "Agreement Ready to Sign",
+              message: `An agreement for request #${id} is ready for your signature.`,
+              link: `/agreements/${agreement.id}`,
+            });
+            await storage.createNotification({
+              userId,
+              type: "agreement_ready",
+              title: "Agreement Ready to Sign",
+              message: `An agreement for request #${id} is ready for your signature.`,
+              link: `/agreements/${agreement.id}`,
+            });
+            broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId: id });
+            broadcastToUser(userId, { type: "agreement_ready", agreementId: agreement.id, requestId: id });
+          }
+        }
+
+        res.json(updated);
+      } catch (error) {
+        console.error("Error finalizing list:", error);
+        res.status(500).json({ message: "Failed to finalize list" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/requests/:id/agreement",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const id = parseInt(req.params.id);
+        const profile = await storage.getProfile(userId);
+        const request = await storage.getRequest(id);
+        if (!request) return res.status(404).json({ message: "Request not found" });
+        const isAdmin = profile?.role === "admin";
+        const isParticipant = request.sellerId === userId || request.reusseId === userId;
+        if (!isAdmin && !isParticipant) {
+          return res.status(403).json({ message: "Not authorized to view this agreement" });
+        }
+        const agreement = await storage.getAgreementByRequest(id);
+        if (!agreement) return res.json(null);
+        res.json(agreement);
+      } catch (error) {
+        console.error("Error fetching agreement:", error);
+        res.status(500).json({ message: "Failed to fetch agreement" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/requests/:id/generate-agreement",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const requestId = parseInt(req.params.id);
+        const profile = await storage.getProfile(userId);
+        const request = await storage.getRequest(requestId);
+        if (!request) return res.status(404).json({ message: "Request not found" });
+        const isAdmin = profile?.role === "admin";
+        const isParticipant = request.sellerId === userId || request.reusseId === userId;
+        if (!isAdmin && !isParticipant) {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+        if (!request.listReadyAt) {
+          return res.status(400).json({ message: "Item list not yet finalized" });
+        }
+        if (!request.reusseId) {
+          return res.status(400).json({ message: "No reseller assigned" });
+        }
+        const existing = await storage.getAgreementByRequest(requestId);
+        if (existing) return res.json(existing);
+        const items = await storage.getItemsByRequest(requestId);
+        if (items.length === 0) {
+          return res.status(400).json({ message: "No items found for this request" });
+        }
+        const allApproved = items.every((i) => i.status === "approved");
+        if (!allApproved) {
+          return res.status(400).json({ message: "Not all items are approved yet" });
+        }
+        const { itemsSnapshot, feeBreakdown, totalValue } = buildAgreementSnapshot(items);
+        const agreement = await storage.createAgreement({
+          requestId,
+          sellerId: request.sellerId,
+          reusseId: request.reusseId,
+          status: "pending",
+          itemCount: items.length,
+          totalValue,
+          itemsSnapshot,
+          feeBreakdown,
+        });
+        await storage.createNotification({
+          userId: request.sellerId,
+          type: "agreement_ready",
+          title: "Agreement Ready to Sign",
+          message: `An agreement for request #${requestId} is ready for your signature.`,
+          link: `/agreements/${agreement.id}`,
+        });
+        await storage.createNotification({
+          userId: request.reusseId,
+          type: "agreement_ready",
+          title: "Agreement Ready to Sign",
+          message: `An agreement for request #${requestId} is ready for your signature.`,
+          link: `/agreements/${agreement.id}`,
+        });
+        broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId });
+        broadcastToUser(request.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId });
+        res.json(agreement);
+      } catch (error) {
+        console.error("Error generating agreement:", error);
+        res.status(500).json({ message: "Failed to generate agreement" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/agreements/:id",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const id = parseInt(req.params.id);
+        const profile = await storage.getProfile(userId);
+        const agreement = await storage.getAgreementWithDetails(id);
+        if (!agreement) return res.status(404).json({ message: "Agreement not found" });
+        if (profile?.role !== "admin" && agreement.sellerId !== userId && agreement.reusseId !== userId) {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+        res.json(agreement);
+      } catch (error) {
+        console.error("Error fetching agreement:", error);
+        res.status(500).json({ message: "Failed to fetch agreement" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/agreements/:id/sign",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const id = parseInt(req.params.id);
+        const profile = await storage.getProfile(userId);
+        if (!profile) return res.status(400).json({ message: "Profile required" });
+
+        const { agreed } = req.body;
+        if (agreed !== true) {
+          return res.status(400).json({ message: "You must agree to sign this agreement (agreed: true)" });
+        }
+
+        const agreement = await storage.getAgreement(id);
+        if (!agreement) return res.status(404).json({ message: "Agreement not found" });
+
+        if (agreement.sellerId !== userId && agreement.reusseId !== userId) {
+          return res.status(403).json({ message: "Not a party to this agreement" });
+        }
+
+        const existingSig = await storage.getAgreementSignature(id, userId);
+        if (existingSig) return res.status(409).json({ message: "Already signed this agreement" });
+
+        const ipAddress = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
+        const role = agreement.sellerId === userId ? "seller" : "reusse";
+
+        await storage.createAgreementSignature({ agreementId: id, userId, role, ipAddress });
+
+        const allSigs = await storage.getAgreementSignatures(id);
+        const hasSeller = allSigs.some((s) => s.userId === agreement.sellerId);
+        const hasReusse = allSigs.some((s) => s.userId === agreement.reusseId);
+
+        let newStatus = agreement.status;
+        if (hasSeller && hasReusse) {
+          newStatus = "fully_signed";
+        } else if (hasSeller) {
+          newStatus = "seller_signed";
+        } else if (hasReusse) {
+          newStatus = "reseller_signed";
+        }
+
+        await storage.updateAgreementStatus(id, newStatus);
+
+        const otherUserId = agreement.sellerId === userId ? agreement.reusseId : agreement.sellerId;
+        await storage.createNotification({
+          userId: otherUserId,
+          type: "agreement_signed",
+          title: newStatus === "fully_signed" ? "Agreement Fully Signed" : "Agreement Partially Signed",
+          message: newStatus === "fully_signed"
+            ? `Agreement for request #${agreement.requestId} has been fully signed by both parties.`
+            : `${profile.role === "seller" ? "The seller" : "The reseller"} has signed the agreement for request #${agreement.requestId}.`,
+          link: `/agreements/${id}`,
+        });
+
+        if (newStatus === "fully_signed") {
+          const requestItems = await storage.getItemsByRequest(agreement.requestId);
+          const parsedItems = JSON.parse(agreement.itemsSnapshot);
+          for (const snapItem of parsedItems) {
+            const price = snapItem.approvedPrice;
+            const fees = calculateFees(price);
+            const matchingItem = requestItems.find((i) => i.id === snapItem.id);
+            if (matchingItem) {
+              const existingTxn = await storage.getTransactionByItemId(matchingItem.id);
+              if (!existingTxn) {
+                await storage.createTransaction({
+                  itemId: matchingItem.id,
+                  requestId: agreement.requestId,
+                  sellerId: agreement.sellerId,
+                  reusseId: agreement.reusseId,
+                  salePrice: price.toString(),
+                  sellerEarning: fees.sellerAmount.toString(),
+                  reusseEarning: fees.resellerAmount.toString(),
+                  status: "completed",
+                });
+              }
+            }
+          }
+        }
+
+        const updated = await storage.getAgreementWithDetails(id);
+        res.json(updated);
+      } catch (error) {
+        console.error("Error signing agreement:", error);
+        res.status(500).json({ message: "Failed to sign agreement" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/admin/agreements",
+    isAuthenticated,
+    requireAdmin,
+    async (req: any, res) => {
+      try {
+        const result = await storage.getAdminAgreements();
+        res.json(result);
+      } catch (error) {
+        console.error("Error fetching admin agreements:", error);
+        res.status(500).json({ message: "Failed to fetch agreements" });
       }
     },
   );

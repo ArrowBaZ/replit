@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
+import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { User, Profile } from "@shared/schema";
-import { Users, Shield, Package, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Users, Shield, Package, CheckCircle, XCircle, Clock, FileSignature } from "lucide-react";
 
 interface UserWithProfile {
   id: string;
@@ -20,9 +21,40 @@ interface UserWithProfile {
   profile: Profile | null;
 }
 
+interface AdminAgreement {
+  id: number;
+  requestId: number;
+  sellerId: string;
+  reusseId: string;
+  status: string;
+  itemCount: number;
+  totalValue: string;
+  generatedAt: string;
+  sellerName: string;
+  reusseName: string;
+  signatureCount: number;
+  sellerSignedAt: string | null;
+  reusseSignedAt: string | null;
+}
+
+const agreementStatusColors: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  seller_signed: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  reseller_signed: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+  fully_signed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+};
+
+const agreementStatusLabels: Record<string, string> = {
+  pending: "Unsigned",
+  seller_signed: "Seller Signed",
+  reseller_signed: "Reseller Signed",
+  fully_signed: "Fully Signed",
+};
+
 export default function AdminDashboard() {
   const { toast } = useToast();
   const { t } = useI18n();
+  const [, setLocation] = useLocation();
 
   const { data: allUsers, isLoading: usersLoading } = useQuery<UserWithProfile[]>({
     queryKey: ["/api/admin/users"],
@@ -41,6 +73,10 @@ export default function AdminDashboard() {
     activeRequests: number;
   }>({
     queryKey: ["/api/admin/stats"],
+  });
+
+  const { data: adminAgreements, isLoading: agreementsLoading } = useQuery<AdminAgreement[]>({
+    queryKey: ["/api/admin/agreements"],
   });
 
   const updateApplication = useMutation({
@@ -127,6 +163,9 @@ export default function AdminDashboard() {
             {t("applications")} {stats?.pendingApplications ? `(${stats.pendingApplications})` : ""}
           </TabsTrigger>
           <TabsTrigger value="users" data-testid="tab-users">{t("users")}</TabsTrigger>
+          <TabsTrigger value="agreements" data-testid="tab-agreements">
+            Agreements {adminAgreements?.length ? `(${adminAgreements.length})` : ""}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="applications" className="space-y-3">
@@ -242,6 +281,62 @@ export default function AdminDashboard() {
               <CardContent className="p-8 text-center">
                 <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">No users found</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="agreements" className="space-y-3">
+          {agreementsLoading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i}><CardContent className="p-4"><Skeleton className="h-16" /></CardContent></Card>
+            ))
+          ) : adminAgreements && adminAgreements.length > 0 ? (
+            adminAgreements.map((agreement) => (
+              <Card
+                key={agreement.id}
+                className="cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => setLocation(`/agreements/${agreement.id}`)}
+                data-testid={`card-agreement-${agreement.id}`}
+              >
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <FileSignature className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">Agreement #{agreement.id} · Request #{agreement.requestId}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Seller: {agreement.sellerName} · Reseller: {agreement.reusseName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {agreement.itemCount} item{agreement.itemCount !== 1 ? "s" : ""} · Total: €{parseFloat(agreement.totalValue).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Seller signed: {agreement.sellerSignedAt ? new Date(agreement.sellerSignedAt).toLocaleString("fr-FR") : "—"} ·{" "}
+                          Reseller signed: {agreement.reusseSignedAt ? new Date(agreement.reusseSignedAt).toLocaleString("fr-FR") : "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <Badge className={agreementStatusColors[agreement.status] || ""} data-testid={`status-agreement-${agreement.id}`}>
+                        {agreementStatusLabels[agreement.status] || agreement.status}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(agreement.generatedAt).toLocaleDateString("fr-FR")}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <FileSignature className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm font-medium mb-1">No agreements yet</p>
+                <p className="text-xs text-muted-foreground">Agreements are generated when all items in a finalized list are approved.</p>
               </CardContent>
             </Card>
           )}

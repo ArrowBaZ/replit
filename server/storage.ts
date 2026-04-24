@@ -33,6 +33,12 @@ import {
   type InsertItemDocument,
   itemDocumentRequests,
   type ItemDocumentRequest,
+  agreements,
+  type Agreement,
+  type InsertAgreement,
+  agreementSignatures,
+  type AgreementSignature,
+  type InsertAgreementSignature,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -87,6 +93,7 @@ export interface IStorage {
   getAdminStats(): Promise<any>;
 
   createTransaction(data: InsertTransaction): Promise<Transaction>;
+  getTransactionByItemId(itemId: number): Promise<Transaction | undefined>;
   getTransactions(userId: string, role: string): Promise<Transaction[]>;
   getEarnings(
     userId: string,
@@ -113,6 +120,16 @@ export interface IStorage {
   getDocumentsByUser(userId: string): Promise<any[]>;
   getDocumentRequestStatus(itemId: number, reusseId: string): Promise<ItemDocumentRequest | undefined>;
   createDocumentRequest(itemId: number, reusseId: string): Promise<ItemDocumentRequest>;
+
+  createAgreement(data: InsertAgreement): Promise<Agreement>;
+  getAgreement(id: number): Promise<Agreement | undefined>;
+  getAgreementByRequest(requestId: number): Promise<Agreement | undefined>;
+  updateAgreementStatus(id: number, status: string): Promise<Agreement | undefined>;
+  getAgreementWithDetails(id: number): Promise<any>;
+  getAdminAgreements(): Promise<any[]>;
+  createAgreementSignature(data: InsertAgreementSignature): Promise<AgreementSignature>;
+  getAgreementSignatures(agreementId: number): Promise<AgreementSignature[]>;
+  getAgreementSignature(agreementId: number, userId: string): Promise<AgreementSignature | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -523,6 +540,11 @@ export class DatabaseStorage implements IStorage {
     return transaction;
   }
 
+  async getTransactionByItemId(itemId: number): Promise<Transaction | undefined> {
+    const [row] = await db.select().from(transactions).where(eq(transactions.itemId, itemId)).limit(1);
+    return row;
+  }
+
   async getTransactions(userId: string, role: string): Promise<Transaction[]> {
     if (role === "reusse") {
       return db
@@ -831,6 +853,88 @@ export class DatabaseStorage implements IStorage {
   async createDocumentRequest(itemId: number, reusseId: string): Promise<ItemDocumentRequest> {
     const [req] = await db.insert(itemDocumentRequests).values({ itemId, reusseId }).returning();
     return req;
+  }
+
+  async createAgreement(data: InsertAgreement): Promise<Agreement> {
+    const [agreement] = await db.insert(agreements).values(data).returning();
+    return agreement;
+  }
+
+  async getAgreement(id: number): Promise<Agreement | undefined> {
+    const [agreement] = await db.select().from(agreements).where(eq(agreements.id, id));
+    return agreement;
+  }
+
+  async getAgreementByRequest(requestId: number): Promise<Agreement | undefined> {
+    const [agreement] = await db.select().from(agreements).where(eq(agreements.requestId, requestId));
+    return agreement;
+  }
+
+  async updateAgreementStatus(id: number, status: string): Promise<Agreement | undefined> {
+    const [agreement] = await db.update(agreements).set({ status }).where(eq(agreements.id, id)).returning();
+    return agreement;
+  }
+
+  async getAgreementWithDetails(id: number): Promise<any> {
+    const [agreement] = await db.select().from(agreements).where(eq(agreements.id, id));
+    if (!agreement) return undefined;
+
+    const sigs = await db.select().from(agreementSignatures).where(eq(agreementSignatures.agreementId, id));
+
+    const [sellerUser] = await db.select().from(users).where(eq(users.id, agreement.sellerId));
+    const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.reusseId));
+    const [request] = await db.select().from(requests).where(eq(requests.id, agreement.requestId));
+
+    const sigWithNames = await Promise.all(sigs.map(async (sig) => {
+      const [u] = await db.select().from(users).where(eq(users.id, sig.userId));
+      return {
+        ...sig,
+        userName: u ? `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email : "Unknown",
+      };
+    }));
+
+    return {
+      ...agreement,
+      seller: sellerUser ? { id: sellerUser.id, firstName: sellerUser.firstName, lastName: sellerUser.lastName, email: sellerUser.email } : null,
+      reusse: reusseUser ? { id: reusseUser.id, firstName: reusseUser.firstName, lastName: reusseUser.lastName, email: reusseUser.email } : null,
+      request: request || null,
+      signatures: sigWithNames,
+    };
+  }
+
+  async getAdminAgreements(): Promise<any[]> {
+    const rows = await db.select().from(agreements).orderBy(desc(agreements.generatedAt));
+    return Promise.all(rows.map(async (agreement) => {
+      const sigs = await db.select().from(agreementSignatures).where(eq(agreementSignatures.agreementId, agreement.id));
+      const [sellerUser] = await db.select().from(users).where(eq(users.id, agreement.sellerId));
+      const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.reusseId));
+      const sellerSig = sigs.find((s) => s.userId === agreement.sellerId);
+      const reusseSig = sigs.find((s) => s.userId === agreement.reusseId);
+      return {
+        ...agreement,
+        sellerName: sellerUser ? `${sellerUser.firstName || ""} ${sellerUser.lastName || ""}`.trim() || sellerUser.email : "Unknown",
+        reusseName: reusseUser ? `${reusseUser.firstName || ""} ${reusseUser.lastName || ""}`.trim() || reusseUser.email : "Unknown",
+        signatureCount: sigs.length,
+        sellerSignedAt: sellerSig?.signedAt ?? null,
+        reusseSignedAt: reusseSig?.signedAt ?? null,
+      };
+    }));
+  }
+
+  async createAgreementSignature(data: InsertAgreementSignature): Promise<AgreementSignature> {
+    const [sig] = await db.insert(agreementSignatures).values(data).returning();
+    return sig;
+  }
+
+  async getAgreementSignatures(agreementId: number): Promise<AgreementSignature[]> {
+    return db.select().from(agreementSignatures).where(eq(agreementSignatures.agreementId, agreementId));
+  }
+
+  async getAgreementSignature(agreementId: number, userId: string): Promise<AgreementSignature | undefined> {
+    const [sig] = await db.select().from(agreementSignatures).where(
+      and(eq(agreementSignatures.agreementId, agreementId), eq(agreementSignatures.userId, userId))
+    );
+    return sig;
   }
 }
 

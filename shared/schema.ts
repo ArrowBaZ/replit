@@ -49,6 +49,7 @@ export const requests = pgTable("requests", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   completedAt: timestamp("completed_at"),
+  listReadyAt: timestamp("list_ready_at"),
 }, (table) => [
   index("idx_requests_seller").on(table.sellerId),
   index("idx_requests_reusse").on(table.reusseId),
@@ -270,6 +271,51 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
   reusse: one(users, { fields: [reviews.reusseId], references: [users.id], relationName: "reusseReviews" }),
 }));
 
+export const agreements = pgTable("agreements", {
+  id: serial("id").primaryKey(),
+  requestId: integer("request_id").notNull().references(() => requests.id),
+  sellerId: varchar("seller_id").notNull().references(() => users.id),
+  reusseId: varchar("reusse_id").notNull().references(() => users.id),
+  status: varchar("status", { length: 30 }).notNull().default("pending"),
+  itemCount: integer("item_count").notNull(),
+  totalValue: numeric("total_value").notNull(),
+  itemsSnapshot: text("items_snapshot").notNull(),
+  feeBreakdown: text("fee_breakdown"),
+  generatedAt: timestamp("generated_at").defaultNow(),
+}, (table) => [
+  index("idx_agreements_request").on(table.requestId),
+  index("idx_agreements_seller").on(table.sellerId),
+  index("idx_agreements_reusse").on(table.reusseId),
+]);
+
+export const agreementsRelations = relations(agreements, ({ one, many }) => ({
+  request: one(requests, { fields: [agreements.requestId], references: [requests.id] }),
+  seller: one(users, { fields: [agreements.sellerId], references: [users.id], relationName: "sellerAgreements" }),
+  reusse: one(users, { fields: [agreements.reusseId], references: [users.id], relationName: "reusseAgreements" }),
+  signatures: many(agreementSignatures),
+}));
+
+export const agreementSignatures = pgTable("agreement_signatures", {
+  id: serial("id").primaryKey(),
+  agreementId: integer("agreement_id").notNull().references(() => agreements.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  role: varchar("role", { length: 20 }).notNull(),
+  signedAt: timestamp("signed_at").defaultNow(),
+  ipAddress: varchar("ip_address", { length: 50 }),
+}, (table) => [
+  index("idx_agreement_sigs_agreement").on(table.agreementId),
+  index("idx_agreement_sigs_user").on(table.userId),
+  uniqueIndex("uq_agreement_sig_user").on(table.agreementId, table.userId),
+]);
+
+export const agreementSignaturesRelations = relations(agreementSignatures, ({ one }) => ({
+  agreement: one(agreements, { fields: [agreementSignatures.agreementId], references: [agreements.id] }),
+  user: one(users, { fields: [agreementSignatures.userId], references: [users.id] }),
+}));
+
+export const insertAgreementSchema = createInsertSchema(agreements).omit({ id: true, generatedAt: true });
+export const insertAgreementSignatureSchema = createInsertSchema(agreementSignatures).omit({ id: true, signedAt: true });
+
 export const insertItemDocumentSchema = createInsertSchema(itemDocuments).omit({ id: true, createdAt: true });
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRequestSchema = createInsertSchema(requests).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
@@ -302,3 +348,7 @@ export type InsertItemDocument = z.infer<typeof insertItemDocumentSchema>;
 export const insertItemDocumentRequestSchema = createInsertSchema(itemDocumentRequests).omit({ id: true, createdAt: true });
 export type ItemDocumentRequest = typeof itemDocumentRequests.$inferSelect;
 export type InsertItemDocumentRequest = z.infer<typeof insertItemDocumentRequestSchema>;
+export type Agreement = typeof agreements.$inferSelect;
+export type InsertAgreement = z.infer<typeof insertAgreementSchema>;
+export type AgreementSignature = typeof agreementSignatures.$inferSelect;
+export type InsertAgreementSignature = z.infer<typeof insertAgreementSignatureSchema>;

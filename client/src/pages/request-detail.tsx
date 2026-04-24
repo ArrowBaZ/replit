@@ -15,9 +15,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Request, Item, Meeting, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag, FileText } from "lucide-react";
+import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag, FileText, FileSignature, Lock } from "lucide-react";
 import { ItemDocumentsSection } from "@/components/item-documents-section";
 import { ITEM_CATEGORIES, type ItemCategory } from "@shared/schema";
+import { calculateFees } from "@shared/feeCalculator";
 import { useState, useRef, useEffect } from "react";
 import { useUpload } from "@/hooks/use-upload";
 
@@ -424,6 +425,28 @@ export default function RequestDetailPage() {
     },
   });
 
+  const { data: requestAgreement } = useQuery<{ id: number; status: string } | null>({
+    queryKey: ["/api/requests", params.id, "agreement"],
+    enabled: !!request?.reusseId,
+  });
+
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
+
+  const finalizeList = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/requests/${params.id}/finalize-list`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id] });
+      setShowFinalizeConfirm(false);
+      toast({ title: "Item list finalized", description: "The seller has been notified to review and approve all items." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to finalize list", variant: "destructive" });
+    },
+  });
+
   useEffect(() => {
     if (!user?.id) return;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -818,6 +841,49 @@ export default function RequestDetailPage() {
         )
       )}
 
+      {requestAgreement && (() => {
+        const fullyDone = requestAgreement.status === "fully_signed";
+        const currentUserSigned = fullyDone ||
+          (isSeller && requestAgreement.status === "seller_signed") ||
+          (isReusse && requestAgreement.status === "reseller_signed");
+        const otherPartySigned =
+          (isSeller && requestAgreement.status === "reseller_signed") ||
+          (isReusse && requestAgreement.status === "seller_signed");
+        const subtitle = fullyDone
+          ? "Both parties have signed the agreement."
+          : currentUserSigned
+            ? "Waiting for the other party to sign."
+            : otherPartySigned
+              ? "The other party signed — your signature is needed."
+              : "Please review and sign the agreement to proceed.";
+        return (
+          <Card className={`border-2 ${fullyDone ? "border-emerald-300 dark:border-emerald-700" : "border-amber-300 dark:border-amber-700"}`} data-testid="card-agreement-cta">
+            <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className={`h-9 w-9 rounded-md flex items-center justify-center shrink-0 ${fullyDone ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400" : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"}`}>
+                  <FileSignature className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">
+                    {fullyDone ? "Agreement fully signed" : "Agreement awaiting signatures"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{subtitle}</p>
+                </div>
+              </div>
+              <Button
+                variant={fullyDone || currentUserSigned ? "outline" : "default"}
+                size="sm"
+                onClick={() => setLocation(`/agreements/${requestAgreement.id}`)}
+                data-testid="button-view-agreement"
+              >
+                <FileSignature className="h-3.5 w-3.5 mr-1" />
+                {fullyDone || currentUserSigned ? "View Agreement" : "Sign Agreement"}
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       <Tabs defaultValue="items" className="space-y-4">
         <TabsList>
           <TabsTrigger value="items">{t("items")} ({requestItems?.length || 0})</TabsTrigger>
@@ -825,7 +891,53 @@ export default function RequestDetailPage() {
         </TabsList>
 
         <TabsContent value="items" className="space-y-3">
-          {(isReusse && isAssigned) && (
+          {isReusse && isAssigned && !request.listReadyAt && (requestItems?.length || 0) > 0 && !requestAgreement && (
+            showFinalizeConfirm ? (
+              <Card className="border-amber-300 dark:border-amber-700">
+                <CardContent className="p-4 space-y-3">
+                  <p className="text-sm font-semibold flex items-center gap-1.5">
+                    <Lock className="h-4 w-4 text-amber-600" /> Finalize Item List
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    This will lock the item list and notify the seller to review and approve all items. You will no longer be able to add, edit, or remove items after this action. An agreement will be automatically generated once all items are approved.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      className="bg-amber-500 hover:bg-amber-600 text-white"
+                      onClick={() => finalizeList.mutate()}
+                      disabled={finalizeList.isPending}
+                      data-testid="button-confirm-finalize"
+                    >
+                      {finalizeList.isPending ? "Finalizing..." : "Yes, Finalize List"}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowFinalizeConfirm(false)} data-testid="button-cancel-finalize">
+                      Cancel
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-300 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                onClick={() => setShowFinalizeConfirm(true)}
+                data-testid="button-finalize-list"
+              >
+                <Lock className="h-3.5 w-3.5 mr-1" /> Finalize Item List
+              </Button>
+            )
+          )}
+
+          {isReusse && isAssigned && request.listReadyAt && !requestAgreement && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400" data-testid="status-list-finalized">
+              <Lock className="h-3.5 w-3.5 shrink-0" />
+              List finalized — awaiting seller approval of all items
+            </div>
+          )}
+
+          {(isReusse && isAssigned && !request.listReadyAt) && (
             <Dialog open={showAddItem} onOpenChange={(open) => { setShowAddItem(open); if (!open) { setItemForm(emptyItemForm); setItemPhotos([]); setCertPhotos([]); } }}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline" data-testid="button-add-item">
@@ -1213,8 +1325,12 @@ export default function RequestDetailPage() {
                       </div>
                       {soldPrice && parseFloat(soldPrice) > 0 && (
                         <div className="text-xs space-y-1">
-                          <p>{t("sellerEarning")}: <span className="font-medium text-emerald-600">{(parseFloat(soldPrice) * 0.8).toFixed(2)} EUR</span></p>
-                          <p>{t("reusseEarning")}: <span className="font-medium text-blue-600">{(parseFloat(soldPrice) * 0.2).toFixed(2)} EUR</span></p>
+                          {(() => { const fees = calculateFees(parseFloat(soldPrice)); return (
+                            <>
+                              <p>{t("sellerEarning")}: <span className="font-medium text-emerald-600">{fees.sellerAmount.toFixed(2)} EUR</span></p>
+                              <p>{t("reusseEarning")}: <span className="font-medium text-blue-600">{fees.resellerAmount.toFixed(2)} EUR</span></p>
+                            </>
+                          ); })()}
                         </div>
                       )}
                       <div className="flex gap-2">
