@@ -98,7 +98,8 @@ function NotificationBell({ userId }: { userId: string }) {
         if (
           data.type === "document_request" ||
           data.type === "new_document" ||
-          data.type === "new_notification"
+          data.type === "new_notification" ||
+          data.type === "agreement_ready"
         ) {
           queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
         }
