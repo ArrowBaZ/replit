@@ -1266,7 +1266,12 @@ export default function RequestDetailPage() {
                           <p className="text-xs text-muted-foreground mt-1">{item.minPrice} - {item.maxPrice} EUR</p>
                         )}
                         {item.salePrice && (
-                          <p className="text-xs font-medium text-emerald-600 mt-1">{t("salePrice")}: {item.salePrice} EUR</p>
+                          <>
+                            <p className="text-xs font-medium text-emerald-600 mt-1">{t("salePrice")}: {item.salePrice} EUR</p>
+                            <div className="mt-2" data-testid={`fee-preview-sold-${item.id}`}>
+                              <ItemFeePreview price={parseFloat(item.salePrice)} />
+                            </div>
+                          </>
                         )}
                         {item.approvedPrice && !item.salePrice && (["approved", "listed"].includes(item.status || "")) && (
                           <div className="mt-2" data-testid={`fee-preview-item-${item.id}`}>
@@ -1307,6 +1312,12 @@ export default function RequestDetailPage() {
                           )}
                         </div>
                       </div>
+                      {item.maxPrice && parseFloat(item.maxPrice) > 0 && (
+                        <div data-testid={`fee-preview-counter-${item.id}`}>
+                          <p className="text-xs text-muted-foreground mb-1">Fee breakdown at seller's max price:</p>
+                          <ItemFeePreview price={parseFloat(item.maxPrice)} />
+                        </div>
+                      )}
                       {showRevisePrice !== item.id && (
                         <div className="flex flex-wrap gap-2">
                           <Button
