@@ -72,6 +72,16 @@ Database-driven tiered fee structure replaces hardcoded logic.
   - fileUrl is stored server-side only; the document list API (`GET /api/items/:id/documents`) strips it from responses.
   - Document downloads go through an authenticated proxy (`GET /api/items/:id/documents/:docId/download`) that fetches from object storage server-side, never exposing raw GCS URLs to clients.
 
+## Price Negotiation Flow (Task #12)
+Sellers can now review and counter-offer item prices before the agreement is finalized.
+- **Seller review step**: After reseller finalizes the item list (sets `listReadyAt`), sellers see a "Review Item Prices" banner. Approve/counter-offer/decline buttons are only shown to sellers when the list is finalized.
+- **Seller counter-offer**: Seller can propose a new price range (min/max) — existing `/api/items/:id/counter-offer` (now guarded by `listReadyAt`).
+- **Reseller response**: When an item has `sellerCounterOffer=true`, the reseller sees the seller's proposed range plus two new action buttons:
+  - "Accept Counter-offer" → `POST /api/items/:id/accept-counter-offer` — sets item to approved, triggers agreement generation if all items approved.
+  - "Revise Price" → `POST /api/items/:id/revise-price` — reseller proposes a fresh price range back to the seller.
+- **Backend guards**: Both `/api/items/:id/approve` and `/api/items/:id/counter-offer` now require `listReadyAt` to be set on the parent request.
+- Agreement is only generated once all prices are mutually agreed (all items have `status=approved`).
+
 ## Recent Changes
 - Initial MVP build: complete frontend + backend
 - Database schema: profiles, requests, items, meetings, messages, notifications, transactions

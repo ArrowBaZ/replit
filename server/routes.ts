@@ -1149,6 +1149,14 @@ export async function registerRoutes(
             .json({ message: "Only the seller can approve item pricing" });
         }
 
+        // Require list to be finalized before seller can approve
+        if (existingItem.requestId) {
+          const parentReq = await storage.getRequest(existingItem.requestId);
+          if (parentReq && !parentReq.listReadyAt) {
+            return res.status(400).json({ message: "Cannot approve items before the reseller finalizes the item list" });
+          }
+        }
+
         const item = await storage.updateItem(id, {
           status: "approved",
           priceApprovedBySeller: true,
@@ -1235,7 +1243,33 @@ export async function registerRoutes(
             .json({ message: "Only the seller can counter-offer" });
         }
 
+        // Require list to be finalized before seller can counter-offer
+        if (existingItem.requestId) {
+          const parentReq = await storage.getRequest(existingItem.requestId);
+          if (parentReq && !parentReq.listReadyAt) {
+            return res.status(400).json({ message: "Cannot counter-offer before the reseller finalizes the item list" });
+          }
+        }
+
         const { minPrice, maxPrice } = req.body;
+        if (!minPrice && !maxPrice) {
+          return res.status(400).json({ message: "At least one of minPrice or maxPrice is required" });
+        }
+        const cParsedMin = minPrice ? parseFloat(minPrice) : null;
+        const cParsedMax = maxPrice ? parseFloat(maxPrice) : null;
+        if ((cParsedMin !== null && isNaN(cParsedMin)) || (cParsedMax !== null && isNaN(cParsedMax))) {
+          return res.status(400).json({ message: "Prices must be valid numbers" });
+        }
+        if (cParsedMin !== null && cParsedMin <= 0) {
+          return res.status(400).json({ message: "Min price must be greater than zero" });
+        }
+        if (cParsedMax !== null && cParsedMax <= 0) {
+          return res.status(400).json({ message: "Max price must be greater than zero" });
+        }
+        if (cParsedMin !== null && cParsedMax !== null && cParsedMin > cParsedMax) {
+          return res.status(400).json({ message: "Min price cannot be greater than max price" });
+        }
+
         const item = await storage.updateItem(id, {
           status: "pending_approval",
           minPrice: minPrice || null,
@@ -1298,6 +1332,186 @@ export async function registerRoutes(
       } catch (error) {
         console.error("Error declining item:", error);
         res.status(500).json({ message: "Failed to decline item" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/items/:id/accept-counter-offer",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const id = parseInt(req.params.id);
+
+        const existingItem = await storage.getItem(id);
+        if (!existingItem) return res.status(404).json({ message: "Item not found" });
+        if (existingItem.reusseId !== userId) {
+          return res.status(403).json({ message: "Only the assigned reseller can accept a counter-offer" });
+        }
+        if (!existingItem.sellerCounterOffer) {
+          return res.status(400).json({ message: "No pending seller counter-offer on this item" });
+        }
+        if (existingItem.status !== "pending_approval") {
+          return res.status(400).json({ message: "Item is not in a negotiation state" });
+        }
+        if (existingItem.requestId) {
+          const parentReq = await storage.getRequest(existingItem.requestId);
+          if (!parentReq || !parentReq.listReadyAt) {
+            return res.status(400).json({ message: "Cannot accept counter-offer before the item list is finalized" });
+          }
+        }
+
+        // Accept the seller's proposed price range — use their maxPrice as the approved price
+        const approvedPrice = existingItem.maxPrice || existingItem.minPrice || null;
+
+        const item = await storage.updateItem(id, {
+          status: "approved",
+          priceApprovedBySeller: true,
+          sellerCounterOffer: false,
+          approvedPrice,
+          updatedAt: new Date(),
+        });
+        if (!item) return res.status(404).json({ message: "Item not found" });
+
+        if (existingItem.sellerId) {
+          await storage.createNotification({
+            userId: existingItem.sellerId,
+            type: "counter_offer_accepted",
+            title: "Counter-offer Accepted",
+            message: `The reseller accepted your proposed price for "${existingItem.title}".`,
+            link: `/requests/${existingItem.requestId}`,
+          });
+        }
+
+        // Trigger agreement generation if all items are now approved
+        if (item.requestId && item.reusseId) {
+          const request = await storage.getRequest(item.requestId);
+          if (request && request.listReadyAt) {
+            const existingAgreement = await storage.getAgreementByRequest(item.requestId);
+            if (!existingAgreement) {
+              const allItems = await storage.getItemsByRequest(item.requestId);
+              const allApproved = allItems.length > 0 && allItems.every((i) => i.status === "approved");
+              if (allApproved) {
+                const { itemsSnapshot, feeBreakdown, totalValue } = await buildAgreementSnapshot(allItems);
+                const agreement = await storage.createAgreement({
+                  requestId: item.requestId,
+                  sellerId: request.sellerId,
+                  reusseId: item.reusseId,
+                  status: "pending",
+                  itemCount: allItems.length,
+                  totalValue,
+                  itemsSnapshot,
+                  feeBreakdown,
+                });
+                await storage.createNotification({
+                  userId: request.sellerId,
+                  type: "agreement_ready",
+                  title: "Agreement Ready to Sign",
+                  message: `An agreement for request #${item.requestId} is ready for your signature.`,
+                  link: `/agreements/${agreement.id}`,
+                });
+                await storage.createNotification({
+                  userId: item.reusseId,
+                  type: "agreement_ready",
+                  title: "Agreement Ready to Sign",
+                  message: `An agreement for request #${item.requestId} is ready for your signature.`,
+                  link: `/agreements/${agreement.id}`,
+                });
+                broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
+                broadcastToUser(item.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
+              }
+            }
+          }
+        }
+
+        res.json(item);
+      } catch (error: any) {
+        if (error?.statusCode === 400) return res.status(400).json({ message: error.message });
+        console.error("Error accepting counter-offer:", error);
+        res.status(500).json({ message: "Failed to accept counter-offer" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/items/:id/revise-price",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const id = parseInt(req.params.id);
+
+        const existingItem = await storage.getItem(id);
+        if (!existingItem) return res.status(404).json({ message: "Item not found" });
+        if (existingItem.reusseId !== userId) {
+          return res.status(403).json({ message: "Only the assigned reseller can revise the price" });
+        }
+
+        // Guard: only allowed when item is in active negotiation and no agreement exists yet
+        if (existingItem.status !== "pending_approval") {
+          return res.status(400).json({ message: "Can only revise price on items that are pending approval" });
+        }
+        if (!existingItem.sellerCounterOffer) {
+          return res.status(400).json({ message: "Can only revise price in response to a seller counter-offer" });
+        }
+        if (existingItem.requestId) {
+          const parentReq = await storage.getRequest(existingItem.requestId);
+          if (!parentReq || !parentReq.listReadyAt) {
+            return res.status(400).json({ message: "Cannot revise price before the item list is finalized" });
+          }
+          const existingAgreement = await storage.getAgreementByRequest(existingItem.requestId);
+          if (existingAgreement) {
+            return res.status(409).json({ message: "An agreement already exists for this request — price revision is no longer allowed" });
+          }
+        }
+
+        const { minPrice, maxPrice } = req.body;
+        if (!minPrice && !maxPrice) {
+          return res.status(400).json({ message: "At least one of minPrice or maxPrice is required" });
+        }
+        const parsedMin = minPrice ? parseFloat(minPrice) : null;
+        const parsedMax = maxPrice ? parseFloat(maxPrice) : null;
+        if ((parsedMin !== null && isNaN(parsedMin)) || (parsedMax !== null && isNaN(parsedMax))) {
+          return res.status(400).json({ message: "Prices must be valid numbers" });
+        }
+        if (parsedMin !== null && parsedMin <= 0) {
+          return res.status(400).json({ message: "Min price must be greater than zero" });
+        }
+        if (parsedMax !== null && parsedMax <= 0) {
+          return res.status(400).json({ message: "Max price must be greater than zero" });
+        }
+        if (parsedMin !== null && parsedMax !== null && parsedMin > parsedMax) {
+          return res.status(400).json({ message: "Min price cannot be greater than max price" });
+        }
+
+        const item = await storage.updateItem(id, {
+          status: "pending_approval",
+          minPrice: minPrice || existingItem.minPrice,
+          maxPrice: maxPrice || existingItem.maxPrice,
+          priceApprovedBySeller: false,
+          sellerCounterOffer: false,
+          approvedPrice: null,
+          updatedAt: new Date(),
+        });
+        if (!item) return res.status(404).json({ message: "Item not found" });
+
+        if (existingItem.sellerId) {
+          await storage.createNotification({
+            userId: existingItem.sellerId,
+            type: "price_revised",
+            title: "Price Range Revised",
+            message: `The reseller has revised the price range for "${existingItem.title}": ${minPrice || existingItem.minPrice} – ${maxPrice || existingItem.maxPrice} EUR. Please review and respond.`,
+            link: `/requests/${existingItem.requestId}`,
+          });
+        }
+
+        res.json(item);
+      } catch (error) {
+        console.error("Error revising price:", error);
+        res.status(500).json({ message: "Failed to revise price" });
       }
     },
   );

@@ -299,6 +299,10 @@ export default function RequestDetailPage() {
   const [showCounterOffer, setShowCounterOffer] = useState<number | null>(null);
   const [counterMin, setCounterMin] = useState("");
   const [counterMax, setCounterMax] = useState("");
+
+  const [showRevisePrice, setShowRevisePrice] = useState<number | null>(null);
+  const [reviseMin, setReviseMin] = useState("");
+  const [reviseMax, setReviseMax] = useState("");
   const [showListItem, setShowListItem] = useState<number | null>(null);
   const [listPlatform, setListPlatform] = useState("");
   const [showReschedule, setShowReschedule] = useState<number | null>(null);
@@ -330,6 +334,38 @@ export default function RequestDetailPage() {
       setCounterMin("");
       setCounterMax("");
       toast({ title: t("counterOfferSent") });
+    },
+  });
+
+  const acceptCounterOffer = useMutation({
+    mutationFn: async (itemId: number) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/accept-counter-offer`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "agreement"] });
+      toast({ title: "Counter-offer accepted", description: "The seller's proposed price has been accepted." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to accept counter-offer", variant: "destructive" });
+    },
+  });
+
+  const revisePriceOffer = useMutation({
+    mutationFn: async ({ itemId, minPrice, maxPrice }: { itemId: number; minPrice: string; maxPrice: string }) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/revise-price`, { minPrice, maxPrice });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      setShowRevisePrice(null);
+      setReviseMin("");
+      setReviseMax("");
+      toast({ title: "Price revised", description: "The seller has been notified to review the new price range." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to revise price", variant: "destructive" });
     },
   });
 
@@ -952,8 +988,26 @@ export default function RequestDetailPage() {
           {isReusse && isAssigned && request.listReadyAt && !requestAgreement && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400" data-testid="status-list-finalized">
               <Lock className="h-3.5 w-3.5 shrink-0" />
-              List finalized — awaiting seller approval of all items
+              {requestItems?.some((i) => i.sellerCounterOffer && i.status === "pending_approval")
+                ? "Seller has counter-offered on some items — review and respond below"
+                : "List finalized — awaiting seller approval of all items"}
             </div>
+          )}
+
+          {isSeller && request.listReadyAt && !requestAgreement && requestItems && requestItems.some((i) => i.status === "pending_approval") && (
+            <Card className="border-2 border-blue-300 dark:border-blue-700" data-testid="card-review-prices">
+              <CardContent className="p-4 flex items-start gap-3">
+                <div className="h-9 w-9 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                  <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Review Item Prices</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    The reseller has finalized the item list. Please review each item's proposed price range below and accept, counter-offer, or decline.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {(isReusse && isAssigned && !request.listReadyAt) && (
@@ -1241,9 +1295,65 @@ export default function RequestDetailPage() {
                   </div>
 
                   {item.sellerCounterOffer && item.status === "pending_approval" && isReusse && (
-                    <div className="ml-[4.25rem] flex items-center gap-1.5 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-md px-3 py-1.5 text-xs font-medium">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                      {t("sellerCounterOfferBadge")}
+                    <div className="ml-[4.25rem] space-y-2">
+                      <div className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-md px-3 py-2 text-xs font-medium">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        <div>
+                          <p>{t("sellerCounterOfferBadge")}</p>
+                          {item.minPrice && item.maxPrice && (
+                            <p className="mt-0.5 font-normal text-amber-600 dark:text-amber-300">
+                              Seller's proposed range: {item.minPrice} – {item.maxPrice} EUR
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {showRevisePrice !== item.id && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                            onClick={() => acceptCounterOffer.mutate(item.id)}
+                            disabled={acceptCounterOffer.isPending}
+                            data-testid={`button-accept-counter-${item.id}`}
+                          >
+                            <ThumbsUp className="h-3.5 w-3.5 mr-1" /> Accept Counter-offer
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => { setShowRevisePrice(item.id); setReviseMin(item.minPrice || ""); setReviseMax(item.maxPrice || ""); }}
+                            data-testid={`button-revise-price-${item.id}`}
+                          >
+                            <DollarSign className="h-3.5 w-3.5 mr-1" /> Revise Price
+                          </Button>
+                        </div>
+                      )}
+                      {showRevisePrice === item.id && (
+                        <div className="p-3 bg-muted rounded-lg space-y-2">
+                          <p className="text-xs font-medium">Propose a revised price range for the seller to review:</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">{t("minPrice")} (EUR)</Label>
+                              <Input type="number" value={reviseMin} onChange={(e) => setReviseMin(e.target.value)} data-testid="input-revise-min" />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">{t("maxPrice")} (EUR)</Label>
+                              <Input type="number" value={reviseMax} onChange={(e) => setReviseMax(e.target.value)} data-testid="input-revise-max" />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => revisePriceOffer.mutate({ itemId: item.id, minPrice: reviseMin, maxPrice: reviseMax })}
+                              disabled={revisePriceOffer.isPending || (!reviseMin && !reviseMax)}
+                              data-testid="button-submit-revise"
+                            >
+                              Send Revised Price
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setShowRevisePrice(null)}>{t("back")}</Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1253,7 +1363,7 @@ export default function RequestDetailPage() {
                     </div>
                   )}
 
-                  {isSeller && item.status === "pending_approval" && (
+                  {isSeller && item.status === "pending_approval" && request.listReadyAt && (
                     <div className="flex flex-wrap gap-2 ml-[4.25rem]">
                       <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approveItem.mutate(item.id)} disabled={approveItem.isPending} data-testid={`button-approve-${item.id}`}>
                         <ThumbsUp className="h-3.5 w-3.5 mr-1" /> {t("approvePrice")}
