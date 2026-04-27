@@ -478,6 +478,15 @@ const translations = {
     noNotifications: "No notifications",
     markAllRead: "Mark all as read",
     notifDocRequest: "Document request",
+
+    // Notification preferences
+    notifPrefsTitle: "Notification Preferences",
+    notifPrefsDesc: "Choose which pop-up alerts you receive in real time.",
+    notifPrefAgreementReady: "Agreement ready to sign",
+    notifPrefAgreementReadyDesc: "Show a pop-up when an agreement is generated and waiting for your signature.",
+    notifPrefDocRequest: "Document request",
+    notifPrefDocRequestDesc: "Show a pop-up when a reseller requests additional documents for an item.",
+    notifPrefsSaved: "Preferences saved",
   },
   fr: {
     // Nav
@@ -954,6 +963,15 @@ const translations = {
     noNotifications: "Aucune notification",
     markAllRead: "Tout marquer comme lu",
     notifDocRequest: "Demande de documents",
+
+    // Notification preferences
+    notifPrefsTitle: "Preferences de notification",
+    notifPrefsDesc: "Choisissez les alertes contextuelles que vous recevez en temps reel.",
+    notifPrefAgreementReady: "Accord pret a signer",
+    notifPrefAgreementReadyDesc: "Afficher une alerte quand un accord est genere et attend votre signature.",
+    notifPrefDocRequest: "Demande de documents",
+    notifPrefDocRequestDesc: "Afficher une alerte quand un revendeur demande des documents supplementaires.",
+    notifPrefsSaved: "Preferences sauvegardees",
   },
 } as const;
 

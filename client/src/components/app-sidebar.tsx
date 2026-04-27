@@ -66,7 +66,12 @@ function NotificationIcon({ type }: { type: string }) {
   return <Bell className="h-4 w-4 text-muted-foreground" />;
 }
 
-function NotificationBell({ userId }: { userId: string }) {
+function toastAllowed(prefs: Record<string, boolean> | null | undefined, key: string): boolean {
+  if (!prefs || prefs[key] === undefined) return true;
+  return prefs[key];
+}
+
+function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?: Record<string, boolean> | null }) {
   const { t } = useI18n();
   const [, navigate] = useLocation();
   const wsRef = useRef<WebSocket | null>(null);
@@ -106,10 +111,10 @@ function NotificationBell({ userId }: { userId: string }) {
         ) {
           queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
         }
-        if (data.type === "agreement_ready" && data.agreementId) {
+        if (data.type === "agreement_ready" && data.agreementId && toastAllowed(notifPrefs, "toast_agreement_ready")) {
           toast({
-            title: "Agreement ready",
-            description: "Your agreement is ready to sign",
+            title: t("notifPrefAgreementReady"),
+            description: t("notifPrefAgreementReadyDesc"),
             action: (
               <ToastAction
                 altText="View and sign the agreement"
@@ -121,11 +126,26 @@ function NotificationBell({ userId }: { userId: string }) {
             ),
           });
         }
+        if (data.type === "document_request" && data.itemTitle && toastAllowed(notifPrefs, "toast_document_request")) {
+          toast({
+            title: t("notifDocRequest"),
+            description: data.itemTitle,
+            action: data.itemId ? (
+              <ToastAction
+                altText="Go to request"
+                onClick={() => navigate(data.requestId ? `/requests/${data.requestId}` : `/items`)}
+                data-testid="toast-link-doc-request"
+              >
+                View
+              </ToastAction>
+            ) : undefined,
+          });
+        }
       } catch {}
     };
     ws.onclose = () => { wsRef.current = null; };
     return () => { ws.close(); };
-  }, [userId, toast, navigate]);
+  }, [userId, toast, navigate, notifPrefs, t]);
 
   const handleNotifClick = (notif: Notification) => {
     if (!notif.isRead) markRead.mutate(notif.id);
@@ -310,7 +330,7 @@ export function AppSidebar() {
               {role === "reusse" ? t("reusse") : role === "admin" ? "Admin" : t("seller")}
             </p>
           </div>
-          {user?.id && <NotificationBell userId={user.id} />}
+          {user?.id && <NotificationBell userId={user.id} notifPrefs={profile?.notificationPrefs} />}
           <Button
             size="icon"
             variant="ghost"

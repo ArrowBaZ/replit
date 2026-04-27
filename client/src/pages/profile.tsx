@@ -4,16 +4,25 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Profile } from "@shared/schema";
-import { User, MapPin, Phone, Mail, Pencil, Save } from "lucide-react";
+import { User, MapPin, Phone, Mail, Pencil, Save, Bell } from "lucide-react";
+
+const PREF_KEYS = ["toast_agreement_ready", "toast_document_request"] as const;
+type PrefKey = typeof PREF_KEYS[number];
+
+function getPref(prefs: Record<string, boolean> | null | undefined, key: PrefKey): boolean {
+  if (!prefs || prefs[key] === undefined) return true;
+  return prefs[key];
+}
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -58,6 +67,25 @@ export default function ProfilePage() {
     },
   });
 
+  const updatePrefs = useMutation({
+    mutationFn: async (prefs: Record<string, boolean>) => {
+      const res = await apiRequest("PATCH", "/api/profile", { notificationPrefs: prefs });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+      toast({ title: t("notifPrefsSaved") });
+    },
+    onError: () => {
+      toast({ title: t("error"), variant: "destructive" });
+    },
+  });
+
+  const togglePref = (key: PrefKey, value: boolean) => {
+    const current = profile?.notificationPrefs || {};
+    updatePrefs.mutate({ ...current, [key]: value });
+  };
+
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -70,6 +98,19 @@ export default function ProfilePage() {
       </div>
     );
   }
+
+  const prefRows: { key: PrefKey; label: string; desc: string }[] = [
+    {
+      key: "toast_agreement_ready",
+      label: t("notifPrefAgreementReady"),
+      desc: t("notifPrefAgreementReadyDesc"),
+    },
+    {
+      key: "toast_document_request",
+      label: t("notifPrefDocRequest"),
+      desc: t("notifPrefDocRequestDesc"),
+    },
+  ];
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-6">
@@ -199,6 +240,32 @@ export default function ProfilePage() {
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-notification-prefs">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Bell className="h-4 w-4" />
+            {t("notifPrefsTitle")}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">{t("notifPrefsDesc")}</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {prefRows.map(({ key, label, desc }) => (
+            <div key={key} className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium leading-none mb-1">{label}</p>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+              </div>
+              <Switch
+                checked={getPref(profile?.notificationPrefs, key)}
+                onCheckedChange={(val) => togglePref(key, val)}
+                disabled={updatePrefs.isPending}
+                data-testid={`switch-notif-pref-${key}`}
+              />
+            </div>
+          ))}
         </CardContent>
       </Card>
     </div>

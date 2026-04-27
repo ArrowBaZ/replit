@@ -2135,6 +2135,7 @@ export async function registerRoutes(
           type: "document_request",
           itemId,
           itemTitle: item.title,
+          requestId: item.requestId,
         });
         res.json({ success: true, message });
       } catch (error) {

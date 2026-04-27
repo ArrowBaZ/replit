@@ -153,6 +153,13 @@ Sellers can now review and counter-offer item prices before the agreement is fin
   - `/agreements/:id` page: full agreement with items table, fee breakdown per item, signing section with checkbox
   - request-detail.tsx: "Finalize Item List" button (reseller only, when items > 0 and list not yet finalized); agreement CTA card when agreement exists; "Add Item" hidden after list finalized
   - Admin dashboard: new "Agreements" tab showing all agreements with status badges
+- Notification Preferences (Task #34):
+  - `notificationPrefs` JSONB column added to `profiles` table (persisted per user)
+  - Toggle switches on /profile page: toast_agreement_ready, toast_document_request
+  - PATCH /api/profile accepts notificationPrefs in body (existing endpoint reused)
+  - NotificationBell WS handler checks prefs before firing toasts; toasts blocked when preference is off
+  - document_request WS event now also fires a toast (previously only refreshed badge counter)
+  - WS broadcast for document_request now includes requestId for direct navigation from toast
 - Seller Documentation & Media Hub (Task #3):
   - `item_documents` table: per-item document records (photo/certificate) with uploader, filename, fileUrl (private), fileType, fileSize, createdAt
   - `item_document_requests` table: idempotent per-reseller-per-item document requests

@@ -23,6 +23,7 @@ export const profiles = pgTable("profiles", {
   siretNumber: varchar("siret_number", { length: 20 }),
   status: varchar("status", { length: 20 }).default("approved"),
   preferredContactMethod: varchar("preferred_contact_method", { length: 20 }),
+  notificationPrefs: jsonb("notification_prefs").$type<Record<string, boolean>>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
