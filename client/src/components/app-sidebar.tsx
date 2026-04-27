@@ -6,6 +6,8 @@ import { useI18n } from "@/lib/i18n";
 import type { Profile, Notification } from "@shared/schema";
 import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
 import { useEffect, useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import {
   Sidebar,
   SidebarContent,
@@ -68,6 +70,7 @@ function NotificationBell({ userId }: { userId: string }) {
   const { t } = useI18n();
   const [, navigate] = useLocation();
   const wsRef = useRef<WebSocket | null>(null);
+  const { toast } = useToast();
 
   const { data: notifs = [] } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
@@ -103,11 +106,26 @@ function NotificationBell({ userId }: { userId: string }) {
         ) {
           queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
         }
+        if (data.type === "agreement_ready" && data.agreementId) {
+          toast({
+            title: "Agreement ready",
+            description: "Your agreement is ready to sign",
+            action: (
+              <ToastAction
+                altText="View and sign the agreement"
+                onClick={() => navigate(`/agreements/${data.agreementId}`)}
+                data-testid="toast-link-agreement"
+              >
+                View &amp; Sign
+              </ToastAction>
+            ),
+          });
+        }
       } catch {}
     };
     ws.onclose = () => { wsRef.current = null; };
     return () => { ws.close(); };
-  }, [userId]);
+  }, [userId, toast, navigate]);
 
   const handleNotifClick = (notif: Notification) => {
     if (!notif.isRead) markRead.mutate(notif.id);
