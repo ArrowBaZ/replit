@@ -13,7 +13,7 @@ import {
 } from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
-import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS } from "@shared/constants";
+import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS, NOTIF_PREF_KEYS } from "@shared/constants";
 import type { Item, Transaction } from "@shared/schema";
 
 function resolveItemPrice(i: Pick<Item, "approvedPrice" | "salePrice" | "maxPrice" | "minPrice">): number {
@@ -294,7 +294,25 @@ export async function registerRoutes(
     async (req: any, res) => {
       try {
         const userId = req.user.claims.sub;
-        const profile = await storage.updateProfile(userId, req.body);
+        const body = req.body as Record<string, unknown>;
+
+        if (body.notificationPrefs !== undefined) {
+          const notifPrefs = body.notificationPrefs;
+          if (typeof notifPrefs !== "object" || notifPrefs === null || Array.isArray(notifPrefs)) {
+            return res.status(400).json({ message: "notificationPrefs must be an object" });
+          }
+          const allowedKeys = new Set<string>(NOTIF_PREF_KEYS);
+          for (const [key, val] of Object.entries(notifPrefs as Record<string, unknown>)) {
+            if (!allowedKeys.has(key)) {
+              return res.status(400).json({ message: `Unknown notification preference key: ${key}` });
+            }
+            if (typeof val !== "boolean") {
+              return res.status(400).json({ message: `Notification preference value for '${key}' must be a boolean` });
+            }
+          }
+        }
+
+        const profile = await storage.updateProfile(userId, body);
         if (!profile) {
           return res.status(404).json({ message: "Profile not found" });
         }

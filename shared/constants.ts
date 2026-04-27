@@ -156,3 +156,11 @@ export const ROLE_I18N_KEYS: Record<UserRole, string> = {
   reusse: "roleReseller",
   admin: "roleAdmin",
 };
+
+// ─── Notification preference keys ────────────────────────────
+export const NOTIF_PREF_KEYS = [
+  "toast_agreement_ready",
+  "toast_document_request",
+] as const;
+
+export type NotifPrefKey = (typeof NOTIF_PREF_KEYS)[number];
