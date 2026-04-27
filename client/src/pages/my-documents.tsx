@@ -6,6 +6,7 @@ import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -27,6 +28,8 @@ import {
   Download,
   Loader2,
   FolderOpen,
+  Search,
+  X,
 } from "lucide-react";
 
 interface UserDocument {
@@ -297,15 +300,33 @@ function DocumentRow({ doc }: { doc: UserDocument }) {
   );
 }
 
+type TypeFilter = "all" | "photo" | "certificate";
+
 export default function MyDocumentsPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+
   const { data: documents, isLoading } = useQuery<UserDocument[]>({
     queryKey: ["/api/documents"],
   });
 
+  const filteredDocuments = (documents ?? []).filter((doc) => {
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      doc.fileName.toLowerCase().includes(q) ||
+      doc.itemTitle.toLowerCase().includes(q);
+    const matchesType =
+      typeFilter === "all" ||
+      (typeFilter === "photo" && doc.fileType === "photo") ||
+      (typeFilter === "certificate" && doc.fileType !== "photo");
+    return matchesSearch && matchesType;
+  });
+
   const grouped: GroupedDocs[] = [];
-  if (documents) {
+  {
     const map = new Map<number, GroupedDocs>();
-    for (const doc of documents) {
+    for (const doc of filteredDocuments) {
       if (!map.has(doc.itemId)) {
         map.set(doc.itemId, {
           itemId: doc.itemId,
@@ -319,6 +340,10 @@ export default function MyDocumentsPage() {
     grouped.push(...Array.from(map.values()));
   }
 
+  const hasDocuments = (documents ?? []).length > 0;
+  const hasResults = grouped.length > 0;
+  const isFiltering = searchQuery.trim() !== "" || typeFilter !== "all";
+
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-6">
@@ -328,18 +353,79 @@ export default function MyDocumentsPage() {
         </p>
       </div>
 
+      {!isLoading && hasDocuments && (
+        <div className="mb-5 space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search by file name or item…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-9"
+              data-testid="input-search-docs"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear search"
+                data-testid="button-clear-search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground mr-1">Type:</span>
+            {(["all", "photo", "certificate"] as TypeFilter[]).map((t) => (
+              <Button
+                key={t}
+                size="sm"
+                variant={typeFilter === t ? "default" : "outline"}
+                className="h-7 px-3 text-xs capitalize"
+                onClick={() => setTypeFilter(t)}
+                data-testid={`filter-type-${t}`}
+              >
+                {t === "all" ? (
+                  "All"
+                ) : t === "photo" ? (
+                  <><FileImage className="h-3.5 w-3.5 mr-1" />Photo</>
+                ) : (
+                  <><FileText className="h-3.5 w-3.5 mr-1" />Certificate</>
+                )}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex items-center gap-2 text-muted-foreground" data-testid="docs-loading">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Loading documents...</span>
         </div>
-      ) : grouped.length === 0 ? (
+      ) : !hasDocuments ? (
         <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="docs-empty">
           <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
           <p className="text-muted-foreground font-medium">No documents uploaded yet</p>
           <p className="text-sm text-muted-foreground mt-1">
             Upload photos or certificates from your item pages.
           </p>
+        </div>
+      ) : !hasResults ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="docs-no-results">
+          <Search className="h-10 w-10 text-muted-foreground mb-4" />
+          <p className="text-muted-foreground font-medium">No documents match your search</p>
+          {isFiltering && (
+            <Button
+              variant="link"
+              className="text-sm mt-2"
+              onClick={() => { setSearchQuery(""); setTypeFilter("all"); }}
+              data-testid="button-clear-filters"
+            >
+              Clear filters
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-6" data-testid="docs-list">
