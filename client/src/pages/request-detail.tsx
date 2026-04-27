@@ -1488,6 +1488,12 @@ export default function RequestDetailPage() {
                     </div>
                   )}
 
+                  {isSeller && item.status === "pending_approval" && request.listReadyAt && item.maxPrice && (
+                    <div className="ml-[4.25rem]" data-testid={`fee-preview-pending-${item.id}`}>
+                      <ItemFeePreview price={parseFloat(item.maxPrice)} />
+                    </div>
+                  )}
+
                   {isSeller && item.status === "pending_approval" && request.listReadyAt && (
                     <div className="flex flex-wrap gap-2 ml-[4.25rem]">
                       <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approveItem.mutate(item.id)} disabled={approveItem.isPending} data-testid={`button-approve-${item.id}`}>
