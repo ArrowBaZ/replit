@@ -37,6 +37,7 @@ server/
   routes.ts          - All API endpoints
   storage.ts         - DatabaseStorage implementation
   db.ts              - Database connection
+  email.ts           - Mock email utility (swap for Resend/SendGrid to enable real emails)
   replit_integrations/ - Auth + Object Storage integrations
 client/src/
   App.tsx            - Main app with routing

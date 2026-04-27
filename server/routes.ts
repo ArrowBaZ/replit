@@ -15,6 +15,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS, NOTIF_PREF_KEYS } from "@shared/constants";
 import type { Item, Transaction } from "@shared/schema";
+import { sendAgreementReadyEmail } from "./email";
 
 function resolveItemPrice(i: Pick<Item, "approvedPrice" | "salePrice" | "maxPrice" | "minPrice">): number {
   return parseFloat(i.approvedPrice || i.salePrice || i.maxPrice || i.minPrice || "0");
@@ -61,6 +62,42 @@ async function buildAgreementSnapshot(items: Item[]): Promise<{ itemsSnapshot: s
     feeBreakdown: JSON.stringify(snapItems.map((it) => ({ itemId: it.id, title: it.title, salePrice: it.approvedPrice, fees: it.fees }))),
     totalValue: totalValue.toFixed(2),
   };
+}
+
+async function notifyAgreementByEmail(
+  sellerId: string,
+  reusseId: string,
+  requestId: number,
+  agreementId: number
+): Promise<void> {
+  try {
+    const [sellerUser] = await db.select().from(users).where(eq(users.id, sellerId));
+    const [reusseUser] = await db.select().from(users).where(eq(users.id, reusseId));
+    const sellerName = sellerUser
+      ? `${sellerUser.firstName || ""} ${sellerUser.lastName || ""}`.trim() || sellerUser.email
+      : "Seller";
+    const reusseName = reusseUser
+      ? `${reusseUser.firstName || ""} ${reusseUser.lastName || ""}`.trim() || reusseUser.email
+      : "Reseller";
+    if (sellerUser?.email) {
+      await sendAgreementReadyEmail({
+        toEmail: sellerUser.email,
+        toName: sellerName || "Seller",
+        requestId,
+        agreementId,
+      });
+    }
+    if (reusseUser?.email) {
+      await sendAgreementReadyEmail({
+        toEmail: reusseUser.email,
+        toName: reusseName || "Reseller",
+        requestId,
+        agreementId,
+      });
+    }
+  } catch (err) {
+    console.error("[email] Failed to send agreement-ready emails:", err);
+  }
 }
 
 const wsClients = new Map<string, Set<WebSocket>>();
@@ -1229,6 +1266,7 @@ export async function registerRoutes(
                 });
                 broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
                 broadcastToUser(item.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
+                await notifyAgreementByEmail(request.sellerId, item.reusseId, item.requestId, agreement.id);
               }
             }
           }
@@ -1440,6 +1478,7 @@ export async function registerRoutes(
                 });
                 broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
                 broadcastToUser(item.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
+                await notifyAgreementByEmail(request.sellerId, item.reusseId, item.requestId, agreement.id);
               }
             }
           }
@@ -2335,6 +2374,7 @@ export async function registerRoutes(
             });
             broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId: id });
             broadcastToUser(userId, { type: "agreement_ready", agreementId: agreement.id, requestId: id });
+            await notifyAgreementByEmail(request.sellerId, userId, id, agreement.id);
           }
         }
 
@@ -2432,6 +2472,7 @@ export async function registerRoutes(
         });
         broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId });
         broadcastToUser(request.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId });
+        await notifyAgreementByEmail(request.sellerId, request.reusseId, requestId, agreement.id);
         res.json(agreement);
       } catch (error: any) {
         if (error?.statusCode === 400) return res.status(400).json({ message: error.message });
