@@ -30,7 +30,9 @@ import {
   FolderOpen,
   Search,
   X,
+  FileSignature,
 } from "lucide-react";
+import { type AgreementDetail, statusLabels, downloadAgreementPdf } from "@/lib/agreement-pdf";
 
 interface UserDocument {
   id: number;
@@ -300,17 +302,102 @@ function DocumentRow({ doc }: { doc: UserDocument }) {
   );
 }
 
-type TypeFilter = "all" | "photo" | "certificate";
+function AgreementRow({ agreement }: { agreement: AgreementDetail }) {
+  const { toast } = useToast();
+  const [isDownloading, setIsDownloading] = useState(false);
+  const isSigned = agreement.status === "fully_signed";
+
+  const handleDownload = () => {
+    if (!isSigned) return;
+    setIsDownloading(true);
+    try {
+      downloadAgreementPdf(agreement);
+    } catch {
+      toast({ title: "Could not generate PDF", variant: "destructive" });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <div
+      className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/30 transition-colors"
+      data-testid={`agreement-row-${agreement.id}`}
+    >
+      <FileSignature className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate" data-testid={`agreement-title-${agreement.id}`}>
+          Agreement #{agreement.id}
+        </p>
+        <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+          <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+            Agreement
+          </Badge>
+          <span
+            className={`inline-flex items-center rounded px-1.5 py-0 text-[10px] font-medium ${
+              isSigned
+                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+                : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+            }`}
+            data-testid={`agreement-status-${agreement.id}`}
+          >
+            {statusLabels[agreement.status] ?? agreement.status}
+          </span>
+          {agreement.itemCount} item{agreement.itemCount !== 1 ? "s" : ""}
+          {agreement.generatedAt
+            ? ` · ${new Date(agreement.generatedAt).toLocaleDateString("fr-FR")}`
+            : ""}
+        </p>
+      </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {isSigned ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-xs"
+            onClick={handleDownload}
+            disabled={isDownloading}
+            data-testid={`button-download-agreement-${agreement.id}`}
+          >
+            {isDownloading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+            ) : (
+              <Download className="h-3.5 w-3.5 mr-1" />
+            )}
+            Download PDF
+          </Button>
+        ) : null}
+        <Link
+          href={`/agreements/${agreement.id}`}
+          className="p-1.5 rounded hover:bg-muted transition-colors"
+          title="View agreement"
+          data-testid={`link-view-agreement-${agreement.id}`}
+        >
+          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+type TypeFilter = "all" | "photo" | "certificate" | "agreement";
 
 export default function MyDocumentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
-  const { data: documents, isLoading } = useQuery<UserDocument[]>({
+  const { data: documents, isLoading: docsLoading } = useQuery<UserDocument[]>({
     queryKey: ["/api/documents"],
   });
 
+  const { data: agreements, isLoading: agreementsLoading } = useQuery<AgreementDetail[]>({
+    queryKey: ["/api/user/agreements"],
+  });
+
+  const isLoading = docsLoading || agreementsLoading;
+
   const filteredDocuments = (documents ?? []).filter((doc) => {
+    if (typeFilter === "agreement") return false;
     const q = searchQuery.trim().toLowerCase();
     const matchesSearch =
       !q ||
@@ -321,6 +408,19 @@ export default function MyDocumentsPage() {
       (typeFilter === "photo" && doc.fileType === "photo") ||
       (typeFilter === "certificate" && doc.fileType !== "photo");
     return matchesSearch && matchesType;
+  });
+
+  const filteredAgreements = (agreements ?? []).filter((ag) => {
+    if (typeFilter === "photo" || typeFilter === "certificate") return false;
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      `agreement #${ag.id}`.includes(q) ||
+      `agreement ${ag.id}`.includes(q) ||
+      (ag.request && typeof ag.request === "object" && "title" in ag.request
+        ? String((ag.request as { title?: string }).title ?? "").toLowerCase().includes(q)
+        : false);
+    return matchesSearch;
   });
 
   const grouped: GroupedDocs[] = [];
@@ -341,7 +441,9 @@ export default function MyDocumentsPage() {
   }
 
   const hasDocuments = (documents ?? []).length > 0;
-  const hasResults = grouped.length > 0;
+  const hasAgreements = (agreements ?? []).length > 0;
+  const hasAnyContent = hasDocuments || hasAgreements;
+  const hasResults = grouped.length > 0 || filteredAgreements.length > 0;
   const isFiltering = searchQuery.trim() !== "" || typeFilter !== "all";
 
   return (
@@ -349,16 +451,16 @@ export default function MyDocumentsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold" data-testid="text-page-title">My Documents</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          All documents you've uploaded, grouped by item.
+          All documents and agreements associated with your account.
         </p>
       </div>
 
-      {!isLoading && hasDocuments && (
+      {!isLoading && hasAnyContent && (
         <div className="mb-5 space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
-              placeholder="Search by file name or item…"
+              placeholder="Search by file name, item or agreement…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-9"
@@ -377,7 +479,7 @@ export default function MyDocumentsPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground mr-1">Type:</span>
-            {(["all", "photo", "certificate"] as TypeFilter[]).map((t) => (
+            {(["all", "photo", "certificate", "agreement"] as TypeFilter[]).map((t) => (
               <Button
                 key={t}
                 size="sm"
@@ -390,8 +492,10 @@ export default function MyDocumentsPage() {
                   "All"
                 ) : t === "photo" ? (
                   <><FileImage className="h-3.5 w-3.5 mr-1" />Photo</>
-                ) : (
+                ) : t === "certificate" ? (
                   <><FileText className="h-3.5 w-3.5 mr-1" />Certificate</>
+                ) : (
+                  <><FileSignature className="h-3.5 w-3.5 mr-1" />Agreement</>
                 )}
               </Button>
             ))}
@@ -404,12 +508,12 @@ export default function MyDocumentsPage() {
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Loading documents...</span>
         </div>
-      ) : !hasDocuments ? (
+      ) : !hasAnyContent ? (
         <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="docs-empty">
           <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-muted-foreground font-medium">No documents uploaded yet</p>
+          <p className="text-muted-foreground font-medium">No documents yet</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Upload photos or certificates from your item pages.
+            Upload photos or certificates from your item pages. Signed agreements will also appear here.
           </p>
         </div>
       ) : !hasResults ? (
@@ -428,34 +532,56 @@ export default function MyDocumentsPage() {
           )}
         </div>
       ) : (
-        <div className="space-y-6" data-testid="docs-list">
-          {grouped.map((group) => (
-            <div key={group.itemId} data-testid={`doc-group-${group.itemId}`}>
+        <div className="space-y-8" data-testid="docs-list">
+          {grouped.length > 0 && (
+            <div className="space-y-6">
+              {grouped.map((group) => (
+                <div key={group.itemId} data-testid={`doc-group-${group.itemId}`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <h2 className="font-semibold text-sm truncate" data-testid={`group-title-${group.itemId}`}>
+                      {group.itemTitle}
+                    </h2>
+                    <Badge variant="outline" className="text-xs flex-shrink-0">
+                      {group.documents.length} doc{group.documents.length !== 1 ? "s" : ""}
+                    </Badge>
+                    {group.requestId && (
+                      <Link
+                        href={`/requests/${group.requestId}`}
+                        className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                        data-testid={`link-request-${group.requestId}`}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        View request
+                      </Link>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {group.documents.map((doc) => (
+                      <DocumentRow key={doc.id} doc={doc} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {filteredAgreements.length > 0 && (
+            <div data-testid="agreements-section">
               <div className="flex items-center gap-2 mb-3">
-                <h2 className="font-semibold text-sm truncate" data-testid={`group-title-${group.itemId}`}>
-                  {group.itemTitle}
+                <h2 className="font-semibold text-sm" data-testid="agreements-section-title">
+                  Agreements
                 </h2>
                 <Badge variant="outline" className="text-xs flex-shrink-0">
-                  {group.documents.length} doc{group.documents.length !== 1 ? "s" : ""}
+                  {filteredAgreements.length} agreement{filteredAgreements.length !== 1 ? "s" : ""}
                 </Badge>
-                {group.requestId && (
-                  <Link
-                    href={`/requests/${group.requestId}`}
-                    className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                    data-testid={`link-request-${group.requestId}`}
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    View request
-                  </Link>
-                )}
               </div>
               <div className="space-y-2">
-                {group.documents.map((doc) => (
-                  <DocumentRow key={doc.id} doc={doc} />
+                {filteredAgreements.map((agreement) => (
+                  <AgreementRow key={agreement.id} agreement={agreement} />
                 ))}
               </div>
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>

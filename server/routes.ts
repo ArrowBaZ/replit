@@ -2368,6 +2368,22 @@ export async function registerRoutes(
     },
   );
 
+  app.get(
+    "/api/user/agreements",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const userAgreements = await storage.getUserAgreements(userId);
+        res.json(userAgreements);
+      } catch (error) {
+        console.error("Error fetching user agreements:", error);
+        res.status(500).json({ message: "Failed to fetch agreements" });
+      }
+    },
+  );
+
   app.delete(
     "/api/items/:id/documents/:docId",
     isAuthenticated,

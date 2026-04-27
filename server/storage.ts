@@ -136,6 +136,7 @@ export interface IStorage {
   updateAgreementStatus(id: number, status: string): Promise<Agreement | undefined>;
   getAgreementWithDetails(id: number): Promise<any>;
   getAdminAgreements(): Promise<any[]>;
+  getUserAgreements(userId: string): Promise<any[]>;
   createAgreementSignature(data: InsertAgreementSignature): Promise<AgreementSignature>;
   getAgreementSignatures(agreementId: number): Promise<AgreementSignature[]>;
   getAgreementSignature(agreementId: number, userId: string): Promise<AgreementSignature | undefined>;
@@ -927,6 +928,34 @@ export class DatabaseStorage implements IStorage {
       request: request || null,
       signatures: sigWithNames,
     };
+  }
+
+  async getUserAgreements(userId: string): Promise<any[]> {
+    const rows = await db
+      .select()
+      .from(agreements)
+      .where(or(eq(agreements.sellerId, userId), eq(agreements.reusseId, userId)))
+      .orderBy(desc(agreements.generatedAt));
+    return Promise.all(rows.map(async (agreement) => {
+      const sigs = await db.select().from(agreementSignatures).where(eq(agreementSignatures.agreementId, agreement.id));
+      const [sellerUser] = await db.select().from(users).where(eq(users.id, agreement.sellerId));
+      const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.reusseId));
+      const [request] = await db.select().from(requests).where(eq(requests.id, agreement.requestId));
+      const sigWithNames = await Promise.all(sigs.map(async (sig) => {
+        const [u] = await db.select().from(users).where(eq(users.id, sig.userId));
+        return {
+          ...sig,
+          userName: u ? `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email : "Unknown",
+        };
+      }));
+      return {
+        ...agreement,
+        seller: sellerUser ? { id: sellerUser.id, firstName: sellerUser.firstName, lastName: sellerUser.lastName, email: sellerUser.email } : null,
+        reusse: reusseUser ? { id: reusseUser.id, firstName: reusseUser.firstName, lastName: reusseUser.lastName, email: reusseUser.email } : null,
+        request: request || null,
+        signatures: sigWithNames,
+      };
+    }));
   }
 
   async getAdminAgreements(): Promise<any[]> {
