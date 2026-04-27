@@ -96,6 +96,7 @@ model profiles {
   siret_number             String?   @db.VarChar(20)
   status                   String?   @default("approved") @db.VarChar(20)
   preferred_contact_method String?   @db.VarChar(20)
+  notification_prefs       Json?
   created_at               DateTime? @default(now()) @db.Timestamp(6)
   updated_at               DateTime? @default(now()) @db.Timestamp(6)
   users                    users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "profiles_user_id_users_id_fk")
