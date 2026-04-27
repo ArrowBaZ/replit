@@ -60,18 +60,44 @@ interface LightboxProps {
   onClose: () => void;
 }
 
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 5;
+const ZOOM_STEP = 0.15;
+
+function clamp(val: number, min: number, max: number) {
+  return Math.min(Math.max(val, min), max);
+}
+
 function Lightbox({ photos, initialIndex, onClose }: LightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const isDragging = useRef(false);
+  const lastPointer = useRef({ x: 0, y: 0 });
+  const lastPinchDist = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const current = photos[currentIndex];
   const hasMultiple = photos.length > 1;
 
+  const resetZoom = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
   const goToPrev = useCallback(() => {
+    resetZoom();
     setCurrentIndex((i) => (i - 1 + photos.length) % photos.length);
-  }, [photos.length]);
+  }, [photos.length, resetZoom]);
 
   const goToNext = useCallback(() => {
+    resetZoom();
     setCurrentIndex((i) => (i + 1) % photos.length);
-  }, [photos.length]);
+  }, [photos.length, resetZoom]);
+
+  useEffect(() => {
+    resetZoom();
+  }, [currentIndex, resetZoom]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -83,10 +109,103 @@ function Lightbox({ photos, initialIndex, onClose }: LightboxProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose, hasMultiple, goToPrev, goToNext]);
 
+  const applyZoom = useCallback((delta: number, originX: number, originY: number) => {
+    setZoom((prevZoom) => {
+      const newZoom = clamp(prevZoom + delta, MIN_ZOOM, MAX_ZOOM);
+      const ratio = newZoom / prevZoom;
+      setPan((prevPan) => ({
+        x: originX + ratio * (prevPan.x - originX),
+        y: originY + ratio * (prevPan.y - originY),
+      }));
+      return newZoom;
+    });
+  }, []);
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const originX = e.clientX - rect.left - rect.width / 2;
+    const originY = e.clientY - rect.top - rect.height / 2;
+    const delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+    applyZoom(delta, originX, originY);
+  }, [applyZoom]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (zoom <= 1) return;
+    isDragging.current = true;
+    lastPointer.current = { x: e.clientX, y: e.clientY };
+    e.preventDefault();
+  }, [zoom]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging.current) return;
+    const dx = e.clientX - lastPointer.current.x;
+    const dy = e.clientY - lastPointer.current.y;
+    lastPointer.current = { x: e.clientX, y: e.clientY };
+    setPan((p) => ({ x: p.x + dx, y: p.y + dy }));
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    isDragging.current = false;
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastPinchDist.current = Math.hypot(dx, dy);
+    } else if (e.touches.length === 1 && zoom > 1) {
+      isDragging.current = true;
+      lastPointer.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  }, [zoom]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (lastPinchDist.current !== null && rect) {
+        const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const originX = midX - rect.left - rect.width / 2;
+        const originY = midY - rect.top - rect.height / 2;
+        const delta = (dist - lastPinchDist.current) * 0.01;
+        applyZoom(delta, originX, originY);
+      }
+      lastPinchDist.current = dist;
+    } else if (e.touches.length === 1 && isDragging.current) {
+      const dx = e.touches[0].clientX - lastPointer.current.x;
+      const dy = e.touches[0].clientY - lastPointer.current.y;
+      lastPointer.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      setPan((p) => ({ x: p.x + dx, y: p.y + dy }));
+    }
+  }, [applyZoom]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length < 2) lastPinchDist.current = null;
+    if (e.touches.length === 1 && zoom > 1) {
+      isDragging.current = true;
+      lastPointer.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    } else if (e.touches.length === 0) {
+      isDragging.current = false;
+    }
+  }, [zoom]);
+
+  const handleOverlayClick = useCallback(() => {
+    if (zoom <= 1) onClose();
+  }, [zoom, onClose]);
+
+  const zoomPercent = Math.round(zoom * 100);
+  const isZoomed = zoom > 1.01;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={handleOverlayClick}
       data-testid="lightbox-overlay"
     >
       <div
@@ -103,6 +222,19 @@ function Lightbox({ photos, initialIndex, onClose }: LightboxProps) {
                 {currentIndex + 1} / {photos.length}
               </span>
             )}
+            <button
+              onClick={resetZoom}
+              className={`text-xs font-mono px-1.5 py-0.5 rounded transition-colors ${
+                isZoomed
+                  ? "bg-white/20 text-white hover:bg-white/30"
+                  : "text-white/50 cursor-default"
+              }`}
+              title={isZoomed ? "Reset zoom" : undefined}
+              disabled={!isZoomed}
+              data-testid="lightbox-zoom-indicator"
+            >
+              {zoomPercent}%
+            </button>
             <a
               href={current.url}
               target="_blank"
@@ -145,12 +277,34 @@ function Lightbox({ photos, initialIndex, onClose }: LightboxProps) {
             </button>
           )}
 
-          <div className="w-full flex items-center justify-center rounded-lg overflow-hidden bg-black/40">
+          <div
+            ref={containerRef}
+            className={`w-full flex items-center justify-center rounded-lg overflow-hidden bg-black/40 select-none ${
+              isZoomed ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"
+            }`}
+            style={{ touchAction: "none" }}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onDoubleClick={isZoomed ? resetZoom : undefined}
+            data-testid="lightbox-image-container"
+          >
             <img
               key={current.url}
               src={current.url}
               alt={current.fileName}
-              className="max-w-full max-h-[80vh] object-contain rounded-lg"
+              className="max-w-full max-h-[80vh] object-contain rounded-lg pointer-events-none"
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: "center center",
+                transition: isDragging.current ? "none" : "transform 0.1s ease-out",
+              }}
+              draggable={false}
               data-testid="lightbox-image"
             />
           </div>
@@ -166,6 +320,12 @@ function Lightbox({ photos, initialIndex, onClose }: LightboxProps) {
             </button>
           )}
         </div>
+
+        {isZoomed && (
+          <p className="text-white/50 text-xs mt-2" data-testid="lightbox-zoom-hint">
+            Drag to pan · Double-click or scroll down to zoom out
+          </p>
+        )}
       </div>
     </div>
   );
