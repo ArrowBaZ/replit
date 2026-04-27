@@ -613,6 +613,32 @@ export default function RequestDetailPage() {
             description: `Additional documentation was requested for "${data.itemTitle}".`,
           });
           queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        } else if (data.type === "counter_offer") {
+          const priceRange = data.minPrice && data.maxPrice
+            ? `${data.minPrice} – ${data.maxPrice} EUR`
+            : data.minPrice || data.maxPrice
+              ? `${data.minPrice || data.maxPrice} EUR`
+              : "a new price";
+          toast({
+            title: "Counter-Offer Received",
+            description: `The seller has proposed ${priceRange} for "${data.itemTitle}". Please review and respond.`,
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/requests", String(data.requestId)] });
+          queryClient.invalidateQueries({ queryKey: ["/api/requests", String(data.requestId), "items"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        } else if (data.type === "price_revised") {
+          const priceRange = data.minPrice && data.maxPrice
+            ? `${data.minPrice} – ${data.maxPrice} EUR`
+            : data.minPrice || data.maxPrice
+              ? `${data.minPrice || data.maxPrice} EUR`
+              : "a revised price";
+          toast({
+            title: "Price Range Revised",
+            description: `The reseller has revised the price to ${priceRange} for "${data.itemTitle}". Please review and respond.`,
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/requests", String(data.requestId)] });
+          queryClient.invalidateQueries({ queryKey: ["/api/requests", String(data.requestId), "items"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
         }
       } catch {}
     };
