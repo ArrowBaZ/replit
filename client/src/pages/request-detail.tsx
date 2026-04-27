@@ -1288,6 +1288,9 @@ export default function RequestDetailPage() {
                       <Input type="number" value={itemForm.maxPrice} onChange={(e) => setItemForm({...itemForm, maxPrice: e.target.value})} data-testid="input-item-max-price" />
                     </div>
                   </div>
+                  {itemForm.maxPrice && parseFloat(itemForm.maxPrice) > 0 && (
+                    <ItemFeePreview price={parseFloat(itemForm.maxPrice)} />
+                  )}
                   <div className="space-y-2">
                     <Label>{t("description")}</Label>
                     <Textarea value={itemForm.description} onChange={(e) => setItemForm({...itemForm, description: e.target.value})} className="resize-none" rows={2} data-testid="input-item-description" />
