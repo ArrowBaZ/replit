@@ -486,7 +486,16 @@ const translations = {
     notifPrefAgreementReadyDesc: "Show a pop-up when an agreement is generated and waiting for your signature.",
     notifPrefDocRequest: "Document request",
     notifPrefDocRequestDesc: "Show a pop-up when a reseller requests additional documents for an item.",
+    notifPrefCounterOffer: "Counter-offer received",
+    notifPrefCounterOfferDesc: "Show a pop-up when the seller submits a counter-offer on an item price.",
+    notifPrefPriceRevised: "Price revision received",
+    notifPrefPriceRevisedDesc: "Show a pop-up when the reseller revises a price in response to your counter-offer.",
     notifPrefsSaved: "Preferences saved",
+    toastCounterOffer: "Counter-offer",
+    toastCounterOfferDesc: "The seller proposed a new price range",
+    toastPriceRevised: "Price revised",
+    toastPriceRevisedDesc: "The reseller revised the price range",
+    toastViewItem: "View",
   },
   fr: {
     // Nav
@@ -971,7 +980,16 @@ const translations = {
     notifPrefAgreementReadyDesc: "Afficher une alerte quand un accord est genere et attend votre signature.",
     notifPrefDocRequest: "Demande de documents",
     notifPrefDocRequestDesc: "Afficher une alerte quand un revendeur demande des documents supplementaires.",
+    notifPrefCounterOffer: "Contre-offre recue",
+    notifPrefCounterOfferDesc: "Afficher une alerte quand le vendeur soumet une contre-offre sur le prix d un article.",
+    notifPrefPriceRevised: "Revision de prix recue",
+    notifPrefPriceRevisedDesc: "Afficher une alerte quand le revendeur revise le prix en reponse a votre contre-offre.",
     notifPrefsSaved: "Preferences sauvegardees",
+    toastCounterOffer: "Contre-offre",
+    toastCounterOfferDesc: "Le vendeur a propose une nouvelle fourchette de prix",
+    toastPriceRevised: "Prix revise",
+    toastPriceRevisedDesc: "Le revendeur a revise la fourchette de prix",
+    toastViewItem: "Voir",
   },
 } as const;
 

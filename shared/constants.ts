@@ -161,6 +161,8 @@ export const ROLE_I18N_KEYS: Record<UserRole, string> = {
 export const NOTIF_PREF_KEYS = [
   "toast_agreement_ready",
   "toast_document_request",
+  "toast_counter_offer",
+  "toast_price_revised",
 ] as const;
 
 export type NotifPrefKey = (typeof NOTIF_PREF_KEYS)[number];

@@ -136,7 +136,39 @@ function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?:
                 onClick={() => navigate(data.requestId ? `/requests/${data.requestId}` : `/items`)}
                 data-testid="toast-link-doc-request"
               >
-                View
+                {t("toastViewItem")}
+              </ToastAction>
+            ) : undefined,
+          });
+        }
+        if (data.type === "counter_offer" && data.itemTitle && toastAllowed(notifPrefs, "toast_counter_offer")) {
+          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+          toast({
+            title: t("toastCounterOffer"),
+            description: `${data.itemTitle}${data.minPrice || data.maxPrice ? ` · ${data.minPrice ?? ""}${data.maxPrice ? ` – ${data.maxPrice}` : ""} EUR` : ""}`,
+            action: data.requestId ? (
+              <ToastAction
+                altText="Go to request"
+                onClick={() => navigate(`/requests/${data.requestId}`)}
+                data-testid="toast-link-counter-offer"
+              >
+                {t("toastViewItem")}
+              </ToastAction>
+            ) : undefined,
+          });
+        }
+        if (data.type === "price_revised" && data.itemTitle && toastAllowed(notifPrefs, "toast_price_revised")) {
+          queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+          toast({
+            title: t("toastPriceRevised"),
+            description: `${data.itemTitle}${data.minPrice || data.maxPrice ? ` · ${data.minPrice ?? ""}${data.maxPrice ? ` – ${data.maxPrice}` : ""} EUR` : ""}`,
+            action: data.requestId ? (
+              <ToastAction
+                altText="Go to request"
+                onClick={() => navigate(`/requests/${data.requestId}`)}
+                data-testid="toast-link-price-revised"
+              >
+                {t("toastViewItem")}
               </ToastAction>
             ) : undefined,
           });

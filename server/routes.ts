@@ -1345,6 +1345,14 @@ export async function registerRoutes(
             message: `Le vendeur a proposé un nouveau prix pour "${item.title}" : ${minPrice} - ${maxPrice} EUR.`,
             link: `/requests/${item.requestId}`,
           });
+          broadcastToUser(item.reusseId, {
+            type: "counter_offer",
+            itemId: item.id,
+            itemTitle: item.title,
+            requestId: item.requestId,
+            minPrice,
+            maxPrice,
+          });
         }
         res.json(item);
       } catch (error) {
@@ -1557,12 +1565,22 @@ export async function registerRoutes(
         if (!item) return res.status(404).json({ message: "Item not found" });
 
         if (existingItem.sellerId) {
+          const revisedMin = minPrice || existingItem.minPrice;
+          const revisedMax = maxPrice || existingItem.maxPrice;
           await storage.createNotification({
             userId: existingItem.sellerId,
             type: "price_revised",
             title: "Price Range Revised",
-            message: `The reseller has revised the price range for "${existingItem.title}": ${minPrice || existingItem.minPrice} – ${maxPrice || existingItem.maxPrice} EUR. Please review and respond.`,
+            message: `The reseller has revised the price range for "${existingItem.title}": ${revisedMin} – ${revisedMax} EUR. Please review and respond.`,
             link: `/requests/${existingItem.requestId}`,
+          });
+          broadcastToUser(existingItem.sellerId, {
+            type: "price_revised",
+            itemId: existingItem.id,
+            itemTitle: existingItem.title,
+            requestId: existingItem.requestId,
+            minPrice: revisedMin,
+            maxPrice: revisedMax,
           });
         }
 
