@@ -1,11 +1,11 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, FileText, Upload, FileImage, Download, MessageSquare, ChevronDown, ChevronUp, X, ExternalLink, ZoomIn } from "lucide-react";
+import { Loader2, FileText, Upload, FileImage, Download, MessageSquare, ChevronDown, ChevronUp, X, ExternalLink, ZoomIn, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Item, Profile } from "@shared/schema";
 
 interface ItemDocument {
@@ -49,20 +49,39 @@ function DocIcon({ fileType, fileName }: { fileType: string; fileName: string })
   return <FileText className="h-4 w-4 text-amber-500" />;
 }
 
-interface LightboxProps {
+interface LightboxPhoto {
   url: string;
   fileName: string;
+}
+
+interface LightboxProps {
+  photos: LightboxPhoto[];
+  initialIndex: number;
   onClose: () => void;
 }
 
-function Lightbox({ url, fileName, onClose }: LightboxProps) {
+function Lightbox({ photos, initialIndex, onClose }: LightboxProps) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const current = photos[currentIndex];
+  const hasMultiple = photos.length > 1;
+
+  const goToPrev = useCallback(() => {
+    setCurrentIndex((i) => (i - 1 + photos.length) % photos.length);
+  }, [photos.length]);
+
+  const goToNext = useCallback(() => {
+    setCurrentIndex((i) => (i + 1) % photos.length);
+  }, [photos.length]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      if (hasMultiple && e.key === "ArrowLeft") goToPrev();
+      if (hasMultiple && e.key === "ArrowRight") goToNext();
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, hasMultiple, goToPrev, goToNext]);
 
   return (
     <div
@@ -76,11 +95,16 @@ function Lightbox({ url, fileName, onClose }: LightboxProps) {
       >
         <div className="flex items-center justify-between w-full mb-2 px-1">
           <p className="text-white text-sm font-medium truncate flex-1 pr-2" data-testid="lightbox-filename">
-            {fileName}
+            {current.fileName}
           </p>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {hasMultiple && (
+              <span className="text-white/70 text-xs font-mono" data-testid="lightbox-counter">
+                {currentIndex + 1} / {photos.length}
+              </span>
+            )}
             <a
-              href={url}
+              href={current.url}
               target="_blank"
               rel="noopener noreferrer"
               className="text-white/80 hover:text-white transition-colors p-1 rounded"
@@ -90,8 +114,8 @@ function Lightbox({ url, fileName, onClose }: LightboxProps) {
               <ExternalLink className="h-4 w-4" />
             </a>
             <a
-              href={url}
-              download={fileName}
+              href={current.url}
+              download={current.fileName}
               className="text-white/80 hover:text-white transition-colors p-1 rounded"
               title="Download"
               data-testid="lightbox-download"
@@ -108,13 +132,39 @@ function Lightbox({ url, fileName, onClose }: LightboxProps) {
             </button>
           </div>
         </div>
-        <div className="w-full flex items-center justify-center rounded-lg overflow-hidden bg-black/40">
-          <img
-            src={url}
-            alt={fileName}
-            className="max-w-full max-h-[80vh] object-contain rounded-lg"
-            data-testid="lightbox-image"
-          />
+
+        <div className="relative w-full flex items-center justify-center">
+          {hasMultiple && (
+            <button
+              onClick={goToPrev}
+              className="absolute left-0 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors -translate-x-1 focus:outline-none"
+              title="Previous photo"
+              data-testid="lightbox-prev"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          )}
+
+          <div className="w-full flex items-center justify-center rounded-lg overflow-hidden bg-black/40">
+            <img
+              key={current.url}
+              src={current.url}
+              alt={current.fileName}
+              className="max-w-full max-h-[80vh] object-contain rounded-lg"
+              data-testid="lightbox-image"
+            />
+          </div>
+
+          {hasMultiple && (
+            <button
+              onClick={goToNext}
+              className="absolute right-0 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors translate-x-1 focus:outline-none"
+              title="Next photo"
+              data-testid="lightbox-next"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -131,7 +181,7 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
   const [docRequestSent, setDocRequestSent] = useState(false);
   const [uploadType, setUploadType] = useState<"photo" | "certificate">("photo");
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const [lightboxDoc, setLightboxDoc] = useState<{ url: string; fileName: string } | null>(null);
+  const [lightboxDoc, setLightboxDoc] = useState<{ photos: LightboxPhoto[]; initialIndex: number } | null>(null);
 
   const canView =
     profile?.role === "admin" ||
@@ -257,8 +307,8 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
     <div className="ml-[4.25rem] mt-2 space-y-2">
       {lightboxDoc && (
         <Lightbox
-          url={lightboxDoc.url}
-          fileName={lightboxDoc.fileName}
+          photos={lightboxDoc.photos}
+          initialIndex={lightboxDoc.initialIndex}
           onClose={() => setLightboxDoc(null)}
         />
       )}
@@ -394,12 +444,18 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
                   <p className="text-xs text-muted-foreground mb-1.5">Photos</p>
                   <div className="space-y-2" data-testid={`photo-gallery-${item.id}`}>
                     <div className="grid grid-cols-3 gap-1.5">
-                      {documents.filter((d) => d.fileType === "photo").map((doc) => {
-                        const docUrl = `/api/items/${item.id}/documents/${doc.id}/download`;
-                        return (
+                      {(() => {
+                        const photoDocs = documents.filter((d) => d.fileType === "photo");
+                        const photoList: LightboxPhoto[] = photoDocs.map((d) => ({
+                          url: `/api/items/${item.id}/documents/${d.id}/download`,
+                          fileName: d.fileName,
+                        }));
+                        return photoDocs.map((doc, idx) => {
+                          const docUrl = photoList[idx].url;
+                          return (
                           <button
                             key={doc.id}
-                            onClick={() => setLightboxDoc({ url: docUrl, fileName: doc.fileName })}
+                            onClick={() => setLightboxDoc({ photos: photoList, initialIndex: idx })}
                             className="relative aspect-square rounded overflow-hidden border bg-muted group cursor-zoom-in"
                             data-testid={`doc-photo-${doc.id}`}
                             title={`Preview ${doc.fileName}`}
@@ -415,7 +471,8 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
                             </div>
                           </button>
                         );
-                      })}
+                        });
+                      })()}
                     </div>
                     {/* Audit log for photo entries */}
                     <div className="space-y-1">
@@ -487,7 +544,7 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
                             )}
                             {isDocImage && (
                               <button
-                                onClick={() => setLightboxDoc({ url: docUrl, fileName: doc.fileName })}
+                                onClick={() => setLightboxDoc({ photos: [{ url: docUrl, fileName: doc.fileName }], initialIndex: 0 })}
                                 className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                                 title="Preview image"
                                 data-testid={`doc-preview-${doc.id}`}
