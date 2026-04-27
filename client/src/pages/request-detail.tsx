@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Request, Item, Meeting, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag, FileText, FileSignature, Lock } from "lucide-react";
+import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag, FileText, FileSignature, Lock, History, ChevronDown, ChevronUp } from "lucide-react";
 import { ItemDocumentsSection } from "@/components/item-documents-section";
 import { ITEM_CATEGORIES, type ItemCategory } from "@shared/schema";
 import type { FeeTier } from "@shared/schema";
@@ -36,6 +36,83 @@ function ItemFeePreview({ price }: { price: number }) {
     </p>
   );
   return <FeeBreakdownCard price={price} tier={tier} />;
+}
+
+type PriceOffer = {
+  id: number;
+  itemId: number;
+  proposedByUserId: string;
+  proposedByRole: string;
+  proposedByName: string;
+  minPrice: string | null;
+  maxPrice: string | null;
+  action: string;
+  createdAt: string;
+};
+
+function NegotiationHistory({ itemId }: { itemId: number }) {
+  const { data: history, isLoading, isError } = useQuery<PriceOffer[]>({
+    queryKey: [`/api/items/${itemId}/price-history`],
+    retry: 1,
+  });
+
+  if (isLoading) {
+    return <div className="text-xs text-muted-foreground py-1">Loading history...</div>;
+  }
+
+  if (isError) {
+    return <p className="text-xs text-red-500 py-1">Could not load negotiation history.</p>;
+  }
+
+  if (!history || history.length === 0) {
+    return <p className="text-xs text-muted-foreground py-1">No price history recorded yet.</p>;
+  }
+
+  const actionLabel: Record<string, string> = {
+    initial: "Initial Price",
+    counter_offer: "Counter-offer",
+    revision: "Revised Price",
+    accepted: "Accepted",
+  };
+
+  const actionColors: Record<string, string> = {
+    initial: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+    counter_offer: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    revision: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+    accepted: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  };
+
+  return (
+    <div className="space-y-1.5" data-testid={`negotiation-history-${itemId}`}>
+      {history.map((offer, idx) => (
+        <div key={offer.id} className="flex items-start gap-2 text-xs">
+          <div className="flex flex-col items-center shrink-0 pt-0.5">
+            <div className={`h-2 w-2 rounded-full mt-1 ${offer.action === "accepted" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+            {idx < history.length - 1 && <div className="w-px flex-1 bg-muted-foreground/20 mt-0.5 h-4" />}
+          </div>
+          <div className="flex-1 min-w-0 pb-1">
+            <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+              <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${actionColors[offer.action] || "bg-muted text-muted-foreground"}`}>
+                {actionLabel[offer.action] || offer.action}
+              </span>
+              <span className="text-muted-foreground truncate max-w-[120px]">{offer.proposedByName}</span>
+              <span className="text-muted-foreground/60">·</span>
+              <span className="text-muted-foreground">{new Date(offer.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+            {(offer.minPrice || offer.maxPrice) && (
+              <p className="text-muted-foreground" data-testid={`history-price-${offer.id}`}>
+                {offer.minPrice && offer.maxPrice
+                  ? `${parseFloat(offer.minPrice).toFixed(0)} – ${parseFloat(offer.maxPrice).toFixed(0)} EUR`
+                  : offer.minPrice
+                  ? `min ${parseFloat(offer.minPrice).toFixed(0)} EUR`
+                  : `max ${parseFloat(offer.maxPrice!).toFixed(0)} EUR`}
+              </p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 const statusColors: Record<string, string> = {
@@ -296,6 +373,13 @@ export default function RequestDetailPage() {
 
   const soldPriceNum = parseFloat(soldPrice);
 
+  const [expandedHistory, setExpandedHistory] = useState<Set<number>>(new Set());
+  const toggleHistory = (itemId: number) => setExpandedHistory((prev) => {
+    const next = new Set(prev);
+    if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
+    return next;
+  });
+
   const [showCounterOffer, setShowCounterOffer] = useState<number | null>(null);
   const [counterMin, setCounterMin] = useState("");
   const [counterMax, setCounterMax] = useState("");
@@ -317,8 +401,9 @@ export default function RequestDetailPage() {
       const res = await apiRequest("POST", `/api/items/${itemId}/approve`, {});
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, itemId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/items/${itemId}/price-history`] });
       toast({ title: t("itemApproved") });
     },
   });
@@ -328,8 +413,9 @@ export default function RequestDetailPage() {
       const res = await apiRequest("POST", `/api/items/${itemId}/counter-offer`, { minPrice, maxPrice });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, { itemId }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/items/${itemId}/price-history`] });
       setShowCounterOffer(null);
       setCounterMin("");
       setCounterMax("");
@@ -342,9 +428,10 @@ export default function RequestDetailPage() {
       const res = await apiRequest("POST", `/api/items/${itemId}/accept-counter-offer`, {});
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, itemId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "agreement"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/items/${itemId}/price-history`] });
       toast({ title: "Counter-offer accepted", description: "The seller's proposed price has been accepted." });
     },
     onError: (err: any) => {
@@ -357,8 +444,9 @@ export default function RequestDetailPage() {
       const res = await apiRequest("POST", `/api/items/${itemId}/revise-price`, { minPrice, maxPrice });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, { itemId }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/items/${itemId}/price-history`] });
       setShowRevisePrice(null);
       setReviseMin("");
       setReviseMax("");
@@ -1499,6 +1587,24 @@ export default function RequestDetailPage() {
                       )}
                     </div>
                   )}
+                  <div className="ml-[4.25rem]">
+                    <button
+                      type="button"
+                      onClick={() => toggleHistory(item.id)}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                      data-testid={`button-toggle-history-${item.id}`}
+                    >
+                      <History className="h-3.5 w-3.5" />
+                      Price Negotiation History
+                      {expandedHistory.has(item.id) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    </button>
+                    {expandedHistory.has(item.id) && (
+                      <div className="mt-1.5 pl-1 border-l-2 border-muted">
+                        <NegotiationHistory itemId={item.id} />
+                      </div>
+                    )}
+                  </div>
+
                   <ItemDocumentsSection
                     item={item}
                     profile={profile}

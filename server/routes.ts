@@ -655,6 +655,17 @@ export async function registerRoutes(
           link: `/requests/${requestId}`,
         });
 
+        if (minPrice || maxPrice) {
+          await storage.createPriceOffer({
+            itemId: item.id,
+            proposedByUserId: userId,
+            proposedByRole: "reusse",
+            minPrice: minPrice || null,
+            maxPrice: maxPrice || null,
+            action: "initial",
+          });
+        }
+
         res.json(item);
       } catch (error) {
         console.error("Error creating item:", error);
@@ -662,6 +673,26 @@ export async function registerRoutes(
       }
     },
   );
+
+  app.get("/api/items/:id/price-history", isAuthenticated, requireAuth, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const item = await storage.getItem(id);
+      if (!item) return res.status(404).json({ message: "Item not found" });
+      const userId = req.user.claims.sub;
+      if (item.sellerId !== userId && item.reusseId !== userId) {
+        const profile = await storage.getProfile(userId);
+        if (!profile || profile.role !== "admin") {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      const history = await storage.getPriceOffersByItem(id);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching price history:", error);
+      res.status(500).json({ message: "Failed to fetch price history" });
+    }
+  });
 
   app.get("/api/items", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
@@ -1221,6 +1252,15 @@ export async function registerRoutes(
         });
         if (!item) return res.status(404).json({ message: "Item not found" });
 
+        await storage.createPriceOffer({
+          itemId: id,
+          proposedByUserId: userId,
+          proposedByRole: "seller",
+          minPrice: existingItem.minPrice || null,
+          maxPrice: existingItem.maxPrice || null,
+          action: "accepted",
+        });
+
         if (item.reusseId) {
           await storage.createNotification({
             userId: item.reusseId,
@@ -1337,6 +1377,15 @@ export async function registerRoutes(
         });
         if (!item) return res.status(404).json({ message: "Item not found" });
 
+        await storage.createPriceOffer({
+          itemId: id,
+          proposedByUserId: userId,
+          proposedByRole: "seller",
+          minPrice: minPrice || null,
+          maxPrice: maxPrice || null,
+          action: "counter_offer",
+        });
+
         if (item.reusseId) {
           await storage.createNotification({
             userId: item.reusseId,
@@ -1439,6 +1488,15 @@ export async function registerRoutes(
           updatedAt: new Date(),
         });
         if (!item) return res.status(404).json({ message: "Item not found" });
+
+        await storage.createPriceOffer({
+          itemId: id,
+          proposedByUserId: userId,
+          proposedByRole: "reusse",
+          minPrice: existingItem.minPrice || null,
+          maxPrice: existingItem.maxPrice || null,
+          action: "accepted",
+        });
 
         if (existingItem.sellerId) {
           await storage.createNotification({
@@ -1563,6 +1621,15 @@ export async function registerRoutes(
           updatedAt: new Date(),
         });
         if (!item) return res.status(404).json({ message: "Item not found" });
+
+        await storage.createPriceOffer({
+          itemId: id,
+          proposedByUserId: userId,
+          proposedByRole: "reusse",
+          minPrice: minPrice || existingItem.minPrice || null,
+          maxPrice: maxPrice || existingItem.maxPrice || null,
+          action: "revision",
+        });
 
         if (existingItem.sellerId) {
           const revisedMin = minPrice || existingItem.minPrice;

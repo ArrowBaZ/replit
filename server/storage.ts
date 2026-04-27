@@ -44,6 +44,9 @@ import {
   type InsertFeeTier,
   feeTierChangelog,
   type FeeTierChangelog,
+  itemPriceOffers,
+  type ItemPriceOffer,
+  type InsertItemPriceOffer,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -146,6 +149,9 @@ export interface IStorage {
   logTierChange(data: { feeTierId: number | null; adminId: string; action: string; previousValues?: unknown; newValues?: unknown }): Promise<FeeTierChangelog>;
   getFeeTierChangelog(): Promise<any[]>;
   seedDefaultFeeTiers(): Promise<void>;
+
+  createPriceOffer(data: InsertItemPriceOffer): Promise<ItemPriceOffer>;
+  getPriceOffersByItem(itemId: number): Promise<(ItemPriceOffer & { proposedByName: string })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1035,6 +1041,26 @@ export class DatabaseStorage implements IStorage {
       await db.insert(feeTiers).values(tier);
     }
     console.log("[fee-tiers] Seeded 3 default fee tiers.");
+  }
+
+  async createPriceOffer(data: InsertItemPriceOffer): Promise<ItemPriceOffer> {
+    const [row] = await db.insert(itemPriceOffers).values(data).returning();
+    return row;
+  }
+
+  async getPriceOffersByItem(itemId: number): Promise<(ItemPriceOffer & { proposedByName: string })[]> {
+    const rows = await db
+      .select({ offer: itemPriceOffers, proposedBy: users })
+      .from(itemPriceOffers)
+      .leftJoin(users, eq(users.id, itemPriceOffers.proposedByUserId))
+      .where(eq(itemPriceOffers.itemId, itemId))
+      .orderBy(itemPriceOffers.createdAt);
+    return rows.map((r) => ({
+      ...r.offer,
+      proposedByName: r.proposedBy
+        ? `${r.proposedBy.firstName || ""} ${r.proposedBy.lastName || ""}`.trim() || r.proposedBy.email || "Unknown"
+        : "Unknown",
+    }));
   }
 }
 

@@ -357,6 +357,28 @@ export const agreementSignaturesRelations = relations(agreementSignatures, ({ on
   user: one(users, { fields: [agreementSignatures.userId], references: [users.id] }),
 }));
 
+export const itemPriceOffers = pgTable("item_price_offers", {
+  id: serial("id").primaryKey(),
+  itemId: integer("item_id").notNull().references(() => items.id),
+  proposedByUserId: varchar("proposed_by_user_id").notNull().references(() => users.id),
+  proposedByRole: varchar("proposed_by_role", { length: 20 }).notNull(),
+  minPrice: numeric("min_price"),
+  maxPrice: numeric("max_price"),
+  action: varchar("action", { length: 30 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_item_price_offers_item").on(table.itemId),
+]);
+
+export const itemPriceOffersRelations = relations(itemPriceOffers, ({ one }) => ({
+  item: one(items, { fields: [itemPriceOffers.itemId], references: [items.id] }),
+  proposedBy: one(users, { fields: [itemPriceOffers.proposedByUserId], references: [users.id] }),
+}));
+
+export const insertItemPriceOfferSchema = createInsertSchema(itemPriceOffers).omit({ id: true, createdAt: true });
+export type ItemPriceOffer = typeof itemPriceOffers.$inferSelect;
+export type InsertItemPriceOffer = z.infer<typeof insertItemPriceOfferSchema>;
+
 export const insertAgreementSchema = createInsertSchema(agreements).omit({ id: true, generatedAt: true });
 export const insertAgreementSignatureSchema = createInsertSchema(agreementSignatures).omit({ id: true, signedAt: true });
 
