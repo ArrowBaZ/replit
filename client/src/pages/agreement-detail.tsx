@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, FileSignature, CheckCircle, Clock, User, Package, Printer, Download } from "lucide-react";
+import { ArrowLeft, FileSignature, CheckCircle, Clock, User, Package, Printer, Download, Mail } from "lucide-react";
 import { useState } from "react";
 import type { Request } from "@shared/schema";
 import jsPDF from "jspdf";
@@ -266,6 +266,19 @@ export default function AgreementDetailPage() {
     },
   });
 
+  const sendEmailMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/agreements/${params.id}/send-pdf`, {});
+      return res.json();
+    },
+    onSuccess: (data: { message: string }) => {
+      toast({ title: "Email Sent", description: data.message || "Agreement summary sent to your email address." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to send email", variant: "destructive" });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4">
@@ -322,9 +335,21 @@ export default function AgreementDetailPage() {
         <div className="flex items-center gap-2">
           <Badge className={statusColors[agreement.status] || ""}>{statusLabels[agreement.status] || agreement.status}</Badge>
           {agreement.status === "fully_signed" && (
-            <Button variant="outline" size="sm" onClick={() => downloadAgreementPdf(agreement)} data-testid="button-download-pdf">
-              <Download className="h-4 w-4 mr-1" /> Download PDF
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={() => downloadAgreementPdf(agreement)} data-testid="button-download-pdf">
+                <Download className="h-4 w-4 mr-1" /> Download PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => sendEmailMutation.mutate()}
+                disabled={sendEmailMutation.isPending}
+                data-testid="button-send-email-pdf"
+              >
+                <Mail className="h-4 w-4 mr-1" />
+                {sendEmailMutation.isPending ? "Sending..." : "Send by Email"}
+              </Button>
+            </>
           )}
           <Button variant="outline" size="sm" onClick={() => window.print()} data-testid="button-print-agreement">
             <Printer className="h-4 w-4 mr-1" /> Print

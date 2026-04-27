@@ -2691,6 +2691,96 @@ export async function registerRoutes(
     },
   );
 
+  app.post(
+    "/api/agreements/:id/send-pdf",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const id = parseInt(req.params.id);
+
+        const [currentUser] = await db.select().from(users).where(eq(users.id, userId));
+        const profile = await storage.getProfile(userId);
+        if (!profile) return res.status(400).json({ message: "Profile required" });
+
+        const agreement = await storage.getAgreementWithDetails(id);
+        if (!agreement) return res.status(404).json({ message: "Agreement not found" });
+
+        if (agreement.sellerId !== userId && agreement.reusseId !== userId && profile.role !== "admin") {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+
+        if (agreement.status !== "fully_signed") {
+          return res.status(400).json({ message: "Only fully signed agreements can be emailed" });
+        }
+
+        const toEmail = currentUser?.email;
+        if (!toEmail) return res.status(400).json({ message: "No email address on file for your account" });
+
+        const toName = `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() || toEmail;
+
+        const parsedItems = JSON.parse(agreement.itemsSnapshot) as Array<{
+          id: number;
+          title: string;
+          approvedPrice: number;
+          fees: {
+            sellerAmount: number;
+            resellerAmount: number;
+            platformAmount: number;
+            sellerPct?: number;
+            resellerPct?: number;
+            platformPct?: number;
+          };
+        }>;
+
+        const sellerName = agreement.seller
+          ? `${agreement.seller.firstName || ""} ${agreement.seller.lastName || ""}`.trim() || agreement.seller.email || "Unknown"
+          : "Unknown";
+        const reusseName = agreement.reusse
+          ? `${agreement.reusse.firstName || ""} ${agreement.reusse.lastName || ""}`.trim() || agreement.reusse.email || "Unknown"
+          : "Unknown";
+
+        const { generateAgreementPdfBytes } = await import("./pdf");
+        const pdfBuffer = generateAgreementPdfBytes(agreement);
+
+        const { sendAgreementPdfEmail } = await import("./email");
+        await sendAgreementPdfEmail({
+          toEmail,
+          toName,
+          agreementId: agreement.id,
+          requestId: agreement.requestId,
+          status: agreement.status,
+          generatedAt: agreement.generatedAt,
+          seller: agreement.seller ? { name: sellerName, email: agreement.seller.email } : null,
+          reusse: agreement.reusse ? { name: reusseName, email: agreement.reusse.email } : null,
+          items: parsedItems.map((item) => ({
+            title: item.title,
+            approvedPrice: item.approvedPrice,
+            sellerAmount: item.fees.sellerAmount,
+            resellerAmount: item.fees.resellerAmount,
+            platformAmount: item.fees.platformAmount,
+            sellerPct: item.fees.sellerPct,
+            resellerPct: item.fees.resellerPct,
+            platformPct: item.fees.platformPct,
+          })),
+          signatures: (agreement.signatures as Array<{ role: string; userName: string; signedAt: string }>).map((sig) => ({
+            role: sig.role,
+            name: sig.userName || "Unknown",
+            signedAt: sig.signedAt,
+          })),
+          totalValue: parseFloat(agreement.totalValue),
+          pdfBuffer,
+        });
+
+        res.json({ message: `Agreement PDF sent to ${toEmail}` });
+      } catch (error) {
+        console.error("Error sending agreement email:", error);
+        res.status(500).json({ message: "Failed to send email" });
+      }
+    },
+  );
+
   app.get(
     "/api/admin/agreements",
     isAuthenticated,
