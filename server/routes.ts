@@ -1247,7 +1247,7 @@ export async function registerRoutes(
         const item = await storage.updateItem(id, {
           status: "approved",
           priceApprovedBySeller: true,
-          approvedPrice: req.body.approvedPrice || null,
+          approvedPrice: req.body?.approvedPrice || null,
           updatedAt: new Date(),
         });
         if (!item) return res.status(404).json({ message: "Item not found" });
@@ -1314,7 +1314,13 @@ export async function registerRoutes(
 
         res.json(item);
       } catch (error: any) {
-        if (error?.statusCode === 400) return res.status(400).json({ message: error.message });
+        if (error?.statusCode === 400) {
+          const isFeeTierError = error.message?.includes("No fee tier");
+          const message = isFeeTierError
+            ? "Cannot finalize — one or more items have no applicable fee tier. Please ask the admin to configure a fee tier that covers this price range."
+            : error.message;
+          return res.status(400).json({ message });
+        }
         console.error("Error approving item:", error);
         res.status(500).json({ message: "Failed to approve item" });
       }
