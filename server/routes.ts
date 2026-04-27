@@ -2883,7 +2883,7 @@ export async function registerRoutes(
       const adminId = req.user.claims.sub;
       const { label, minPrice, maxPrice, sellerPercent, resellerPercent, platformPercent, currencyNote } = req.body;
       const overlapError = await checkTierOverlap(minPrice, maxPrice);
-      if (overlapError) return res.status(400).json({ message: overlapError });
+      if (overlapError) return res.status(400).json({ message: overlapError, errorCode: "TIER_OVERLAP" });
       const tier = await storage.createFeeTier({
         label,
         minPrice,
@@ -2917,7 +2917,7 @@ export async function registerRoutes(
       const willBeActive = isActive !== undefined ? isActive : existing.isActive;
       if (willBeActive) {
         const overlapError = await checkTierOverlap(minPrice, maxPrice, id);
-        if (overlapError) return res.status(400).json({ message: overlapError });
+        if (overlapError) return res.status(400).json({ message: overlapError, errorCode: "TIER_OVERLAP" });
       }
       const updated = await storage.updateFeeTier(id, {
         label,

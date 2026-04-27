@@ -82,10 +82,14 @@ function TierForm({
   defaultValues,
   onSubmit,
   isPending,
+  serverError,
+  onClearError,
 }: {
   defaultValues?: Partial<TierFormValues>;
   onSubmit: (v: TierFormValues) => void;
   isPending: boolean;
+  serverError?: string | null;
+  onClearError?: () => void;
 }) {
   const form = useForm<TierFormValues>({
     resolver: zodResolver(tierFormSchema),
@@ -131,7 +135,12 @@ function TierForm({
               <FormItem>
                 <FormLabel>Min Price (€)</FormLabel>
                 <FormControl>
-                  <Input type="number" min="0" step="0.01" placeholder="0" {...field} data-testid="input-tier-min-price" />
+                  <Input
+                    type="number" min="0" step="0.01" placeholder="0"
+                    {...field}
+                    onChange={(e) => { field.onChange(e); onClearError?.(); }}
+                    data-testid="input-tier-min-price"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -144,7 +153,12 @@ function TierForm({
               <FormItem>
                 <FormLabel>Max Price (€, blank = unlimited)</FormLabel>
                 <FormControl>
-                  <Input type="number" min="0" step="0.01" placeholder="Unlimited" {...field} data-testid="input-tier-max-price" />
+                  <Input
+                    type="number" min="0" step="0.01" placeholder="Unlimited"
+                    {...field}
+                    onChange={(e) => { field.onChange(e); onClearError?.(); }}
+                    data-testid="input-tier-max-price"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -216,6 +230,16 @@ function TierForm({
           )}
         />
 
+        {serverError && (
+          <div
+            className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 dark:border-red-800/50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-400"
+            data-testid="error-overlap-inline"
+          >
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-red-500 dark:text-red-400" />
+            <span>{serverError}</span>
+          </div>
+        )}
+
         <DialogFooter>
           <Button type="submit" disabled={isPending} data-testid="button-save-tier">
             {isPending ? "Saving..." : "Save Tier"}
@@ -231,12 +255,20 @@ interface CoverageGap {
   to: number;
 }
 
+interface CoverageOverlap {
+  tierA: string;
+  tierB: string;
+  from: number;
+  to: number;
+}
+
 interface CoverageSummary {
   activeTierCount: number;
   coverageMin: number | null;
   coverageMax: number | null;
   hasUnlimitedMax: boolean;
   gaps: CoverageGap[];
+  overlaps: CoverageOverlap[];
 }
 
 function computeCoverage(tiers: FeeTier[]): CoverageSummary {
@@ -245,7 +277,7 @@ function computeCoverage(tiers: FeeTier[]): CoverageSummary {
     .sort((a, b) => parseFloat(a.minPrice ?? "0") - parseFloat(b.minPrice ?? "0"));
 
   if (activeTiers.length === 0) {
-    return { activeTierCount: 0, coverageMin: null, coverageMax: null, hasUnlimitedMax: false, gaps: [] };
+    return { activeTierCount: 0, coverageMin: null, coverageMax: null, hasUnlimitedMax: false, gaps: [], overlaps: [] };
   }
 
   const coverageMin = parseFloat(activeTiers[0].minPrice ?? "0");
@@ -254,21 +286,39 @@ function computeCoverage(tiers: FeeTier[]): CoverageSummary {
   const coverageMax = hasUnlimitedMax ? null : parseFloat(lastTier.maxPrice!);
 
   const gaps: CoverageGap[] = [];
+  const overlaps: CoverageOverlap[] = [];
+
   for (let i = 0; i < activeTiers.length - 1; i++) {
-    const currentMax = parseFloat(activeTiers[i].maxPrice ?? "0");
+    const a = activeTiers[i];
+    const aMin = parseFloat(a.minPrice ?? "0");
+    const aMax = a.maxPrice ? parseFloat(a.maxPrice) : Infinity;
+
+    for (let j = i + 1; j < activeTiers.length; j++) {
+      const b = activeTiers[j];
+      const bMin = parseFloat(b.minPrice ?? "0");
+      const bMax = b.maxPrice ? parseFloat(b.maxPrice) : Infinity;
+
+      const overlapFrom = Math.max(aMin, bMin);
+      const overlapTo = Math.min(aMax, bMax);
+      if (overlapTo >= overlapFrom) {
+        overlaps.push({ tierA: a.label, tierB: b.label, from: overlapFrom, to: overlapTo });
+      }
+    }
+
+    const currentMax = aMax === Infinity ? null : aMax;
     const nextMin = parseFloat(activeTiers[i + 1].minPrice ?? "0");
-    if (nextMin > currentMax) {
+    if (currentMax !== null && nextMin > currentMax) {
       gaps.push({ from: currentMax, to: nextMin });
     }
   }
 
-  return { activeTierCount: activeTiers.length, coverageMin, coverageMax, hasUnlimitedMax, gaps };
+  return { activeTierCount: activeTiers.length, coverageMin, coverageMax, hasUnlimitedMax, gaps, overlaps };
 }
 
 function CoverageIndicator({ tiers, isLoading }: { tiers: FeeTier[]; isLoading: boolean }) {
   if (isLoading) return null;
 
-  const { activeTierCount, coverageMin, coverageMax, hasUnlimitedMax, gaps } = computeCoverage(tiers);
+  const { activeTierCount, coverageMin, coverageMax, hasUnlimitedMax, gaps, overlaps } = computeCoverage(tiers);
 
   if (activeTierCount === 0) {
     return (
@@ -292,6 +342,29 @@ function CoverageIndicator({ tiers, isLoading }: { tiers: FeeTier[]; isLoading: 
 
   const hasFallback = !hasUnlimitedMax;
   const hasGaps = gaps.length > 0;
+  const hasOverlaps = overlaps.length > 0;
+
+  if (hasOverlaps) {
+    return (
+      <div
+        className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 dark:border-red-800/50 dark:bg-red-900/20 p-4"
+        data-testid="coverage-indicator-overlaps"
+      >
+        <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+        <div className="text-sm space-y-1">
+          <p className="font-semibold text-red-800 dark:text-red-300">
+            Overlapping tiers detected — fee splits may be applied incorrectly
+          </p>
+          {overlaps.map((o, i) => (
+            <p key={i} className="text-red-700 dark:text-red-400" data-testid={`coverage-overlap-${i}`}>
+              "{o.tierA}" and "{o.tierB}" both cover {fmt(o.from)}–{o.to === Infinity ? "∞" : fmt(o.to)}.
+              Edit one of these tiers to eliminate the overlap.
+            </p>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!hasFallback && !hasGaps) {
     return (
@@ -410,6 +483,8 @@ export default function AdminFeeTiersPage() {
   const [editTier, setEditTier] = useState<FeeTier | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [createServerError, setCreateServerError] = useState<string | null>(null);
+  const [editServerError, setEditServerError] = useState<string | null>(null);
 
   const { data: tiers = [], isLoading } = useQuery<FeeTier[]>({
     queryKey: ["/api/admin/fee-tiers"],
@@ -425,15 +500,36 @@ export default function AdminFeeTiersPage() {
     queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-tiers/uncovered-items"] });
   }
 
+  function parseMutationError(e: any): { message: string; errorCode?: string } {
+    const raw: string = e?.message ?? "";
+    const jsonStart = raw.indexOf("{");
+    if (jsonStart !== -1) {
+      try {
+        const parsed = JSON.parse(raw.slice(jsonStart));
+        return { message: parsed.message ?? raw, errorCode: parsed.errorCode };
+      } catch {
+      }
+    }
+    return { message: raw };
+  }
+
   const createMutation = useMutation({
     mutationFn: (data: TierFormValues) =>
       apiRequest("POST", "/api/admin/fee-tiers", data),
     onSuccess: () => {
       invalidateAll();
       setCreateOpen(false);
+      setCreateServerError(null);
       toast({ title: "Fee tier created" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => {
+      const { message, errorCode } = parseMutationError(e);
+      if (errorCode === "TIER_OVERLAP") {
+        setCreateServerError(message);
+      } else {
+        toast({ title: "Error", description: message, variant: "destructive" });
+      }
+    },
   });
 
   const updateMutation = useMutation({
@@ -442,9 +538,17 @@ export default function AdminFeeTiersPage() {
     onSuccess: () => {
       invalidateAll();
       setEditTier(null);
+      setEditServerError(null);
       toast({ title: "Fee tier updated" });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => {
+      const { message, errorCode } = parseMutationError(e);
+      if (errorCode === "TIER_OVERLAP") {
+        setEditServerError(message);
+      } else {
+        toast({ title: "Error", description: message, variant: "destructive" });
+      }
+    },
   });
 
   const deleteMutation = useMutation({
@@ -660,7 +764,7 @@ export default function AdminFeeTiersPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setCreateServerError(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Create Fee Tier</DialogTitle>
@@ -668,11 +772,13 @@ export default function AdminFeeTiersPage() {
           <TierForm
             onSubmit={(v) => createMutation.mutate(v)}
             isPending={createMutation.isPending}
+            serverError={createServerError}
+            onClearError={() => setCreateServerError(null)}
           />
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editTier} onOpenChange={(open) => !open && setEditTier(null)}>
+      <Dialog open={!!editTier} onOpenChange={(open) => { if (!open) { setEditTier(null); setEditServerError(null); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Fee Tier</DialogTitle>
@@ -682,6 +788,8 @@ export default function AdminFeeTiersPage() {
               defaultValues={getDefaultValues(editTier)}
               onSubmit={(v) => updateMutation.mutate({ id: editTier.id, data: v })}
               isPending={updateMutation.isPending}
+              serverError={editServerError}
+              onClearError={() => setEditServerError(null)}
             />
           )}
         </DialogContent>
