@@ -36,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Percent, Plus, Pencil, Trash2, History, Layers } from "lucide-react";
+import { Percent, Plus, Pencil, Trash2, History, Layers, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import type { FeeTier } from "@shared/schema";
 
 interface FeeTierChangelog {
@@ -225,6 +225,120 @@ function TierForm({
   );
 }
 
+interface CoverageGap {
+  from: number;
+  to: number;
+}
+
+interface CoverageSummary {
+  activeTierCount: number;
+  coverageMin: number | null;
+  coverageMax: number | null;
+  hasUnlimitedMax: boolean;
+  gaps: CoverageGap[];
+}
+
+function computeCoverage(tiers: FeeTier[]): CoverageSummary {
+  const activeTiers = tiers
+    .filter((t) => t.isActive)
+    .sort((a, b) => parseFloat(a.minPrice ?? "0") - parseFloat(b.minPrice ?? "0"));
+
+  if (activeTiers.length === 0) {
+    return { activeTierCount: 0, coverageMin: null, coverageMax: null, hasUnlimitedMax: false, gaps: [] };
+  }
+
+  const coverageMin = parseFloat(activeTiers[0].minPrice ?? "0");
+  const lastTier = activeTiers[activeTiers.length - 1];
+  const hasUnlimitedMax = !lastTier.maxPrice;
+  const coverageMax = hasUnlimitedMax ? null : parseFloat(lastTier.maxPrice!);
+
+  const gaps: CoverageGap[] = [];
+  for (let i = 0; i < activeTiers.length - 1; i++) {
+    const currentMax = parseFloat(activeTiers[i].maxPrice ?? "0");
+    const nextMin = parseFloat(activeTiers[i + 1].minPrice ?? "0");
+    if (nextMin > currentMax) {
+      gaps.push({ from: currentMax, to: nextMin });
+    }
+  }
+
+  return { activeTierCount: activeTiers.length, coverageMin, coverageMax, hasUnlimitedMax, gaps };
+}
+
+function CoverageIndicator({ tiers, isLoading }: { tiers: FeeTier[]; isLoading: boolean }) {
+  if (isLoading) return null;
+
+  const { activeTierCount, coverageMin, coverageMax, hasUnlimitedMax, gaps } = computeCoverage(tiers);
+
+  if (activeTierCount === 0) {
+    return (
+      <div
+        className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-900/20 p-4"
+        data-testid="coverage-indicator-no-tiers"
+      >
+        <Info className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+        <div className="text-sm">
+          <p className="font-semibold text-amber-800 dark:text-amber-300">No active fee tiers</p>
+          <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+            All transactions will be blocked until at least one active fee tier is configured.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const fmt = (v: number) =>
+    `€${v.toLocaleString("fr-CH", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+  const hasFallback = !hasUnlimitedMax;
+  const hasGaps = gaps.length > 0;
+
+  if (!hasFallback && !hasGaps) {
+    return (
+      <div
+        className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20 p-4"
+        data-testid="coverage-indicator-full"
+      >
+        <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
+        <div className="text-sm">
+          <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+            Full coverage — {fmt(coverageMin!)} and above
+          </p>
+          <p className="text-emerald-700 dark:text-emerald-400 mt-0.5">
+            All prices from {fmt(coverageMin!)} upward are covered by {activeTierCount} active{" "}
+            {activeTierCount === 1 ? "tier" : "tiers"}. No fallback logic will be used.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-900/20 p-4"
+      data-testid="coverage-indicator-partial"
+    >
+      <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+      <div className="text-sm space-y-1">
+        <p className="font-semibold text-amber-800 dark:text-amber-300">
+          Partial coverage — {fmt(coverageMin!)}–{coverageMax !== null ? fmt(coverageMax) : "∞"}
+        </p>
+        {hasFallback && (
+          <p className="text-amber-700 dark:text-amber-400" data-testid="coverage-fallback-warning">
+            Prices above {fmt(coverageMax!)} are not covered — transactions at those prices will be
+            blocked until a matching tier is added.
+          </p>
+        )}
+        {hasGaps &&
+          gaps.map((g, i) => (
+            <p key={i} className="text-amber-700 dark:text-amber-400" data-testid={`coverage-gap-${i}`}>
+              Gap detected: prices between {fmt(g.from)} and {fmt(g.to)} are not covered by any tier.
+            </p>
+          ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminFeeTiersPage() {
   const { toast } = useToast();
   const [editTier, setEditTier] = useState<FeeTier | null>(null);
@@ -312,6 +426,8 @@ export default function AdminFeeTiersPage() {
           Add Tier
         </Button>
       </div>
+
+      <CoverageIndicator tiers={tiers} isLoading={isLoading} />
 
       <Tabs defaultValue="tiers">
         <TabsList data-testid="tabs-fee-tiers">

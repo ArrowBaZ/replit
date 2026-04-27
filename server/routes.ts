@@ -37,6 +37,7 @@ async function resolveFeePercentages(price: number): Promise<TierResolution> {
       tierId: tier.id,
     };
   }
+  console.warn(`[fee-tier] WARNING: No active fee tier covers price €${price}. Transaction blocked — configure a tier that includes this price range.`);
   throw Object.assign(new Error(`No fee tier covers price €${price}. Please configure a fee tier that includes this price range.`), { statusCode: 400 });
 }
 
