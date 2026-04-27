@@ -377,6 +377,7 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items", item.id, "documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
     },
   });
 

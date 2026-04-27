@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useI18n } from "@/lib/i18n";
-import type { Profile, Notification } from "@shared/schema";
+import type { Profile, Notification, ItemDocument } from "@shared/schema";
 import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
 import { useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -273,11 +273,18 @@ export function AppSidebar() {
 
   const role = profile?.role || "seller";
 
+  const { data: documents = [] } = useQuery<ItemDocument[]>({
+    queryKey: ["/api/documents"],
+    enabled: !!user && profile?.role === "seller",
+  });
+
+  const documentCount = documents.length;
+
   const sellerItems = [
     { title: t("dashboard"), url: "/dashboard", icon: LayoutDashboard },
     { title: t("myRequests"), url: "/requests", icon: ClipboardList },
     { title: t("myItems"), url: "/items", icon: Shirt },
-    { title: "My Documents", url: "/documents", icon: FolderOpen },
+    { title: "My Documents", url: "/documents", icon: FolderOpen, badge: documentCount > 0 ? documentCount : null },
     { title: t("discoverResellers"), url: "/resellers", icon: Star },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
     { title: "Fee Structure", url: "/fee-structure", icon: Percent },
@@ -337,6 +344,14 @@ export function AppSidebar() {
                     <Link href={item.url} data-testid={`link-nav-${item.url.replace(/\//g, "-").slice(1)}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
+                      {"badge" in item && item.badge !== null && item.badge !== undefined && (
+                        <span
+                          className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground px-1"
+                          data-testid="badge-document-count"
+                        >
+                          {(item.badge as number) > 99 ? "99+" : item.badge}
+                        </span>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
