@@ -2973,6 +2973,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/fee-tiers/uncovered-items", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const uncoveredItems = await storage.getUncoveredItems();
+      res.json(uncoveredItems);
+    } catch (error) {
+      console.error("Error fetching uncovered items:", error);
+      res.status(500).json({ message: "Failed to fetch uncovered items" });
+    }
+  });
+
   app.get("/api/fee-tiers", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
       const tiers = await storage.getFeeTiers(true);

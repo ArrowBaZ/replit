@@ -147,6 +147,7 @@ export interface IStorage {
   updateFeeTier(id: number, data: Partial<InsertFeeTier>): Promise<FeeTier | undefined>;
   deleteFeeTier(id: number): Promise<void>;
   getTierForPrice(price: number): Promise<FeeTier | undefined>;
+  getUncoveredItems(): Promise<Item[]>;
   logTierChange(data: { feeTierId: number | null; adminId: string; action: string; previousValues?: unknown; newValues?: unknown }): Promise<FeeTierChangelog>;
   getFeeTierChangelog(): Promise<any[]>;
   seedDefaultFeeTiers(): Promise<void>;
@@ -1031,6 +1032,23 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(feeTiers.minPrice))
       .limit(1);
     return tier;
+  }
+
+  async getUncoveredItems(): Promise<Item[]> {
+    return db
+      .select()
+      .from(items)
+      .where(
+        and(
+          isNotNull(items.approvedPrice),
+          sql`NOT EXISTS (
+            SELECT 1 FROM fee_tiers
+            WHERE fee_tiers.is_active = true
+            AND fee_tiers.min_price::numeric <= items.approved_price::numeric
+            AND (fee_tiers.max_price IS NULL OR fee_tiers.max_price::numeric >= items.approved_price::numeric)
+          )`
+        )
+      );
   }
 
   async logTierChange(data: { feeTierId: number | null; adminId: string; action: string; previousValues?: unknown; newValues?: unknown }): Promise<FeeTierChangelog> {

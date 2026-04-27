@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -36,8 +37,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Percent, Plus, Pencil, Trash2, History, Layers, AlertTriangle, CheckCircle2, Info } from "lucide-react";
-import type { FeeTier } from "@shared/schema";
+import { Percent, Plus, Pencil, Trash2, History, Layers, AlertTriangle, CheckCircle2, Info, ShieldAlert } from "lucide-react";
+import type { FeeTier, Item } from "@shared/schema";
 
 interface FeeTierChangelog {
   id: number;
@@ -339,6 +340,71 @@ function CoverageIndicator({ tiers, isLoading }: { tiers: FeeTier[]; isLoading: 
   );
 }
 
+function UncoveredItemsBanner({
+  onAddTier,
+}: {
+  onAddTier: () => void;
+}) {
+  const [, navigate] = useLocation();
+  const { data: uncoveredItems = [], isLoading } = useQuery<Item[]>({
+    queryKey: ["/api/admin/fee-tiers/uncovered-items"],
+  });
+
+  if (isLoading || uncoveredItems.length === 0) return null;
+
+  const fmt = (v: string | number | null) => {
+    if (!v) return "—";
+    return `€${parseFloat(v as string).toLocaleString("fr-CH", { minimumFractionDigits: 2 })}`;
+  };
+
+  return (
+    <div
+      className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800/50 dark:bg-red-900/20 p-4 space-y-3"
+      data-testid="banner-uncovered-items"
+    >
+      <div className="flex items-start gap-3">
+        <ShieldAlert className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+            {uncoveredItems.length} item{uncoveredItems.length !== 1 ? "s" : ""} with approved prices not covered by any active tier
+          </p>
+          <p className="text-xs text-red-700 dark:text-red-400 mt-0.5">
+            These transactions will be blocked until a matching fee tier is added.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/40"
+          onClick={onAddTier}
+          data-testid="button-add-tier-from-banner"
+        >
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
+          Add Covering Tier
+        </Button>
+      </div>
+      <div className="space-y-1.5 pl-8" data-testid="list-uncovered-items">
+        {uncoveredItems.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className="w-full text-left flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm bg-red-100/60 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 transition-colors"
+            onClick={() => navigate(`/items?search=${encodeURIComponent(item.title)}`)}
+            data-testid={`button-uncovered-item-${item.id}`}
+          >
+            <span className="font-medium text-red-900 dark:text-red-200 truncate">
+              {item.title}
+            </span>
+            <span className="shrink-0 text-xs font-semibold text-red-700 dark:text-red-300 tabular-nums">
+              Approved: {fmt(item.approvedPrice)}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminFeeTiersPage() {
   const { toast } = useToast();
   const [editTier, setEditTier] = useState<FeeTier | null>(null);
@@ -353,12 +419,17 @@ export default function AdminFeeTiersPage() {
     queryKey: ["/api/admin/fee-tiers/changelog"],
   });
 
+  function invalidateAll() {
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-tiers"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-tiers/changelog"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-tiers/uncovered-items"] });
+  }
+
   const createMutation = useMutation({
     mutationFn: (data: TierFormValues) =>
       apiRequest("POST", "/api/admin/fee-tiers", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-tiers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-tiers/changelog"] });
+      invalidateAll();
       setCreateOpen(false);
       toast({ title: "Fee tier created" });
     },
@@ -369,8 +440,7 @@ export default function AdminFeeTiersPage() {
     mutationFn: ({ id, data }: { id: number; data: TierFormValues }) =>
       apiRequest("PATCH", `/api/admin/fee-tiers/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-tiers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-tiers/changelog"] });
+      invalidateAll();
       setEditTier(null);
       toast({ title: "Fee tier updated" });
     },
@@ -380,8 +450,7 @@ export default function AdminFeeTiersPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/admin/fee-tiers/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-tiers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-tiers/changelog"] });
+      invalidateAll();
       setDeleteId(null);
       toast({ title: "Fee tier deleted" });
     },
@@ -428,6 +497,8 @@ export default function AdminFeeTiersPage() {
       </div>
 
       <CoverageIndicator tiers={tiers} isLoading={isLoading} />
+
+      <UncoveredItemsBanner onAddTier={() => setCreateOpen(true)} />
 
       <Tabs defaultValue="tiers">
         <TabsList data-testid="tabs-fee-tiers">

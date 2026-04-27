@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useSearch } from "wouter";
 import { useI18n } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +22,9 @@ const itemStatusColors: Record<string, string> = {
 
 export default function ItemsListPage() {
   const { t } = useI18n();
-  const [search, setSearch] = useState("");
+  const searchParams = useSearch();
+  const initialSearch = new URLSearchParams(searchParams).get("search") ?? "";
+  const [search, setSearch] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
