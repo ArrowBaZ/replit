@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Request, Item, Meeting, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag, FileText, FileSignature, Lock, History, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag, FileText, FileSignature, Lock, History, ChevronDown, ChevronUp, Users } from "lucide-react";
 import { ItemDocumentsSection } from "@/components/item-documents-section";
 import { ItemStatusBadge } from "@/components/item-status-badge";
 import { ITEM_CATEGORIES, type ItemCategory } from "@shared/schema";
@@ -134,6 +134,21 @@ const itemStatusColors: Record<string, string> = {
   returned: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
   donated: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
 };
+
+function parseApiError(err: any): { status: number | null; message: string } {
+  const raw = err?.message || "Unknown error";
+  const match = raw.match(/^(\d{3}): ([\s\S]*)/);
+  if (match) {
+    const status = parseInt(match[1]);
+    try {
+      const body = JSON.parse(match[2]);
+      return { status, message: body.message || match[2] };
+    } catch {
+      return { status, message: match[2] };
+    }
+  }
+  return { status: null, message: raw };
+}
 
 export default function RequestDetailPage() {
   const params = useParams<{ id: string }>();
@@ -397,21 +412,46 @@ export default function RequestDetailPage() {
   const [reportReason, setReportReason] = useState("");
   const [declineReason, setDeclineReason] = useState("");
 
-  const approveItem = useMutation({
-    mutationFn: async (itemId: number) => {
-      const res = await apiRequest("POST", `/api/items/${itemId}/approve`, {});
+  const acceptAllItems = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/requests/${params.id}/items/accept-all`, {});
       return res.json();
     },
-    onSuccess: (_data, itemId) => {
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "agreement"] });
+      toast({ title: "All items accepted", description: `${data.accepted} item${data.accepted !== 1 ? "s" : ""} accepted successfully.` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to accept all items", variant: "destructive" });
+    },
+  });
+
+  const approveItem = useMutation({
+    mutationFn: async ({ itemId, version }: { itemId: number; version: number }) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/approve`, { version });
+      return res.json();
+    },
+    onSuccess: (_data, { itemId }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
       queryClient.invalidateQueries({ queryKey: [`/api/items/${itemId}/price-history`] });
       toast({ title: t("itemApproved") });
     },
+    onError: (err: any) => {
+      const { status, message } = parseApiError(err);
+      if (status === 409) {
+        toast({ title: "Item changed", description: "This item was modified since you loaded the page. Please refresh to see the latest state before retrying.", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: message || "Failed to approve item", variant: "destructive" });
+      }
+    },
   });
 
+  const [counterOfferError, setCounterOfferError] = useState<string | null>(null);
+
   const counterOfferItem = useMutation({
-    mutationFn: async ({ itemId, minPrice, maxPrice }: { itemId: number; minPrice: string; maxPrice: string }) => {
-      const res = await apiRequest("POST", `/api/items/${itemId}/counter-offer`, { minPrice, maxPrice });
+    mutationFn: async ({ itemId, minPrice, maxPrice, version }: { itemId: number; minPrice: string; maxPrice: string; version: number }) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/counter-offer`, { minPrice, maxPrice, version });
       return res.json();
     },
     onSuccess: (_data, { itemId }) => {
@@ -420,29 +460,45 @@ export default function RequestDetailPage() {
       setShowCounterOffer(null);
       setCounterMin("");
       setCounterMax("");
+      setCounterOfferError(null);
       toast({ title: t("counterOfferSent") });
+    },
+    onError: (err: any) => {
+      const { status, message } = parseApiError(err);
+      if (status === 409) {
+        setCounterOfferError("This item was modified since you loaded the page. Please refresh to see the latest state before retrying.");
+      } else {
+        setCounterOfferError(message || "Failed to submit counter offer");
+      }
     },
   });
 
   const acceptCounterOffer = useMutation({
-    mutationFn: async (itemId: number) => {
-      const res = await apiRequest("POST", `/api/items/${itemId}/accept-counter-offer`, {});
+    mutationFn: async ({ itemId, version }: { itemId: number; version: number }) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/accept-counter-offer`, { version });
       return res.json();
     },
-    onSuccess: (_data, itemId) => {
+    onSuccess: (_data, { itemId }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "agreement"] });
       queryClient.invalidateQueries({ queryKey: [`/api/items/${itemId}/price-history`] });
       toast({ title: "Counter-offer accepted", description: "The seller's proposed price has been accepted." });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message || "Failed to accept counter-offer", variant: "destructive" });
+      const { status, message } = parseApiError(err);
+      if (status === 409) {
+        toast({ title: "Item changed", description: "This item was modified since you loaded the page. Please refresh and try again.", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: message || "Failed to accept counter-offer", variant: "destructive" });
+      }
     },
   });
 
+  const [revisePriceError, setRevisePriceError] = useState<string | null>(null);
+
   const revisePriceOffer = useMutation({
-    mutationFn: async ({ itemId, minPrice, maxPrice }: { itemId: number; minPrice: string; maxPrice: string }) => {
-      const res = await apiRequest("POST", `/api/items/${itemId}/revise-price`, { minPrice, maxPrice });
+    mutationFn: async ({ itemId, minPrice, maxPrice, version }: { itemId: number; minPrice: string; maxPrice: string; version: number }) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/revise-price`, { minPrice, maxPrice, version });
       return res.json();
     },
     onSuccess: (_data, { itemId }) => {
@@ -451,16 +507,22 @@ export default function RequestDetailPage() {
       setShowRevisePrice(null);
       setReviseMin("");
       setReviseMax("");
+      setRevisePriceError(null);
       toast({ title: "Price revised", description: "The seller has been notified to review the new price range." });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message || "Failed to revise price", variant: "destructive" });
+      const { status, message } = parseApiError(err);
+      if (status === 409) {
+        setRevisePriceError("This item was modified since you loaded the page. Please refresh to see the latest state before retrying.");
+      } else {
+        setRevisePriceError(message || "Failed to revise price");
+      }
     },
   });
 
   const declineItem = useMutation({
-    mutationFn: async ({ itemId, reason }: { itemId: number; reason: string }) => {
-      const res = await apiRequest("POST", `/api/items/${itemId}/decline`, { reason });
+    mutationFn: async ({ itemId, reason, version }: { itemId: number; reason: string; version: number }) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/decline`, { reason, version });
       return res.json();
     },
     onSuccess: () => {
@@ -468,6 +530,14 @@ export default function RequestDetailPage() {
       setShowDeclineReason(null);
       setDeclineReason("");
       toast({ title: t("itemDeclined") });
+    },
+    onError: (err: any) => {
+      const { status, message } = parseApiError(err);
+      if (status === 409) {
+        toast({ title: "Item changed", description: "This item was modified since you loaded the page. Please refresh and try again.", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: message || "Failed to decline item", variant: "destructive" });
+      }
     },
   });
 
@@ -1123,14 +1193,22 @@ export default function RequestDetailPage() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={() => setLocation(`/requests/${params.id}/review`)}
-                  data-testid="button-review-items"
-                >
-                  Review Items
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-emerald-300 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                    onClick={() => acceptAllItems.mutate()}
+                    disabled={acceptAllItems.isPending || !requestItems?.some((i) => i.status === "pending_approval")}
+                    data-testid="button-accept-all-items"
+                  >
+                    {acceptAllItems.isPending ? (
+                      <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />Accepting...</>
+                    ) : (
+                      <><CheckCircle className="h-3.5 w-3.5 mr-1" />Accept All</>
+                    )}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -1366,7 +1444,28 @@ export default function RequestDetailPage() {
           {itemsLoading ? (
             Array.from({ length: 2 }).map((_, i) => <Card key={i}><CardContent className="p-4"><Skeleton className="h-16" /></CardContent></Card>)
           ) : requestItems && requestItems.length > 0 ? (
-            requestItems.map((item) => (
+            (() => {
+              const pendingItems = isSeller && !!request.listReadyAt ? requestItems.filter((i) => i.status === "pending_approval") : [];
+              const otherItems = pendingItems.length > 0 ? requestItems.filter((i) => i.status !== "pending_approval") : requestItems;
+              const orderedItems = [...pendingItems, ...otherItems];
+              const totalProposed = pendingItems.reduce((sum, i) => sum + parseFloat(i.maxPrice || i.minPrice || "0"), 0);
+              const resellerName = contactInfo
+                ? `${contactInfo.firstName || ""} ${contactInfo.lastName || ""}`.trim() || "Reseller"
+                : "Reseller";
+              return (
+                <>
+                  {pendingItems.length > 0 && (
+                    <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 px-3 py-2.5 flex flex-wrap items-center justify-between gap-2" data-testid="reseller-group-header">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <span className="text-sm font-medium text-blue-800 dark:text-blue-300">{resellerName}</span>
+                      </div>
+                      <span className="text-xs text-blue-700/80 dark:text-blue-400/80">
+                        {pendingItems.length} item{pendingItems.length !== 1 ? "s" : ""} pending · Proposed total: {totalProposed.toFixed(0)} EUR
+                      </span>
+                    </div>
+                  )}
+                  {orderedItems.map((item) => (
               <Card key={item.id}>
                 <CardContent className="p-4 space-y-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1453,7 +1552,7 @@ export default function RequestDetailPage() {
                           <Button
                             size="sm"
                             className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={() => acceptCounterOffer.mutate(item.id)}
+                            onClick={() => acceptCounterOffer.mutate({ itemId: item.id, version: item.version ?? 1 })}
                             disabled={acceptCounterOffer.isPending}
                             data-testid={`button-accept-counter-${item.id}`}
                           >
@@ -1462,7 +1561,7 @@ export default function RequestDetailPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => { setShowRevisePrice(item.id); setReviseMin(item.minPrice || ""); setReviseMax(item.maxPrice || ""); }}
+                            onClick={() => { setShowRevisePrice(item.id); setReviseMin(item.minPrice || ""); setReviseMax(item.maxPrice || ""); setRevisePriceError(null); }}
                             data-testid={`button-revise-price-${item.id}`}
                           >
                             <DollarSign className="h-3.5 w-3.5 mr-1" /> Revise Price
@@ -1475,23 +1574,29 @@ export default function RequestDetailPage() {
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
                               <Label className="text-xs">{t("minPrice")} (EUR)</Label>
-                              <Input type="number" value={reviseMin} onChange={(e) => setReviseMin(e.target.value)} data-testid="input-revise-min" />
+                              <Input type="number" value={reviseMin} onChange={(e) => { setReviseMin(e.target.value); setRevisePriceError(null); }} data-testid="input-revise-min" />
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">{t("maxPrice")} (EUR)</Label>
-                              <Input type="number" value={reviseMax} onChange={(e) => setReviseMax(e.target.value)} data-testid="input-revise-max" />
+                              <Input type="number" value={reviseMax} onChange={(e) => { setReviseMax(e.target.value); setRevisePriceError(null); }} data-testid="input-revise-max" />
                             </div>
                           </div>
+                          {revisePriceError && (
+                            <div className="flex items-start gap-1.5 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-2.5 py-2 text-xs text-red-700 dark:text-red-400" data-testid="text-revise-price-error">
+                              <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                              {revisePriceError}
+                            </div>
+                          )}
                           <div className="flex gap-2">
                             <Button
                               size="sm"
-                              onClick={() => revisePriceOffer.mutate({ itemId: item.id, minPrice: reviseMin, maxPrice: reviseMax })}
+                              onClick={() => revisePriceOffer.mutate({ itemId: item.id, minPrice: reviseMin, maxPrice: reviseMax, version: item.version ?? 1 })}
                               disabled={revisePriceOffer.isPending || (!reviseMin && !reviseMax)}
                               data-testid="button-submit-revise"
                             >
                               Send Revised Price
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setShowRevisePrice(null)}>{t("back")}</Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setShowRevisePrice(null); setRevisePriceError(null); }}>{t("back")}</Button>
                           </div>
                         </div>
                       )}
@@ -1512,10 +1617,10 @@ export default function RequestDetailPage() {
 
                   {isSeller && item.status === "pending_approval" && request.listReadyAt && (
                     <div className="flex flex-wrap gap-2 ml-[4.25rem]">
-                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approveItem.mutate(item.id)} disabled={approveItem.isPending} data-testid={`button-approve-${item.id}`}>
+                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => approveItem.mutate({ itemId: item.id, version: item.version ?? 1 })} disabled={approveItem.isPending} data-testid={`button-approve-${item.id}`}>
                         <ThumbsUp className="h-3.5 w-3.5 mr-1" /> {t("approvePrice")}
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setShowCounterOffer(item.id)} data-testid={`button-counter-${item.id}`}>
+                      <Button size="sm" variant="outline" onClick={() => { setShowCounterOffer(item.id); setCounterOfferError(null); setCounterMin(""); setCounterMax(""); }} data-testid={`button-counter-${item.id}`}>
                         <DollarSign className="h-3.5 w-3.5 mr-1" /> {t("counterOffer")}
                       </Button>
                       <Button size="sm" variant="destructive" onClick={() => { setShowDeclineReason(item.id); setDeclineReason(""); }} data-testid={`button-decline-${item.id}`}>
@@ -1529,18 +1634,24 @@ export default function RequestDetailPage() {
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
                           <Label className="text-xs">{t("minPrice")} (EUR)</Label>
-                          <Input type="number" value={counterMin} onChange={(e) => setCounterMin(e.target.value)} data-testid="input-counter-min" />
+                          <Input type="number" value={counterMin} onChange={(e) => { setCounterMin(e.target.value); setCounterOfferError(null); }} data-testid="input-counter-min" />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs">{t("maxPrice")} (EUR)</Label>
-                          <Input type="number" value={counterMax} onChange={(e) => setCounterMax(e.target.value)} data-testid="input-counter-max" />
+                          <Input type="number" value={counterMax} onChange={(e) => { setCounterMax(e.target.value); setCounterOfferError(null); }} data-testid="input-counter-max" />
                         </div>
                       </div>
+                      {counterOfferError && (
+                        <div className="flex items-start gap-1.5 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-2.5 py-2 text-xs text-red-700 dark:text-red-400" data-testid="text-counter-offer-error">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                          {counterOfferError}
+                        </div>
+                      )}
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={() => counterOfferItem.mutate({ itemId: item.id, minPrice: counterMin, maxPrice: counterMax })} disabled={counterOfferItem.isPending} data-testid="button-submit-counter">
+                        <Button size="sm" onClick={() => counterOfferItem.mutate({ itemId: item.id, minPrice: counterMin, maxPrice: counterMax, version: item.version ?? 1 })} disabled={counterOfferItem.isPending} data-testid="button-submit-counter">
                           {t("counterOffer")}
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setShowCounterOffer(null)}>{t("back")}</Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setShowCounterOffer(null); setCounterOfferError(null); }}>{t("back")}</Button>
                       </div>
                     </div>
                   )}
@@ -1559,7 +1670,7 @@ export default function RequestDetailPage() {
                         />
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="destructive" onClick={() => declineItem.mutate({ itemId: item.id, reason: declineReason })} disabled={declineItem.isPending || !declineReason.trim()} data-testid="button-confirm-decline">
+                        <Button size="sm" variant="destructive" onClick={() => declineItem.mutate({ itemId: item.id, reason: declineReason, version: item.version ?? 1 })} disabled={declineItem.isPending || !declineReason.trim()} data-testid="button-confirm-decline">
                           {t("declineItem")}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setShowDeclineReason(null)}>{t("back")}</Button>
@@ -1660,7 +1771,10 @@ export default function RequestDetailPage() {
                   />
                 </CardContent>
               </Card>
-            ))
+                  ))}
+                </>
+              );
+            })()
           ) : (
             <Card>
               <CardContent className="p-8 text-center">

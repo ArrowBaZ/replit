@@ -588,8 +588,19 @@ export async function registerRoutes(
         if (request.sellerId !== userId) {
           return res.status(403).json({ message: "Not authorized for this request" });
         }
+        if (!request.listReadyAt) {
+          return res.status(400).json({ message: "Cannot accept items before the reseller finalizes the list" });
+        }
 
-        const { updatedItems: updated } = await storage.bulkApproveItemsTransaction(requestId, userId);
+        let updated: Awaited<ReturnType<typeof storage.bulkApproveItemsTransaction>>["updatedItems"];
+        try {
+          ({ updatedItems: updated } = await storage.bulkApproveItemsTransaction(requestId, userId));
+        } catch (txErr: any) {
+          if (txErr?.message?.startsWith("CONFLICT:item:")) {
+            return res.status(409).json({ message: "One or more items were modified since you loaded the page. Please refresh and try again." });
+          }
+          throw txErr;
+        }
 
         if (updated.length === 0) {
           return res.status(400).json({ message: "No pending items to accept" });
@@ -773,7 +784,7 @@ export async function registerRoutes(
   app.get("/api/items/:id/price-history", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const item = await storage.getItem(id);
+      const item = await storage.getItemIncludingDeleted(id);
       if (!item) return res.status(404).json({ message: "Item not found" });
       const userId = req.user.claims.sub;
       if (item.sellerId !== userId && item.reusseId !== userId) {
@@ -1334,9 +1345,12 @@ export async function registerRoutes(
             .json({ message: "Only the seller can approve item pricing" });
         }
 
-        // Optimistic locking: if client sends a version, ensure it matches
+        // Optimistic locking: version is required to prevent concurrent overwrites
         const clientVersion = req.body?.version;
-        if (clientVersion !== undefined && existingItem.version !== null && existingItem.version !== Number(clientVersion)) {
+        if (clientVersion === undefined || clientVersion === null) {
+          return res.status(400).json({ message: "Request version is required. Please refresh the page and try again." });
+        }
+        if (existingItem.version !== null && existingItem.version !== Number(clientVersion)) {
           return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
         }
 
@@ -1355,14 +1369,8 @@ export async function registerRoutes(
           version: (existingItem.version ?? 1) + 1,
           updatedAt: new Date(),
         };
-        let item: Item | undefined;
-        if (clientVersion !== undefined) {
-          item = await storage.updateItemConditional(id, Number(clientVersion), newData);
-          if (!item) return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
-        } else {
-          item = await storage.updateItem(id, newData);
-          if (!item) return res.status(404).json({ message: "Item not found" });
-        }
+        const item = await storage.updateItemConditional(id, Number(clientVersion), newData);
+        if (!item) return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
 
         await storage.createPriceOffer({
           itemId: id,
@@ -1459,9 +1467,12 @@ export async function registerRoutes(
             .json({ message: "Only the seller can counter-offer" });
         }
 
-        // Optimistic locking: if client sends a version, ensure it matches
+        // Optimistic locking: version is required to prevent concurrent overwrites
         const counterClientVersion = req.body?.version;
-        if (counterClientVersion !== undefined && existingItem.version !== null && existingItem.version !== Number(counterClientVersion)) {
+        if (counterClientVersion === undefined || counterClientVersion === null) {
+          return res.status(400).json({ message: "Request version is required. Please refresh the page and try again." });
+        }
+        if (existingItem.version !== null && existingItem.version !== Number(counterClientVersion)) {
           return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
         }
 
@@ -1492,6 +1503,27 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Min price cannot be greater than max price" });
         }
 
+        const cEffectiveMin = cParsedMin ?? (existingItem.minPrice ? parseFloat(existingItem.minPrice) : null);
+        const cEffectiveMax = cParsedMax ?? (existingItem.maxPrice ? parseFloat(existingItem.maxPrice) : null);
+        if (cEffectiveMin !== null && cEffectiveMax !== null) {
+          const cRangeCovered = await storage.checkRangeCoveredByTiers(cEffectiveMin, cEffectiveMax);
+          if (!cRangeCovered) {
+            return res.status(400).json({
+              message: `The proposed price range €${cEffectiveMin}–€${cEffectiveMax} is not fully covered by active fee tiers. Please propose a range within configured fee tier ranges, or ask an admin to configure one.`,
+            });
+          }
+        } else {
+          const checkPrice = cParsedMax ?? cParsedMin;
+          if (checkPrice !== null) {
+            const cTier = await storage.getTierForPrice(checkPrice);
+            if (!cTier) {
+              return res.status(400).json({
+                message: `The proposed price €${checkPrice} is not covered by any active fee tier. Please propose a price within a configured fee tier range, or ask an admin to configure one.`,
+              });
+            }
+          }
+        }
+
         const counterNewData = {
           status: "pending_approval" as const,
           minPrice: minPrice || null,
@@ -1501,14 +1533,8 @@ export async function registerRoutes(
           version: (existingItem.version ?? 1) + 1,
           updatedAt: new Date(),
         };
-        let item: Item | undefined;
-        if (counterClientVersion !== undefined) {
-          item = await storage.updateItemConditional(id, Number(counterClientVersion), counterNewData);
-          if (!item) return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
-        } else {
-          item = await storage.updateItem(id, counterNewData);
-          if (!item) return res.status(404).json({ message: "Item not found" });
-        }
+        const item = await storage.updateItemConditional(id, Number(counterClientVersion), counterNewData);
+        if (!item) return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
 
         await storage.createPriceOffer({
           itemId: id,
@@ -1563,13 +1589,24 @@ export async function registerRoutes(
         if (existingItem.sellerId !== userId) {
           return res.status(403).json({ message: "Only the seller can decline item pricing" });
         }
-        const item = await storage.updateItem(id, {
-          status: "returned",
+
+        const declineClientVersion = req.body?.version;
+        if (declineClientVersion === undefined || declineClientVersion === null) {
+          return res.status(400).json({ message: "Request version is required. Please refresh the page and try again." });
+        }
+        if (existingItem.version !== null && existingItem.version !== Number(declineClientVersion)) {
+          return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
+        }
+
+        const declineNewData = {
+          status: "returned" as const,
           priceApprovedBySeller: false,
           declineReason: reason.trim(),
+          version: (existingItem.version ?? 1) + 1,
           updatedAt: new Date(),
-        });
-        if (!item) return res.status(404).json({ message: "Item not found" });
+        };
+        const item = await storage.updateItemConditional(id, Number(declineClientVersion), declineNewData);
+        if (!item) return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
 
         if (item.reusseId) {
           await storage.createNotification({
@@ -1619,14 +1656,24 @@ export async function registerRoutes(
         // Accept the seller's proposed price range — use their maxPrice as the approved price
         const approvedPrice = existingItem.maxPrice || existingItem.minPrice || null;
 
-        const item = await storage.updateItem(id, {
-          status: "approved",
+        const acceptClientVersion = req.body?.version;
+        if (acceptClientVersion === undefined || acceptClientVersion === null) {
+          return res.status(400).json({ message: "Request version is required. Please refresh the page and try again." });
+        }
+        if (existingItem.version !== null && existingItem.version !== Number(acceptClientVersion)) {
+          return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
+        }
+
+        const acceptNewData = {
+          status: "approved" as const,
           priceApprovedBySeller: true,
           sellerCounterOffer: false,
           approvedPrice,
+          version: (existingItem.version ?? 1) + 1,
           updatedAt: new Date(),
-        });
-        if (!item) return res.status(404).json({ message: "Item not found" });
+        };
+        const item = await storage.updateItemConditional(id, Number(acceptClientVersion), acceptNewData);
+        if (!item) return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
 
         await storage.createPriceOffer({
           itemId: id,
@@ -1751,16 +1798,47 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Min price cannot be greater than max price" });
         }
 
-        const item = await storage.updateItem(id, {
-          status: "pending_approval",
+        const reviseClientVersion = req.body?.version;
+        if (reviseClientVersion === undefined || reviseClientVersion === null) {
+          return res.status(400).json({ message: "Request version is required. Please refresh the page and try again." });
+        }
+        if (existingItem.version !== null && existingItem.version !== Number(reviseClientVersion)) {
+          return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
+        }
+
+        const rEffectiveMin = parsedMin ?? (existingItem.minPrice ? parseFloat(existingItem.minPrice) : null);
+        const rEffectiveMax = parsedMax ?? (existingItem.maxPrice ? parseFloat(existingItem.maxPrice) : null);
+        if (rEffectiveMin !== null && rEffectiveMax !== null) {
+          const rRangeCovered = await storage.checkRangeCoveredByTiers(rEffectiveMin, rEffectiveMax);
+          if (!rRangeCovered) {
+            return res.status(400).json({
+              message: `The proposed price range €${rEffectiveMin}–€${rEffectiveMax} is not fully covered by active fee tiers. Please propose a range within configured fee tier ranges, or ask an admin to configure one.`,
+            });
+          }
+        } else {
+          const checkPrice = parsedMax ?? parsedMin;
+          if (checkPrice !== null) {
+            const rTier = await storage.getTierForPrice(checkPrice);
+            if (!rTier) {
+              return res.status(400).json({
+                message: `The proposed price €${checkPrice} is not covered by any active fee tier. Please propose a price within a configured fee tier range, or ask an admin to configure one.`,
+              });
+            }
+          }
+        }
+
+        const reviseNewData = {
+          status: "pending_approval" as const,
           minPrice: minPrice || existingItem.minPrice,
           maxPrice: maxPrice || existingItem.maxPrice,
           priceApprovedBySeller: false,
           sellerCounterOffer: false,
           approvedPrice: null,
+          version: (existingItem.version ?? 1) + 1,
           updatedAt: new Date(),
-        });
-        if (!item) return res.status(404).json({ message: "Item not found" });
+        };
+        const item = await storage.updateItemConditional(id, Number(reviseClientVersion), reviseNewData);
+        if (!item) return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
 
         await storage.createPriceOffer({
           itemId: id,

@@ -17,6 +17,7 @@ export function createMockStorage(
     acceptRequest: vi.fn().mockResolvedValue(undefined),
 
     getItem: vi.fn().mockResolvedValue(undefined),
+    getItemIncludingDeleted: vi.fn().mockResolvedValue(undefined),
     getItems: vi.fn().mockResolvedValue([]),
     getItemsByRequest: vi.fn().mockResolvedValue([]),
     createItem: vi.fn().mockResolvedValue({ id: 1 }),
@@ -102,6 +103,7 @@ export function createMockStorage(
     updateFeeTier: vi.fn().mockResolvedValue(undefined),
     deleteFeeTier: vi.fn().mockResolvedValue(undefined),
     getTierForPrice: vi.fn().mockResolvedValue(undefined),
+    checkRangeCoveredByTiers: vi.fn().mockResolvedValue(true),
     getUncoveredItems: vi.fn().mockResolvedValue([]),
     logTierChange: vi.fn().mockResolvedValue({ id: 1 }),
     getFeeTierChangelog: vi.fn().mockResolvedValue([]),

@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Request, Item, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, CheckCircle, XCircle, Tag, Loader2, ChevronDown, ChevronUp, CheckCheck } from "lucide-react";
+import { ArrowLeft, Package, Shirt, CheckCircle, XCircle, Tag, Loader2, ChevronDown, ChevronUp, CheckCheck, RefreshCw } from "lucide-react";
 import { ItemStatusBadge } from "@/components/item-status-badge";
 import { useState } from "react";
 
@@ -28,6 +28,22 @@ type PriceOffer = {
   action: string;
   createdAt: string;
 };
+
+function parseApiError(err: unknown): { status: number | null; message: string } {
+  if (err instanceof Error) {
+    const match = err.message.match(/^(\d+):\s*([\s\S]*)$/);
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[2]);
+        return { status: parseInt(match[1], 10), message: parsed.message || match[2] };
+      } catch {
+        return { status: parseInt(match[1], 10), message: match[2] };
+      }
+    }
+    return { status: null, message: err.message };
+  }
+  return { status: null, message: "An unexpected error occurred" };
+}
 
 function NegotiationHistorySummary({ itemId }: { itemId: number }) {
   const { data: history, isLoading } = useQuery<PriceOffer[]>({
@@ -64,7 +80,7 @@ interface ItemCardProps {
   item: Item;
   requestId: string;
   onApprove: (itemId: number, version: number) => void;
-  onDecline: (itemId: number) => void;
+  onDecline: (itemId: number, version: number) => void;
   onCounterOffer: (itemId: number, version: number) => void;
   isApproving: boolean;
   isDeclining: boolean;
@@ -167,7 +183,7 @@ function ItemReviewCard({ item, requestId, onApprove, onDecline, onCounterOffer,
                   size="sm"
                   variant="outline"
                   className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-                  onClick={() => onDecline(item.id)}
+                  onClick={() => onDecline(item.id, item.version ?? 1)}
                   disabled={isApproving || isDeclining}
                   data-testid={`button-decline-item-${item.id}`}
                 >
@@ -201,7 +217,8 @@ export default function SellerReviewPage() {
 
   const [showAcceptAllConfirm, setShowAcceptAllConfirm] = useState(false);
   const [showCounterOffer, setShowCounterOffer] = useState<{ itemId: number; version: number } | null>(null);
-  const [showDeclineDialog, setShowDeclineDialog] = useState<number | null>(null);
+  const [counterOfferError, setCounterOfferError] = useState<string | null>(null);
+  const [showDeclineDialog, setShowDeclineDialog] = useState<{ itemId: number; version: number } | null>(null);
   const [counterMin, setCounterMin] = useState("");
   const [counterMax, setCounterMax] = useState("");
   const [declineReason, setDeclineReason] = useState("");
@@ -211,73 +228,85 @@ export default function SellerReviewPage() {
   const otherItems = requestItems?.filter((i) => !["pending_approval", "approved"].includes(i.status)) ?? [];
 
   const approveItem = useMutation({
-    mutationFn: async ({ itemId, version }: { itemId: number; version: number }) => {
-      const res = await apiRequest("POST", `/api/items/${itemId}/approve`, { version });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Failed to accept item");
-      }
-      return res.json();
-    },
+    mutationFn: async ({ itemId, version }: { itemId: number; version: number }) =>
+      (await apiRequest("POST", `/api/items/${itemId}/approve`, { version })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
       toast({ title: "Item accepted" });
     },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message || "Failed to accept item", variant: "destructive" });
+    onError: (err: unknown) => {
+      const { status, message } = parseApiError(err);
+      if (status === 409) {
+        toast({ title: "Item changed", description: "This item was modified. Please refresh and try again.", variant: "destructive" });
+        queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      } else {
+        toast({ title: "Error", description: message || "Failed to accept item", variant: "destructive" });
+      }
     },
   });
 
   const counterOfferItem = useMutation({
-    mutationFn: async ({ itemId, version, minPrice, maxPrice }: { itemId: number; version: number; minPrice: string; maxPrice: string }) => {
-      const res = await apiRequest("POST", `/api/items/${itemId}/counter-offer`, { version, minPrice, maxPrice });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Failed to send counter-offer");
-      }
-      return res.json();
-    },
+    mutationFn: async ({ itemId, version, minPrice, maxPrice }: { itemId: number; version: number; minPrice: string; maxPrice: string }) =>
+      (await apiRequest("POST", `/api/items/${itemId}/counter-offer`, { version, minPrice, maxPrice })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
       setShowCounterOffer(null);
+      setCounterOfferError(null);
       setCounterMin("");
       setCounterMax("");
       toast({ title: "Counter-offer sent" });
     },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message || "Failed to send counter-offer", variant: "destructive" });
+    onError: (err: unknown) => {
+      const { status, message } = parseApiError(err);
+      if (status === 409) {
+        setShowCounterOffer(null);
+        setCounterOfferError(null);
+        toast({ title: "Item changed", description: "This item was modified. Please refresh and try again.", variant: "destructive" });
+        queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      } else {
+        setCounterOfferError(message || "Failed to send counter-offer");
+      }
     },
   });
 
   const declineItem = useMutation({
-    mutationFn: async ({ itemId, reason }: { itemId: number; reason: string }) => {
-      const res = await apiRequest("POST", `/api/items/${itemId}/decline`, { reason });
-      return res.json();
-    },
+    mutationFn: async ({ itemId, version, reason }: { itemId: number; version: number; reason: string }) =>
+      (await apiRequest("POST", `/api/items/${itemId}/decline`, { version, reason })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
       setShowDeclineDialog(null);
       setDeclineReason("");
       toast({ title: "Item rejected" });
     },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message || "Failed to reject item", variant: "destructive" });
+    onError: (err: unknown) => {
+      const { status, message } = parseApiError(err);
+      if (status === 409) {
+        setShowDeclineDialog(null);
+        toast({ title: "Item changed", description: "This item was modified. Please refresh and try again.", variant: "destructive" });
+        queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      } else {
+        toast({ title: "Error", description: message || "Failed to reject item", variant: "destructive" });
+      }
     },
   });
 
   const acceptAll = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/requests/${params.id}/items/accept-all`, {});
-      return res.json();
-    },
+    mutationFn: async () =>
+      (await apiRequest("POST", `/api/requests/${params.id}/items/accept-all`, {})).json(),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
       setShowAcceptAllConfirm(false);
       toast({ title: "All items accepted", description: `${data.accepted} item(s) have been approved.` });
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
+      const { status, message } = parseApiError(err);
       setShowAcceptAllConfirm(false);
-      toast({ title: "Error", description: err.message || "Failed to accept all items", variant: "destructive" });
+      if (status === 409) {
+        toast({ title: "Items changed", description: "Some items were modified. Please refresh and try again.", variant: "destructive" });
+        queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      } else {
+        toast({ title: "Error", description: message || "Failed to accept all items", variant: "destructive" });
+      }
     },
   });
 
@@ -384,8 +413,8 @@ export default function SellerReviewPage() {
                     item={item}
                     requestId={params.id}
                     onApprove={(id, version) => approveItem.mutate({ itemId: id, version })}
-                    onDecline={(id) => { setShowDeclineDialog(id); setDeclineReason(""); }}
-                    onCounterOffer={(id, version) => { setShowCounterOffer({ itemId: id, version }); setCounterMin(""); setCounterMax(""); }}
+                    onDecline={(id, version) => { setShowDeclineDialog({ itemId: id, version }); setDeclineReason(""); }}
+                    onCounterOffer={(id, version) => { setShowCounterOffer({ itemId: id, version }); setCounterOfferError(null); setCounterMin(""); setCounterMax(""); }}
                     isApproving={approveItem.isPending}
                     isDeclining={declineItem.isPending}
                   />
@@ -406,8 +435,8 @@ export default function SellerReviewPage() {
                     item={item}
                     requestId={params.id}
                     onApprove={(id, version) => approveItem.mutate({ itemId: id, version })}
-                    onDecline={(id) => { setShowDeclineDialog(id); setDeclineReason(""); }}
-                    onCounterOffer={(id, version) => { setShowCounterOffer({ itemId: id, version }); setCounterMin(""); setCounterMax(""); }}
+                    onDecline={(id, version) => { setShowDeclineDialog({ itemId: id, version }); setDeclineReason(""); }}
+                    onCounterOffer={(id, version) => { setShowCounterOffer({ itemId: id, version }); setCounterOfferError(null); setCounterMin(""); setCounterMax(""); }}
                     isApproving={approveItem.isPending}
                     isDeclining={declineItem.isPending}
                   />
@@ -428,8 +457,8 @@ export default function SellerReviewPage() {
                     item={item}
                     requestId={params.id}
                     onApprove={(id, version) => approveItem.mutate({ itemId: id, version })}
-                    onDecline={(id) => { setShowDeclineDialog(id); setDeclineReason(""); }}
-                    onCounterOffer={(id, version) => { setShowCounterOffer({ itemId: id, version }); setCounterMin(""); setCounterMax(""); }}
+                    onDecline={(id, version) => { setShowDeclineDialog({ itemId: id, version }); setDeclineReason(""); }}
+                    onCounterOffer={(id, version) => { setShowCounterOffer({ itemId: id, version }); setCounterOfferError(null); setCounterMin(""); setCounterMax(""); }}
                     isApproving={approveItem.isPending}
                     isDeclining={declineItem.isPending}
                   />
@@ -461,7 +490,17 @@ export default function SellerReviewPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={showCounterOffer !== null} onOpenChange={(open) => { if (!open) { setShowCounterOffer(null); setCounterMin(""); setCounterMax(""); } }}>
+      <Dialog
+        open={showCounterOffer !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowCounterOffer(null);
+            setCounterOfferError(null);
+            setCounterMin("");
+            setCounterMax("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Send Counter-Offer</DialogTitle>
@@ -474,7 +513,7 @@ export default function SellerReviewPage() {
                   type="number"
                   placeholder="0"
                   value={counterMin}
-                  onChange={(e) => setCounterMin(e.target.value)}
+                  onChange={(e) => { setCounterMin(e.target.value); setCounterOfferError(null); }}
                   data-testid="input-counter-min"
                 />
               </div>
@@ -484,13 +523,16 @@ export default function SellerReviewPage() {
                   type="number"
                   placeholder="0"
                   value={counterMax}
-                  onChange={(e) => setCounterMax(e.target.value)}
+                  onChange={(e) => { setCounterMax(e.target.value); setCounterOfferError(null); }}
                   data-testid="input-counter-max"
                 />
               </div>
             </div>
+            {counterOfferError && (
+              <p className="text-xs text-red-600 dark:text-red-400" data-testid="text-counter-offer-error">{counterOfferError}</p>
+            )}
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => { setShowCounterOffer(null); setCounterMin(""); setCounterMax(""); }} data-testid="button-counter-cancel">
+              <Button variant="outline" onClick={() => { setShowCounterOffer(null); setCounterOfferError(null); setCounterMin(""); setCounterMax(""); }} data-testid="button-counter-cancel">
                 Cancel
               </Button>
               <Button
@@ -511,7 +553,10 @@ export default function SellerReviewPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showDeclineDialog !== null} onOpenChange={(open) => { if (!open) { setShowDeclineDialog(null); setDeclineReason(""); } }}>
+      <Dialog
+        open={showDeclineDialog !== null}
+        onOpenChange={(open) => { if (!open) { setShowDeclineDialog(null); setDeclineReason(""); } }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reject Item</DialogTitle>
@@ -534,7 +579,7 @@ export default function SellerReviewPage() {
                 variant="destructive"
                 onClick={() => {
                   if (showDeclineDialog && declineReason.trim()) {
-                    declineItem.mutate({ itemId: showDeclineDialog, reason: declineReason });
+                    declineItem.mutate({ itemId: showDeclineDialog.itemId, version: showDeclineDialog.version, reason: declineReason });
                   }
                 }}
                 disabled={declineItem.isPending || !declineReason.trim()}

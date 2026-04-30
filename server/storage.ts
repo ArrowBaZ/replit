@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, or, desc, sql, ne, isNull, inArray, gte, lte, isNotNull } from "drizzle-orm";
+import { eq, and, or, desc, asc, sql, ne, isNull, inArray, gte, lte, isNotNull } from "drizzle-orm";
 import {
   users,
   profiles,
@@ -71,6 +71,7 @@ export interface IStorage {
   ): Promise<Request | undefined>;
 
   getItem(id: number): Promise<Item | undefined>;
+  getItemIncludingDeleted(id: number): Promise<Item | undefined>;
   getItems(userId: string, role: string): Promise<Item[]>;
   getItemsByRequest(requestId: number): Promise<Item[]>;
   createItem(data: InsertItem): Promise<Item>;
@@ -150,6 +151,7 @@ export interface IStorage {
   updateFeeTier(id: number, data: Partial<InsertFeeTier>): Promise<FeeTier | undefined>;
   deleteFeeTier(id: number): Promise<void>;
   getTierForPrice(price: number): Promise<FeeTier | undefined>;
+  checkRangeCoveredByTiers(minPrice: number, maxPrice: number): Promise<boolean>;
   getUncoveredItems(): Promise<Item[]>;
   logTierChange(data: { feeTierId: number | null; adminId: string; action: string; previousValues?: unknown; newValues?: unknown }): Promise<FeeTierChangelog>;
   getFeeTierChangelog(): Promise<any[]>;
@@ -253,6 +255,11 @@ export class DatabaseStorage implements IStorage {
     return item;
   }
 
+  async getItemIncludingDeleted(id: number): Promise<Item | undefined> {
+    const [item] = await db.select().from(items).where(eq(items.id, id));
+    return item;
+  }
+
   async getItems(userId: string, role: string): Promise<Item[]> {
     if (role === "reusse") {
       return db
@@ -277,7 +284,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async softDeleteItem(id: number): Promise<void> {
-    await db.update(items).set({ deletedAt: new Date() }).where(eq(items.id, id));
+    await db
+      .update(items)
+      .set({ deletedAt: new Date(), version: sql`${items.version} + 1` })
+      .where(eq(items.id, id));
   }
 
   async createItem(data: InsertItem): Promise<Item> {
@@ -304,14 +314,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async bulkApproveItemsTransaction(requestId: number, approverId: string): Promise<{ updatedItems: Item[] }> {
-    const pendingItems = await db
-      .select()
-      .from(items)
-      .where(and(eq(items.requestId, requestId), eq(items.status, "pending_approval"), isNull(items.deletedAt)));
-
-    if (pendingItems.length === 0) return { updatedItems: [] };
-
     const updatedItems = await db.transaction(async (tx) => {
+      const pendingItems = await tx
+        .select()
+        .from(items)
+        .where(and(eq(items.requestId, requestId), eq(items.status, "pending_approval"), isNull(items.deletedAt)));
+
+      if (pendingItems.length === 0) return [];
+
       const results: Item[] = [];
       for (const item of pendingItems) {
         const [updated] = await tx
@@ -325,17 +335,18 @@ export class DatabaseStorage implements IStorage {
           })
           .where(and(eq(items.id, item.id), eq(items.version, item.version ?? 1)))
           .returning();
-        if (updated) {
-          results.push(updated);
-          await tx.insert(itemPriceOffers).values({
-            itemId: item.id,
-            proposedByUserId: approverId,
-            proposedByRole: "seller",
-            minPrice: item.minPrice || null,
-            maxPrice: item.maxPrice || null,
-            action: "accepted",
-          });
+        if (!updated) {
+          throw new Error(`CONFLICT:item:${item.id}`);
         }
+        results.push(updated);
+        await tx.insert(itemPriceOffers).values({
+          itemId: item.id,
+          proposedByUserId: approverId,
+          proposedByRole: "seller",
+          minPrice: item.minPrice || null,
+          maxPrice: item.maxPrice || null,
+          action: "accepted",
+        });
       }
       return results;
     });
@@ -1088,6 +1099,29 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(feeTiers.minPrice))
       .limit(1);
     return tier;
+  }
+
+  async checkRangeCoveredByTiers(minPrice: number, maxPrice: number): Promise<boolean> {
+    const activeTiers = await db
+      .select()
+      .from(feeTiers)
+      .where(eq(feeTiers.isActive, true))
+      .orderBy(asc(feeTiers.minPrice));
+
+    if (activeTiers.length === 0) return false;
+
+    let covered = minPrice;
+    for (const tier of activeTiers) {
+      const tierMin = parseFloat(tier.minPrice);
+      const tierMax = tier.maxPrice !== null ? parseFloat(tier.maxPrice) : Infinity;
+
+      if (tierMin > maxPrice) break;
+      if (tierMax < minPrice) continue;
+      if (tierMin > covered) return false;
+      covered = Math.max(covered, tierMax);
+      if (covered >= maxPrice) return true;
+    }
+    return covered >= maxPrice;
   }
 
   async getUncoveredItems(): Promise<Item[]> {
