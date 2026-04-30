@@ -1,0 +1,119 @@
+
+# Seller-Reseller Price Negotiation Workflow
+
+## Problem Statement / Motivation
+
+Currently, when a reseller submits articles to a seller at proposed prices, the seller has no way to:
+- Accept articles at the proposed prices
+- Reject articles
+- Counter-propose alternative prices
+- Engage in multi-round price negotiation
+
+This blocks the article validation workflow and forces sellers into manual communication channels (email/chat), creating friction and incomplete request tracking. Articles submitted by resellers remain in a limbo state with no formal acceptance or renegotiation path.
+
+## Overview
+
+This feature adds a price negotiation interface where sellers can:
+- **View pending articles** submitted by resellers with proposed prices
+- **Accept articles** in bulk or individually at offered prices
+- **Counter-propose prices** on individual articles, initiating negotiation
+- **Track negotiation history** showing all offers and counter-offers
+- Resellers can then **accept or counter-propose** in response
+
+Articles transition through states: `pending → negotiating → accepted/rejected/finalized`
+
+## Proposed Solution
+
+1. **Seller Article Review Page**: A dedicated view showing all pending articles from active requests, grouped by reseller with price summaries
+2. **Item-Level Actions**: For each article, show current proposed price with action buttons:
+   - "Accept" — Confirm at current price
+   - "Counter-Offer" — Propose alternative price (opens modal with price input)
+   - "Reject" — Decline the article
+3. **Bulk Actions**: "Accept All" to confirm all articles in a request at once
+4. **Negotiation Timeline**: Show price history when an article is being negotiated (who proposed what price and when)
+5. **State Tracking**: Articles persist in the database with negotiation records for audit/history
+6. **Notifications**: Notify resellers when seller counters a price; notify seller when reseller responds
+
+## Technical Considerations
+
+- **Database schema changes**: Add `article_negotiations` table to track price history; add `status` field to articles (`pending`, `accepted`, `rejected`, `negotiating`)
+- **API endpoints**: 
+  - `POST /articles/:id/accept` — Seller accepts article at current price
+  - `POST /articles/:id/reject` — Seller rejects article
+  - `POST /articles/:id/counter-offer` — Seller proposes new price, creates negotiation record
+  - `GET /articles?status=pending` — Fetch pending articles for review
+  - `GET /articles/:id/negotiations` — Fetch negotiation history
+- **Real-time updates**: Consider WebSocket or polling for live negotiation state (both parties seeing offers in real-time)
+- **Price validation**: Ensure counter-proposed prices fall within tier constraints (respect the existing fee tier logic)
+
+## System-Wide Impact
+
+### Interaction graph
+- When seller accepts → reseller receives notification → they can upload final files
+- When seller counters → creates negotiation record → reseller can view and respond
+- Reseller response triggers another notification to seller
+
+### Error propagation
+- If price counter-offer violates fee tier constraints, return 400 with tier violation message; seller sees inline error
+
+### State lifecycle risks
+- **Risk**: Orphaned negotiations if an article is deleted while negotiating. **Mitigation**: Soft-delete articles, mark as `rejected`
+- **Risk**: Multiple simultaneous counter-offers from both sides race condition. **Mitigation**: Use optimistic locking or version field on article
+
+### API surface parity
+- Other parts of the app viewing articles will need to handle new `status` field; consider adding status badges/labels throughout UI
+
+## Success Metrics
+
+- Seller can accept/reject/renegotiate 100% of reseller-submitted articles without leaving the app
+- Negotiation flow supports 2+ rounds of counter-offers without errors
+- Article state correctly persists and is visible to both parties
+- Audit trail shows full negotiation history for compliance
+
+## Acceptance Criteria
+
+- [ ] Seller can view all pending articles in a dedicated page
+- [ ] Seller can accept articles individually or in bulk
+- [ ] Seller can propose counter-prices with reasoning (optional comment field)
+- [ ] Reseller receives notification when seller counters a price
+- [ ] Reseller can accept counter-offer or propose another price
+- [ ] Negotiation history is visible and shows all price proposals
+- [ ] Articles cannot move to accepted status if price violates tier constraints
+- [ ] All new states transition smoothly without orphaning data
+
+## Dependencies & Risks
+
+| Risk | Impact | Mitigation |
+|------|--------|-----------|
+| Race condition on simultaneous counter-offers | Data corruption, unclear state | Add version/timestamp field; last-write-wins or optimistic locking |
+| Seller/reseller both propose new price at same time | Ambiguous negotiation state | Queue offers, apply sequentially; notify party of conflict |
+| Fee tier constraint violations on counter-offer | Invalid final price accepted | Validate every counter-offer against fee tiers before persisting |
+| No pricing logic exists to auto-reject if prices don't meet min/max | Endless negotiation | Implement tier-aware validation + optional auto-reject if outside range |
+| Resellers don't see counter-offer notifications | Negotiation stalls silently | Ensure email/in-app notifications trigger on every counter-offer |
+
+## Tasks
+
+| ID | Title | Description | Acceptance Criteria | Priority | Passes | Notes |
+|----|----|-----|---|---|---|---|
+| T-001 | Design article negotiation data model | Create/update schema: `articles` add `status` field; create `price_negotiations` table with seller_id, reseller_id, proposed_price, proposed_at, response_price, responded_at | - Schema migration runs without errors\n- Existing articles migrate with `status = 'pending'`\n- price_negotiations table has all required fields | 1 | false | Use migrations framework |
+| T-002 | Add seller article review page | Build new page showing all pending articles grouped by reseller, displaying proposed price, current status, and action buttons | - Page loads and displays pending articles\n- Articles are grouped/organized logically\n- Page is responsive | 1 | false | Route: `/requests/:id/articles` |
+| T-003 | Implement "Accept Article" button & logic | Add backend endpoint `POST /articles/:id/accept` to mark article as accepted; add UI button; update article state | - Button accepts article\n- Article status changes to `accepted`\n- Reseller is notified | 2 | false | Use existing notification system |
+| T-004 | Implement "Reject Article" button & logic | Add backend endpoint `POST /articles/:id/reject` with optional reason field; add UI button | - Button rejects article\n- Article status changes to `rejected`\n- Rejection is logged | 2 | false | |
+| T-005 | Implement "Counter-Offer" modal & backend | Create modal form for seller to input new price; add `POST /articles/:id/counter-offer` endpoint; validate price against fee tiers | - Modal opens/closes correctly\n- Price input validated\n- Counter-offer persists to `price_negotiations`\n- Reseller notified | 1 | false | Validate using fee tier logic from tier config |
+| T-006 | Display negotiation history timeline | Show all price proposals/counter-offers on article detail view, with seller/reseller, price, timestamp | - Timeline displays correctly\n- All proposals shown in chronological order\n- Clear labeling of who proposed what | 2 | false | Consider using a timeline component |
+| T-007 | Implement "Accept All" bulk action | Add button to accept all articles in a request at once; update multiple articles in transaction | - Button visible on article list\n- Accepts all pending articles\n- All state updates atomic | 3 | false | Use transaction to ensure atomicity |
+| T-008 | Add reseller notification on counter-offer | When seller counters, notify reseller in-app and via email with proposed price and link to respond | - Notification fires on counter-offer\n- Includes price details\n- Reseller can click through to respond | 2 | false | Reuse notification service |
+| T-009 | Implement reseller counter-response | Allow reseller to accept seller's counter-offer or propose another price; add `POST /articles/:id/accept-counter` and `POST /articles/:id/counter-counter-offer` | - Reseller can accept counter\n- Reseller can propose new price\n- Seller is notified | 2 | false | |
+| T-010 | Add fee tier validation to all price proposals | Every price counter-offer must be validated against fee tier constraints before persisting | - Counter-offer validation runs\n- Invalid prices rejected with 400 + error message\n- Seller sees error inline | 1 | false | Tie into existing tier validation logic |
+| T-011 | Test multi-round negotiation flow | Create integration test: seller submits counter → reseller responds with counter → seller accepts → article marked as finalized | - Test covers 2+ rounds\n- Final state is correct\n- All notifications fired | 2 | false | Use test fixtures for requests/articles |
+| T-012 | Update article detail view to show negotiation status | Show clear status badge (pending, negotiating, accepted, rejected) on article cards and detail pages throughout the app | - Status badges render\n- Styling matches design system\n- All states covered | 3 | false | |
+| T-013 | Soft-delete articles instead of hard-delete | Ensure articles marked as deleted don't appear in seller/reseller views but are preserved for audit | - Articles with deleted_at are hidden\n- Historical negotiations remain queryable\n- No data loss | 3 | false | Add deleted_at timestamp field |
+| T-014 | Add optimistic locking to prevent race conditions | Add version field to articles; check version on updates to prevent simultaneous edits | - Version field added\n- Conflicting updates rejected with 409\n- Clear error message to user | 2 | false | |
+
+## Context
+
+From your memory: Sellzy uses a tiered fee structure (50/40/10 → 55/35/10 → 60/30/10 by price tier). Price proposals must respect these tier boundaries. This feature depends on the existing fee tier validation logic.
+
+## Sources
+
+- Related memory: [Sellzy Tiered Commission Structure](../../memory/project_fee_structure.md)
