@@ -326,6 +326,37 @@ function Lightbox({ photos, initialIndex, onClose }: LightboxProps) {
             Drag to pan · Double-click or scroll down to zoom out
           </p>
         )}
+
+        {hasMultiple && (
+          <div className="flex items-center justify-center gap-2 mt-3 flex-wrap" data-testid="lightbox-thumbnail-strip">
+            {photos.map((photo, index) => (
+              <button
+                key={photo.url}
+                onClick={() => {
+                  if (index !== currentIndex) {
+                    resetZoom();
+                    setCurrentIndex(index);
+                  }
+                }}
+                className={`relative flex-shrink-0 w-12 h-12 rounded overflow-hidden border-2 transition-all focus:outline-none ${
+                  index === currentIndex
+                    ? "border-white opacity-100 scale-110 shadow-lg"
+                    : "border-white/30 opacity-50 hover:opacity-80 hover:border-white/60"
+                }`}
+                title={photo.fileName}
+                aria-label={`Go to photo ${index + 1}: ${photo.fileName}`}
+                data-testid={`lightbox-thumbnail-${index}`}
+              >
+                <img
+                  src={photo.url}
+                  alt={photo.fileName}
+                  className="w-full h-full object-cover"
+                  draggable={false}
+                />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
