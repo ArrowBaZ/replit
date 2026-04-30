@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Request, Item, Meeting, Profile } from "@shared/schema";
 import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag, FileText, FileSignature, Lock, History, ChevronDown, ChevronUp } from "lucide-react";
 import { ItemDocumentsSection } from "@/components/item-documents-section";
+import { ItemStatusBadge } from "@/components/item-status-badge";
 import { ITEM_CATEGORIES, type ItemCategory } from "@shared/schema";
 import type { FeeTier } from "@shared/schema";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
@@ -1110,16 +1111,26 @@ export default function RequestDetailPage() {
 
           {isSeller && request.listReadyAt && !requestAgreement && requestItems && requestItems.some((i) => i.status === "pending_approval") && (
             <Card className="border-2 border-blue-300 dark:border-blue-700" data-testid="card-review-prices">
-              <CardContent className="p-4 flex items-start gap-3">
-                <div className="h-9 w-9 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-                  <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <CardContent className="p-4 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="h-9 w-9 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                    <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">Review Item Prices</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      The reseller has finalized the item list. Please review each item's proposed price range and accept, counter-offer, or decline.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold">Review Item Prices</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    The reseller has finalized the item list. Please review each item's proposed price range below and accept, counter-offer, or decline.
-                  </p>
-                </div>
+                <Button
+                  size="sm"
+                  className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => setLocation(`/requests/${params.id}/review`)}
+                  data-testid="button-review-items"
+                >
+                  Review Items
+                </Button>
               </CardContent>
             </Card>
           )}
@@ -1411,9 +1422,11 @@ export default function RequestDetailPage() {
                         )}
                       </div>
                     </div>
-                    <Badge variant="secondary" className={itemStatusColors[item.status] || ""}>
-                      {translateStatus(item.status)}
-                    </Badge>
+                    <ItemStatusBadge
+                      status={item.status}
+                      isNegotiating={item.sellerCounterOffer ?? false}
+                      testId={`badge-item-status-${item.id}`}
+                    />
                   </div>
 
                   {item.sellerCounterOffer && item.status === "pending_approval" && isReusse && (

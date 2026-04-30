@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Item, Profile } from "@shared/schema";
 import { Shirt, Search, Filter, Tag } from "lucide-react";
 import { useState, useMemo } from "react";
+import { ItemStatusBadge } from "@/components/item-status-badge";
 
 const itemStatusColors: Record<string, string> = {
   pending_approval: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
@@ -191,9 +192,11 @@ export default function ItemsListPage() {
                       )}
                     </div>
                   </div>
-                  <Badge variant="secondary" className={`shrink-0 ${itemStatusColors[item.status] || ""}`}>
-                    {translateStatus(item.status)}
-                  </Badge>
+                  <ItemStatusBadge
+                    status={item.status}
+                    isNegotiating={item.sellerCounterOffer ?? false}
+                    testId={`badge-item-status-${item.id}`}
+                  />
                 </div>
               </CardContent>
             </Card>

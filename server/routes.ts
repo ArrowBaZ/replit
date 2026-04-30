@@ -550,12 +550,108 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
+        const userId = req.user.claims.sub;
         const id = parseInt(req.params.id);
+        const request = await storage.getRequest(id);
+        if (!request) return res.status(404).json({ message: "Request not found" });
+        const profile = await storage.getProfile(userId);
+        const isAdmin = profile?.role === "admin";
+        const isParty = request.sellerId === userId || request.reusseId === userId;
+        if (!isAdmin && !isParty) {
+          return res.status(403).json({ message: "Not authorized to view items for this request" });
+        }
         const result = await storage.getItemsByRequest(id);
         res.json(result);
       } catch (error) {
         console.error("Error fetching items:", error);
         res.status(500).json({ message: "Failed to fetch items" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/requests/:id/items/accept-all",
+    isAuthenticated,
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const requestId = parseInt(req.params.id);
+
+        const profile = await storage.getProfile(userId);
+        if (!profile || profile.role !== "seller") {
+          return res.status(403).json({ message: "Only sellers can bulk-accept items" });
+        }
+
+        const request = await storage.getRequest(requestId);
+        if (!request) return res.status(404).json({ message: "Request not found" });
+        if (request.sellerId !== userId) {
+          return res.status(403).json({ message: "Not authorized for this request" });
+        }
+
+        const { updatedItems: updated } = await storage.bulkApproveItemsTransaction(requestId, userId);
+
+        if (updated.length === 0) {
+          return res.status(400).json({ message: "No pending items to accept" });
+        }
+
+        if (request.reusseId) {
+          await storage.createNotification({
+            userId: request.reusseId,
+            type: "items_bulk_approved",
+            title: "All Items Approved",
+            message: `The seller approved all ${updated.length} pending item(s) for request #${requestId}.`,
+            link: `/requests/${requestId}`,
+          });
+          broadcastToUser(request.reusseId, {
+            type: "items_bulk_approved",
+            requestId,
+            count: updated.length,
+          });
+        }
+
+        if (request.listReadyAt && request.reusseId) {
+          const existingAgreement = await storage.getAgreementByRequest(requestId);
+          if (!existingAgreement) {
+            const allItems = await storage.getItemsByRequest(requestId);
+            const allApproved = allItems.length > 0 && allItems.every((i) => i.status === "approved");
+            if (allApproved) {
+              const { itemsSnapshot, feeBreakdown, totalValue } = await buildAgreementSnapshot(allItems);
+              const agreement = await storage.createAgreement({
+                requestId,
+                sellerId: request.sellerId,
+                reusseId: request.reusseId,
+                status: "pending",
+                itemCount: allItems.length,
+                totalValue,
+                itemsSnapshot,
+                feeBreakdown,
+              });
+              await storage.createNotification({
+                userId: request.sellerId,
+                type: "agreement_ready",
+                title: "Agreement Ready to Sign",
+                message: `An agreement for request #${requestId} is ready for your signature.`,
+                link: `/agreements/${agreement.id}`,
+              });
+              await storage.createNotification({
+                userId: request.reusseId,
+                type: "agreement_ready",
+                title: "Agreement Ready to Sign",
+                message: `An agreement for request #${requestId} is ready for your signature.`,
+                link: `/agreements/${agreement.id}`,
+              });
+              broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId });
+              broadcastToUser(request.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId });
+              await notifyAgreementByEmail(request.sellerId, request.reusseId, requestId, agreement.id);
+            }
+          }
+        }
+
+        res.json({ accepted: updated.length, items: updated });
+      } catch (error) {
+        console.error("Error bulk-accepting items:", error);
+        res.status(500).json({ message: "Failed to bulk-accept items" });
       }
     },
   );
@@ -1238,6 +1334,12 @@ export async function registerRoutes(
             .json({ message: "Only the seller can approve item pricing" });
         }
 
+        // Optimistic locking: if client sends a version, ensure it matches
+        const clientVersion = req.body?.version;
+        if (clientVersion !== undefined && existingItem.version !== null && existingItem.version !== Number(clientVersion)) {
+          return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
+        }
+
         // Require list to be finalized before seller can approve
         if (existingItem.requestId) {
           const parentReq = await storage.getRequest(existingItem.requestId);
@@ -1246,13 +1348,21 @@ export async function registerRoutes(
           }
         }
 
-        const item = await storage.updateItem(id, {
-          status: "approved",
+        const newData = {
+          status: "approved" as const,
           priceApprovedBySeller: true,
           approvedPrice: req.body?.approvedPrice || null,
+          version: (existingItem.version ?? 1) + 1,
           updatedAt: new Date(),
-        });
-        if (!item) return res.status(404).json({ message: "Item not found" });
+        };
+        let item: Item | undefined;
+        if (clientVersion !== undefined) {
+          item = await storage.updateItemConditional(id, Number(clientVersion), newData);
+          if (!item) return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
+        } else {
+          item = await storage.updateItem(id, newData);
+          if (!item) return res.status(404).json({ message: "Item not found" });
+        }
 
         await storage.createPriceOffer({
           itemId: id,
@@ -1349,6 +1459,12 @@ export async function registerRoutes(
             .json({ message: "Only the seller can counter-offer" });
         }
 
+        // Optimistic locking: if client sends a version, ensure it matches
+        const counterClientVersion = req.body?.version;
+        if (counterClientVersion !== undefined && existingItem.version !== null && existingItem.version !== Number(counterClientVersion)) {
+          return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
+        }
+
         // Require list to be finalized before seller can counter-offer
         if (existingItem.requestId) {
           const parentReq = await storage.getRequest(existingItem.requestId);
@@ -1376,15 +1492,23 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Min price cannot be greater than max price" });
         }
 
-        const item = await storage.updateItem(id, {
-          status: "pending_approval",
+        const counterNewData = {
+          status: "pending_approval" as const,
           minPrice: minPrice || null,
           maxPrice: maxPrice || null,
           priceApprovedBySeller: false,
           sellerCounterOffer: true,
+          version: (existingItem.version ?? 1) + 1,
           updatedAt: new Date(),
-        });
-        if (!item) return res.status(404).json({ message: "Item not found" });
+        };
+        let item: Item | undefined;
+        if (counterClientVersion !== undefined) {
+          item = await storage.updateItemConditional(id, Number(counterClientVersion), counterNewData);
+          if (!item) return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
+        } else {
+          item = await storage.updateItem(id, counterNewData);
+          if (!item) return res.status(404).json({ message: "Item not found" });
+        }
 
         await storage.createPriceOffer({
           itemId: id,

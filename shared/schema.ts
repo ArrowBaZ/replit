@@ -101,6 +101,8 @@ export const items = pgTable("items", {
   sellerCounterOffer: boolean("seller_counter_offer").default(false),
   declineReason: text("decline_reason"),
   status: varchar("status", { length: 20 }).notNull().default("pending_approval"),
+  version: integer("version").notNull().default(1),
+  deletedAt: timestamp("deleted_at"),
   listedAt: timestamp("listed_at"),
   soldAt: timestamp("sold_at"),
   salePrice: numeric("sale_price"),

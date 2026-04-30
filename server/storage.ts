@@ -75,6 +75,9 @@ export interface IStorage {
   getItemsByRequest(requestId: number): Promise<Item[]>;
   createItem(data: InsertItem): Promise<Item>;
   updateItem(id: number, data: Partial<Item>): Promise<Item | undefined>;
+  updateItemConditional(id: number, expectedVersion: number, data: Partial<Item>): Promise<Item | undefined>;
+  softDeleteItem(id: number): Promise<void>;
+  bulkApproveItemsTransaction(requestId: number, approverId: string): Promise<{ updatedItems: Item[] }>;
 
   getMeetings(userId: string): Promise<Meeting[]>;
   getMeetingsByRequest(requestId: number): Promise<Meeting[]>;
@@ -246,7 +249,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getItem(id: number): Promise<Item | undefined> {
-    const [item] = await db.select().from(items).where(eq(items.id, id));
+    const [item] = await db.select().from(items).where(and(eq(items.id, id), isNull(items.deletedAt)));
     return item;
   }
 
@@ -255,13 +258,13 @@ export class DatabaseStorage implements IStorage {
       return db
         .select()
         .from(items)
-        .where(eq(items.reusseId, userId))
+        .where(and(eq(items.reusseId, userId), isNull(items.deletedAt)))
         .orderBy(desc(items.createdAt));
     }
     return db
       .select()
       .from(items)
-      .where(eq(items.sellerId, userId))
+      .where(and(eq(items.sellerId, userId), isNull(items.deletedAt)))
       .orderBy(desc(items.createdAt));
   }
 
@@ -269,8 +272,12 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(items)
-      .where(eq(items.requestId, requestId))
+      .where(and(eq(items.requestId, requestId), isNull(items.deletedAt)))
       .orderBy(desc(items.createdAt));
+  }
+
+  async softDeleteItem(id: number): Promise<void> {
+    await db.update(items).set({ deletedAt: new Date() }).where(eq(items.id, id));
   }
 
   async createItem(data: InsertItem): Promise<Item> {
@@ -285,6 +292,55 @@ export class DatabaseStorage implements IStorage {
       .where(eq(items.id, id))
       .returning();
     return item;
+  }
+
+  async updateItemConditional(id: number, expectedVersion: number, data: Partial<Item>): Promise<Item | undefined> {
+    const [item] = await db
+      .update(items)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(items.id, id), eq(items.version, expectedVersion)))
+      .returning();
+    return item;
+  }
+
+  async bulkApproveItemsTransaction(requestId: number, approverId: string): Promise<{ updatedItems: Item[] }> {
+    const pendingItems = await db
+      .select()
+      .from(items)
+      .where(and(eq(items.requestId, requestId), eq(items.status, "pending_approval"), isNull(items.deletedAt)));
+
+    if (pendingItems.length === 0) return { updatedItems: [] };
+
+    const updatedItems = await db.transaction(async (tx) => {
+      const results: Item[] = [];
+      for (const item of pendingItems) {
+        const [updated] = await tx
+          .update(items)
+          .set({
+            status: "approved",
+            priceApprovedBySeller: true,
+            approvedPrice: item.maxPrice || item.minPrice || null,
+            version: (item.version ?? 1) + 1,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(items.id, item.id), eq(items.version, item.version ?? 1)))
+          .returning();
+        if (updated) {
+          results.push(updated);
+          await tx.insert(itemPriceOffers).values({
+            itemId: item.id,
+            proposedByUserId: approverId,
+            proposedByRole: "seller",
+            minPrice: item.minPrice || null,
+            maxPrice: item.maxPrice || null,
+            action: "accepted",
+          });
+        }
+      }
+      return results;
+    });
+
+    return { updatedItems };
   }
 
   async getMeetings(userId: string): Promise<Meeting[]> {
@@ -683,12 +739,12 @@ export class DatabaseStorage implements IStorage {
     const [soldItems] = await db
       .select({ count: sql<number>`count(*)` })
       .from(items)
-      .where(and(eq(itemCol, userId), eq(items.status, "sold")));
+      .where(and(eq(itemCol, userId), eq(items.status, "sold"), isNull(items.deletedAt)));
 
     const [soldThisMonth] = await db
       .select({ count: sql<number>`count(*)` })
       .from(items)
-      .where(and(eq(itemCol, userId), eq(items.status, "sold"), gte(items.soldAt!, firstOfMonth)));
+      .where(and(eq(itemCol, userId), eq(items.status, "sold"), gte(items.soldAt!, firstOfMonth), isNull(items.deletedAt)));
 
     const msgCol = role === "reusse" ? messages.senderId : messages.senderId;
     const [msgsThisMonth] = await db
@@ -729,7 +785,7 @@ export class DatabaseStorage implements IStorage {
       const [soldRow] = await db
         .select({ count: sql<number>`count(*)` })
         .from(items)
-        .where(and(eq(items.reusseId, r.profile.userId), eq(items.status, "sold")));
+        .where(and(eq(items.reusseId, r.profile.userId), eq(items.status, "sold"), isNull(items.deletedAt)));
       return {
         userId: r.profile.userId,
         firstName: r.user?.firstName,
@@ -773,7 +829,7 @@ export class DatabaseStorage implements IStorage {
     const [soldRow] = await db
       .select({ count: sql<number>`count(*)` })
       .from(items)
-      .where(and(eq(items.reusseId, reusseId), eq(items.status, "sold")));
+      .where(and(eq(items.reusseId, reusseId), eq(items.status, "sold"), isNull(items.deletedAt)));
     return {
       userId: row.profile.userId,
       firstName: row.user?.firstName,
@@ -858,7 +914,7 @@ export class DatabaseStorage implements IStorage {
         request: requests,
       })
       .from(itemDocuments)
-      .innerJoin(items, eq(items.id, itemDocuments.itemId))
+      .innerJoin(items, and(eq(items.id, itemDocuments.itemId), isNull(items.deletedAt)))
       .leftJoin(requests, eq(requests.id, items.requestId))
       .where(eq(itemDocuments.uploaderUserId, userId))
       .orderBy(desc(itemDocuments.createdAt));
@@ -1041,6 +1097,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           isNotNull(items.approvedPrice),
+          isNull(items.deletedAt),
           sql`NOT EXISTS (
             SELECT 1 FROM fee_tiers
             WHERE fee_tiers.is_active = true

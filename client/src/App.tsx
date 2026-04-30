@@ -34,6 +34,7 @@ import TermsPage from "@/pages/terms";
 import PrivacyPage from "@/pages/privacy";
 import AdminFeeTiersPage from "@/pages/admin-fee-tiers";
 import FeeStructurePage from "@/pages/fee-structure";
+import SellerReviewPage from "@/pages/seller-review";
 import { Loader2 } from "lucide-react";
 
 function DashboardRoute() {
@@ -63,6 +64,7 @@ function AuthenticatedRouter() {
     <Switch>
       <Route path="/dashboard" component={DashboardRoute} />
       <Route path="/requests/new" component={CreateRequestPage} />
+      <Route path="/requests/:id/review" component={SellerReviewPage} />
       <Route path="/requests/:id" component={RequestDetailPage} />
       <Route path="/requests" component={RequestsListPage} />
       <Route path="/available" component={RequestsListPage} />
