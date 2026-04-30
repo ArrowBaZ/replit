@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Profile } from "@shared/schema";
 import { User, MapPin, Phone, Mail, Pencil, Save, Bell } from "lucide-react";
 
-const PREF_KEYS = ["toast_agreement_ready", "toast_document_request", "toast_counter_offer", "toast_price_revised"] as const;
+const PREF_KEYS = ["toast_agreement_ready", "toast_document_request", "toast_counter_offer", "toast_price_revised", "toast_meeting_update", "toast_item_pricing"] as const;
 type PrefKey = typeof PREF_KEYS[number];
 
 function getPref(prefs: Record<string, boolean> | null | undefined, key: PrefKey): boolean {
@@ -119,6 +119,16 @@ export default function ProfilePage() {
       key: "toast_price_revised",
       label: t("notifPrefPriceRevised"),
       desc: t("notifPrefPriceRevisedDesc"),
+    },
+    {
+      key: "toast_meeting_update",
+      label: t("notifPrefMeetingUpdate"),
+      desc: t("notifPrefMeetingUpdateDesc"),
+    },
+    {
+      key: "toast_item_pricing",
+      label: t("notifPrefItemPricing"),
+      desc: t("notifPrefItemPricingDesc"),
     },
   ];
 

@@ -803,6 +803,7 @@ export async function registerRoutes(
             message: `A meeting scheduled for ${meeting.scheduledDate ? new Date(meeting.scheduledDate).toLocaleDateString("fr-FR") : "unknown date"} has been cancelled.`,
             link: `/requests/${request.id}`,
           });
+          broadcastToUser(notifyUserId, { type: "meeting_cancelled", requestId: request.id });
         }
         res.json(updated);
       } catch (error) {
@@ -855,6 +856,7 @@ export async function registerRoutes(
             message: `A meeting has been rescheduled to ${new Date(scheduledDate).toLocaleDateString("fr-FR")}.`,
             link: `/requests/${request.id}`,
           });
+          broadcastToUser(notifyUserId, { type: "meeting_rescheduled", requestId: request.id, scheduledDate });
         }
         res.json(updated);
       } catch (error) {
@@ -1269,6 +1271,7 @@ export async function registerRoutes(
             message: `Seller approved pricing for "${item.title}".`,
             link: `/requests/${item.requestId}`,
           });
+          broadcastToUser(item.reusseId, { type: "item_approved", itemId: item.id, itemTitle: item.title, requestId: item.requestId });
         }
 
         if (item.requestId && item.reusseId) {
@@ -1431,6 +1434,11 @@ export async function registerRoutes(
             .status(400)
             .json({ message: "A decline reason is required" });
         }
+        const existingItem = await storage.getItem(id);
+        if (!existingItem) return res.status(404).json({ message: "Item not found" });
+        if (existingItem.sellerId !== userId) {
+          return res.status(403).json({ message: "Only the seller can decline item pricing" });
+        }
         const item = await storage.updateItem(id, {
           status: "returned",
           priceApprovedBySeller: false,
@@ -1447,6 +1455,7 @@ export async function registerRoutes(
             message: `Le vendeur a refusé "${item.title}". Raison : ${reason.trim()}`,
             link: `/requests/${item.requestId}`,
           });
+          broadcastToUser(item.reusseId, { type: "item_declined", itemId: item.id, itemTitle: item.title, requestId: item.requestId });
         }
         res.json(item);
       } catch (error) {
@@ -1512,6 +1521,7 @@ export async function registerRoutes(
             message: `The reseller accepted your proposed price for "${existingItem.title}".`,
             link: `/requests/${existingItem.requestId}`,
           });
+          broadcastToUser(existingItem.sellerId, { type: "item_approved", itemId: id, itemTitle: existingItem.title, requestId: existingItem.requestId });
         }
 
         // Trigger agreement generation if all items are now approved

@@ -163,6 +163,8 @@ export const NOTIF_PREF_KEYS = [
   "toast_document_request",
   "toast_counter_offer",
   "toast_price_revised",
+  "toast_meeting_update",
+  "toast_item_pricing",
 ] as const;
 
 export type NotifPrefKey = (typeof NOTIF_PREF_KEYS)[number];

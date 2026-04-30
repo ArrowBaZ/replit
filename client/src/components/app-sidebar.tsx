@@ -107,7 +107,12 @@ function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?:
           data.type === "document_request" ||
           data.type === "new_document" ||
           data.type === "new_notification" ||
-          data.type === "agreement_ready"
+          data.type === "agreement_ready" ||
+          data.type === "meeting_cancelled" ||
+          data.type === "meeting_rescheduled" ||
+          data.type === "item_approved" ||
+          data.type === "item_declined" ||
+          data.type === "counter_offer_accepted"
         ) {
           queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
         }
@@ -167,6 +172,64 @@ function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?:
                 altText="Go to request"
                 onClick={() => navigate(`/requests/${data.requestId}`)}
                 data-testid="toast-link-price-revised"
+              >
+                {t("toastViewItem")}
+              </ToastAction>
+            ) : undefined,
+          });
+        }
+        if (data.type === "meeting_cancelled" && toastAllowed(notifPrefs, "toast_meeting_update")) {
+          toast({
+            title: t("toastMeetingCancelled"),
+            action: data.requestId ? (
+              <ToastAction
+                altText="Go to request"
+                onClick={() => navigate(`/requests/${data.requestId}`)}
+                data-testid="toast-link-meeting-cancelled"
+              >
+                {t("toastViewItem")}
+              </ToastAction>
+            ) : undefined,
+          });
+        }
+        if (data.type === "meeting_rescheduled" && toastAllowed(notifPrefs, "toast_meeting_update")) {
+          toast({
+            title: t("toastMeetingRescheduled"),
+            action: data.requestId ? (
+              <ToastAction
+                altText="Go to request"
+                onClick={() => navigate(`/requests/${data.requestId}`)}
+                data-testid="toast-link-meeting-rescheduled"
+              >
+                {t("toastViewItem")}
+              </ToastAction>
+            ) : undefined,
+          });
+        }
+        if (data.type === "item_approved" && data.itemTitle && toastAllowed(notifPrefs, "toast_item_pricing")) {
+          toast({
+            title: t("toastItemApproved"),
+            description: data.itemTitle,
+            action: data.requestId ? (
+              <ToastAction
+                altText="Go to request"
+                onClick={() => navigate(`/requests/${data.requestId}`)}
+                data-testid="toast-link-item-approved"
+              >
+                {t("toastViewItem")}
+              </ToastAction>
+            ) : undefined,
+          });
+        }
+        if (data.type === "item_declined" && data.itemTitle && toastAllowed(notifPrefs, "toast_item_pricing")) {
+          toast({
+            title: t("toastItemDeclined"),
+            description: data.itemTitle,
+            action: data.requestId ? (
+              <ToastAction
+                altText="Go to request"
+                onClick={() => navigate(`/requests/${data.requestId}`)}
+                data-testid="toast-link-item-declined"
               >
                 {t("toastViewItem")}
               </ToastAction>
