@@ -3,7 +3,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,9 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Request, Item, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, CheckCircle, XCircle, Tag, Loader2, ChevronDown, ChevronUp, CheckCheck, RefreshCw } from "lucide-react";
+import { ArrowLeft, Package, Shirt, CheckCircle, XCircle, Tag, Loader2, ChevronDown, ChevronUp, CheckCheck, AlertCircle } from "lucide-react";
 import { ItemStatusBadge } from "@/components/item-status-badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 type PriceOffer = {
   id: number;
@@ -45,34 +45,60 @@ function parseApiError(err: unknown): { status: number | null; message: string }
   return { status: null, message: "An unexpected error occurred" };
 }
 
-function NegotiationHistorySummary({ itemId }: { itemId: number }) {
-  const { data: history, isLoading } = useQuery<PriceOffer[]>({
+const ACTION_LABEL: Record<string, string> = {
+  initial: "Initial Price",
+  counter_offer: "Counter-offer",
+  revision: "Revised Price",
+  accepted: "Accepted",
+};
+
+const ACTION_COLORS: Record<string, string> = {
+  initial: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  counter_offer: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  revision: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  accepted: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+};
+
+function NegotiationHistory({ itemId }: { itemId: number }) {
+  const { data: history, isLoading, isError } = useQuery<PriceOffer[]>({
     queryKey: [`/api/items/${itemId}/price-history`],
     retry: 1,
   });
 
-  if (isLoading) return <span className="text-xs text-muted-foreground">Loading...</span>;
-  if (!history || history.length === 0) return <span className="text-xs text-muted-foreground">No history</span>;
-
-  const latest = history[history.length - 1];
-  const actionLabel: Record<string, string> = {
-    initial: "Initial offer",
-    counter_offer: "Counter-offer",
-    revision: "Revised",
-    accepted: "Accepted",
-  };
+  if (isLoading) return <div className="text-xs text-muted-foreground py-1">Loading history...</div>;
+  if (isError) return <p className="text-xs text-red-500 py-1">Could not load negotiation history.</p>;
+  if (!history || history.length === 0) return <p className="text-xs text-muted-foreground py-1">No price history recorded yet.</p>;
 
   return (
-    <span className="text-xs text-muted-foreground">
-      {history.length} event{history.length !== 1 ? "s" : ""} — last: {actionLabel[latest.action] || latest.action}
-      {(latest.minPrice || latest.maxPrice) && (
-        <> ({latest.minPrice && latest.maxPrice
-          ? `${parseFloat(latest.minPrice).toFixed(0)} – ${parseFloat(latest.maxPrice).toFixed(0)} EUR`
-          : latest.minPrice
-          ? `min ${parseFloat(latest.minPrice).toFixed(0)} EUR`
-          : `max ${parseFloat(latest.maxPrice!).toFixed(0)} EUR`})</>
-      )}
-    </span>
+    <div className="space-y-1.5" data-testid={`negotiation-history-${itemId}`}>
+      {history.map((offer, idx) => (
+        <div key={offer.id} className="flex items-start gap-2 text-xs">
+          <div className="flex flex-col items-center shrink-0 pt-0.5">
+            <div className={`h-2 w-2 rounded-full mt-1 ${offer.action === "accepted" ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+            {idx < history.length - 1 && <div className="w-px flex-1 bg-muted-foreground/20 mt-0.5 h-4" />}
+          </div>
+          <div className="flex-1 min-w-0 pb-1">
+            <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+              <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${ACTION_COLORS[offer.action] || "bg-muted text-muted-foreground"}`}>
+                {ACTION_LABEL[offer.action] || offer.action}
+              </span>
+              <span className="text-muted-foreground truncate max-w-[120px]">{offer.proposedByName}</span>
+              <span className="text-muted-foreground/60">·</span>
+              <span className="text-muted-foreground">{new Date(offer.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+            {(offer.minPrice || offer.maxPrice) && (
+              <p className="text-muted-foreground" data-testid={`history-price-${offer.id}`}>
+                {offer.minPrice && offer.maxPrice
+                  ? `${parseFloat(offer.minPrice).toFixed(0)} – ${parseFloat(offer.maxPrice).toFixed(0)} EUR`
+                  : offer.minPrice
+                  ? `min ${parseFloat(offer.minPrice).toFixed(0)} EUR`
+                  : `max ${parseFloat(offer.maxPrice!).toFixed(0)} EUR`}
+              </p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -87,7 +113,13 @@ interface ItemCardProps {
 }
 
 function ItemReviewCard({ item, requestId, onApprove, onDecline, onCounterOffer, isApproving, isDeclining }: ItemCardProps) {
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(item.sellerCounterOffer ?? false);
+
+  useEffect(() => {
+    if (item.sellerCounterOffer) {
+      setShowHistory(true);
+    }
+  }, [item.sellerCounterOffer]);
 
   return (
     <Card data-testid={`card-review-item-${item.id}`}>
@@ -146,8 +178,8 @@ function ItemReviewCard({ item, requestId, onApprove, onDecline, onCounterOffer,
             </button>
 
             {showHistory && (
-              <div className="mb-3 pl-2 border-l-2 border-muted">
-                <NegotiationHistorySummary itemId={item.id} />
+              <div className="mb-3 pl-3 border-l-2 border-muted">
+                <NegotiationHistory itemId={item.id} />
               </div>
             )}
 
@@ -248,8 +280,9 @@ export default function SellerReviewPage() {
   const counterOfferItem = useMutation({
     mutationFn: async ({ itemId, version, minPrice, maxPrice }: { itemId: number; version: number; minPrice: string; maxPrice: string }) =>
       (await apiRequest("POST", `/api/items/${itemId}/counter-offer`, { version, minPrice, maxPrice })).json(),
-    onSuccess: () => {
+    onSuccess: (_data, { itemId }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/items/${itemId}/price-history`] });
       setShowCounterOffer(null);
       setCounterOfferError(null);
       setCounterMin("");
@@ -343,6 +376,10 @@ export default function SellerReviewPage() {
     express: "Express",
     sos_dressing: "SOS Dressing",
   };
+
+  const dialogItem = showCounterOffer
+    ? requestItems?.find((i) => i.id === showCounterOffer.itemId) ?? null
+    : null;
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
@@ -501,36 +538,69 @@ export default function SellerReviewPage() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Send Counter-Offer</DialogTitle>
+            {dialogItem && (
+              <p className="text-sm text-muted-foreground mt-0.5">{dialogItem.title}</p>
+            )}
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Min Price (EUR)</Label>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={counterMin}
-                  onChange={(e) => { setCounterMin(e.target.value); setCounterOfferError(null); }}
-                  data-testid="input-counter-min"
-                />
+            {dialogItem && (dialogItem.minPrice || dialogItem.maxPrice) && (
+              <div className="rounded-md bg-muted/50 border px-3 py-2">
+                <p className="text-xs text-muted-foreground mb-0.5">Current proposed price</p>
+                <p className="text-sm font-medium text-[hsl(var(--success))]">
+                  {dialogItem.minPrice && dialogItem.maxPrice
+                    ? `${parseFloat(dialogItem.minPrice).toFixed(0)} – ${parseFloat(dialogItem.maxPrice).toFixed(0)} EUR`
+                    : dialogItem.minPrice
+                    ? `from ${parseFloat(dialogItem.minPrice).toFixed(0)} EUR`
+                    : `up to ${parseFloat(dialogItem.maxPrice!).toFixed(0)} EUR`}
+                </p>
               </div>
-              <div className="space-y-1.5">
-                <Label>Max Price (EUR)</Label>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={counterMax}
-                  onChange={(e) => { setCounterMax(e.target.value); setCounterOfferError(null); }}
-                  data-testid="input-counter-max"
-                />
+            )}
+
+            {showCounterOffer && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Negotiation History</p>
+                <div className="pl-2 border-l-2 border-muted max-h-40 overflow-y-auto">
+                  <NegotiationHistory itemId={showCounterOffer.itemId} />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Your Counter-Offer</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Min Price (EUR)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={counterMin}
+                    onChange={(e) => { setCounterMin(e.target.value); setCounterOfferError(null); }}
+                    data-testid="input-counter-min"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Max Price (EUR)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={counterMax}
+                    onChange={(e) => { setCounterMax(e.target.value); setCounterOfferError(null); }}
+                    data-testid="input-counter-max"
+                  />
+                </div>
               </div>
             </div>
+
             {counterOfferError && (
-              <p className="text-xs text-red-600 dark:text-red-400" data-testid="text-counter-offer-error">{counterOfferError}</p>
+              <div className="flex items-start gap-1.5 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-2.5 py-2 text-xs text-red-700 dark:text-red-400" data-testid="text-counter-offer-error">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                {counterOfferError}
+              </div>
             )}
+
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => { setShowCounterOffer(null); setCounterOfferError(null); setCounterMin(""); setCounterMax(""); }} data-testid="button-counter-cancel">
                 Cancel
@@ -568,6 +638,7 @@ export default function SellerReviewPage() {
                 placeholder="Please provide a reason..."
                 value={declineReason}
                 onChange={(e) => setDeclineReason(e.target.value)}
+                rows={3}
                 data-testid="input-decline-reason"
               />
             </div>
@@ -578,15 +649,15 @@ export default function SellerReviewPage() {
               <Button
                 variant="destructive"
                 onClick={() => {
-                  if (showDeclineDialog && declineReason.trim()) {
+                  if (showDeclineDialog) {
                     declineItem.mutate({ itemId: showDeclineDialog.itemId, version: showDeclineDialog.version, reason: declineReason });
                   }
                 }}
                 disabled={declineItem.isPending || !declineReason.trim()}
-                data-testid="button-decline-submit"
+                data-testid="button-decline-confirm"
               >
                 {declineItem.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                Reject Item
+                Confirm Rejection
               </Button>
             </div>
           </div>
