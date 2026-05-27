@@ -99,7 +99,7 @@ export default function FeeStructurePage() {
           <div className="space-y-3" data-testid="list-tiers">
             {tiers.map((tier) => {
               const sellerPct = parseFloat(tier.sellerPercent as string);
-              const resellerPct = parseFloat(tier.resellerPercent as string);
+              const marchantPct = parseFloat(tier.marchantPercent as string);
               const platformPct = parseFloat(tier.platformPercent as string);
               return (
                 <Card key={tier.id} data-testid={`card-tier-${tier.id}`}>
@@ -123,8 +123,8 @@ export default function FeeStructurePage() {
                           <p className="font-bold text-emerald-600 dark:text-emerald-400" data-testid={`text-tier-seller-${tier.id}`}>{sellerPct.toFixed(1)}%</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-xs text-muted-foreground">Reseller</p>
-                          <p className="font-bold text-blue-600 dark:text-blue-400" data-testid={`text-tier-reseller-${tier.id}`}>{resellerPct.toFixed(1)}%</p>
+                          <p className="text-xs text-muted-foreground">Marchand</p>
+                          <p className="font-bold text-blue-600 dark:text-blue-400" data-testid={`text-tier-marchand-${tier.id}`}>{marchantPct.toFixed(1)}%</p>
                         </div>
                         <div className="text-center">
                           <p className="text-xs text-muted-foreground">Platform</p>

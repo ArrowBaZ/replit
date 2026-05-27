@@ -163,7 +163,7 @@ export default function RequestDetailPage() {
     queryKey: ["/api/profile"],
   });
 
-  const { data: request, isLoading } = useQuery<Request & { seller?: any; reusse?: any }>({
+  const { data: request, isLoading } = useQuery<Request & { seller?: any; marchand?: any }>({
     queryKey: ["/api/requests", params.id],
   });
 
@@ -184,7 +184,7 @@ export default function RequestDetailPage() {
     role: string | null;
   } | null>({
     queryKey: ["/api/requests", params.id, "contact"],
-    enabled: !!request && (!!request.reusseId),
+    enabled: !!request && (!!request.marchantId),
   });
 
   const conditionLabel = (cond: string | null): string => {
@@ -641,7 +641,7 @@ export default function RequestDetailPage() {
 
   const { data: requestAgreement } = useQuery<{ id: number; status: string } | null>({
     queryKey: ["/api/requests", params.id, "agreement"],
-    enabled: !!request?.reusseId,
+    enabled: !!request?.marchantId,
   });
 
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
@@ -719,9 +719,9 @@ export default function RequestDetailPage() {
   }, [user?.id]);
 
   const serviceTypeLabels: Record<string, string> = {
-    classic: t("classic"),
+    classic: t("classicShort"),
     express: t("express"),
-    sos_dressing: t("sosDressing"),
+    sos_dressing: t("sosDressingShort"),
   };
 
   const translateStatus = (status: string) => {
@@ -757,10 +757,10 @@ export default function RequestDetailPage() {
     );
   }
 
-  const isReusse = profile?.role === "reusse";
+  const isMarchand = profile?.role === "marchand";
   const isSeller = profile?.role === "seller";
-  const isAssigned = request.reusseId === user?.id;
-  const canAccept = isReusse && request.status === "pending" && !request.reusseId;
+  const isAssigned = request.marchantId === user?.id;
+  const canAccept = isMarchand && request.status === "pending" && !request.marchantId;
 
   const CATEGORY_LABELS: Record<string, string> = {
     all_fashion: t("catAllFashion"),
@@ -925,7 +925,7 @@ export default function RequestDetailPage() {
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Button size="icon" variant="ghost" onClick={() => setLocation(isReusse ? "/available" : "/requests")} data-testid="button-back-detail">
+        <Button size="icon" variant="ghost" onClick={() => setLocation(isMarchand ? "/available" : "/requests")} data-testid="button-back-detail">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
@@ -1018,7 +1018,7 @@ export default function RequestDetailPage() {
             <Phone className="h-5 w-5 text-blue-500 mt-0.5" />
             <div className="space-y-0.5">
               <p className="text-xs text-muted-foreground mb-1">
-                {isReusse ? t("sellerContact") : t("reusseContact")}
+                {isMarchand ? t("sellerContact") : t("marchandContact")}
               </p>
               <p className="text-sm font-medium">{contactInfo.firstName} {contactInfo.lastName}</p>
               {contactInfo.phone ? (
@@ -1034,7 +1034,7 @@ export default function RequestDetailPage() {
         </Card>
       )}
 
-      {isReusse && isAssigned && ["pending", "matched", "scheduled", "in_progress"].includes(request.status) && (
+      {isMarchand && isAssigned && ["pending", "matched", "scheduled", "in_progress"].includes(request.status) && (
         showReport ? (
           <Card className="border-red-200 dark:border-red-800">
             <CardContent className="p-4 space-y-3">
@@ -1085,10 +1085,10 @@ export default function RequestDetailPage() {
         const fullyDone = requestAgreement.status === "fully_signed";
         const currentUserSigned = fullyDone ||
           (isSeller && requestAgreement.status === "seller_signed") ||
-          (isReusse && requestAgreement.status === "reseller_signed");
+          (isMarchand && requestAgreement.status === "marchand_signed");
         const otherPartySigned =
-          (isSeller && requestAgreement.status === "reseller_signed") ||
-          (isReusse && requestAgreement.status === "seller_signed");
+          (isSeller && requestAgreement.status === "marchand_signed") ||
+          (isMarchand && requestAgreement.status === "seller_signed");
         const subtitle = fullyDone
           ? "Both parties have signed the agreement."
           : currentUserSigned
@@ -1131,7 +1131,7 @@ export default function RequestDetailPage() {
         </TabsList>
 
         <TabsContent value="items" className="space-y-3">
-          {isReusse && isAssigned && !request.listReadyAt && (requestItems?.length || 0) > 0 && !requestAgreement && (
+          {isMarchand && isAssigned && !request.listReadyAt && (requestItems?.length || 0) > 0 && !requestAgreement && (
             showFinalizeConfirm ? (
               <Card className="border-amber-300 dark:border-amber-700">
                 <CardContent className="p-4 space-y-3">
@@ -1170,7 +1170,7 @@ export default function RequestDetailPage() {
             )
           )}
 
-          {isReusse && isAssigned && request.listReadyAt && !requestAgreement && (
+          {isMarchand && isAssigned && request.listReadyAt && !requestAgreement && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400" data-testid="status-list-finalized">
               <Lock className="h-3.5 w-3.5 shrink-0" />
               {requestItems?.some((i) => i.sellerCounterOffer && i.status === "pending_approval")
@@ -1213,7 +1213,7 @@ export default function RequestDetailPage() {
             </Card>
           )}
 
-          {(isReusse && isAssigned && !request.listReadyAt) && (
+          {(isMarchand && isAssigned && !request.listReadyAt) && (
             <Dialog open={showAddItem} onOpenChange={(open) => { setShowAddItem(open); if (!open) { setItemForm(emptyItemForm); setItemPhotos([]); setCertPhotos([]); } }}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline" data-testid="button-add-item">
@@ -1528,7 +1528,7 @@ export default function RequestDetailPage() {
                     />
                   </div>
 
-                  {item.sellerCounterOffer && item.status === "pending_approval" && isReusse && (
+                  {item.sellerCounterOffer && item.status === "pending_approval" && isMarchand && (
                     <div className="ml-[4.25rem] space-y-2">
                       <div className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-md px-3 py-2 text-xs font-medium">
                         <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
@@ -1678,7 +1678,7 @@ export default function RequestDetailPage() {
                     </div>
                   )}
 
-                  {isReusse && isAssigned && item.status === "approved" && (
+                  {isMarchand && isAssigned && item.status === "approved" && (
                     <div className="flex flex-wrap gap-2 ml-[4.25rem]">
                       <Button size="sm" variant="outline" onClick={() => setShowListItem(item.id)} data-testid={`button-list-${item.id}`}>
                         <Tag className="h-3.5 w-3.5 mr-1" /> {t("markAsListed")}
@@ -1701,7 +1701,7 @@ export default function RequestDetailPage() {
                     </div>
                   )}
 
-                  {isReusse && isAssigned && item.status === "listed" && (
+                  {isMarchand && isAssigned && item.status === "listed" && (
                     <div className="flex flex-wrap gap-2 ml-[4.25rem]">
                       <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setShowMarkSold(item.id)} data-testid={`button-sell-${item.id}`}>
                         <ShoppingBag className="h-3.5 w-3.5 mr-1" /> {t("markAsSold")}
@@ -1729,7 +1729,7 @@ export default function RequestDetailPage() {
                     </div>
                   )}
 
-                  {isReusse && isAssigned && (item.status === "returned" || item.status === "sold" || item.status === "listed" || item.status === "approved" || item.status === "pending_approval") && (
+                  {isMarchand && isAssigned && (item.status === "returned" || item.status === "sold" || item.status === "listed" || item.status === "approved" || item.status === "pending_approval") && (
                     <div className="ml-[4.25rem]">
                       <Button
                         size="sm"
@@ -1786,7 +1786,7 @@ export default function RequestDetailPage() {
         </TabsContent>
 
         <TabsContent value="meetings" className="space-y-3">
-          {(isReusse && isAssigned) && (
+          {(isMarchand && isAssigned) && (
             <Dialog open={showScheduleMeeting} onOpenChange={setShowScheduleMeeting}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline" data-testid="button-schedule-meeting">
@@ -1910,7 +1910,7 @@ export default function RequestDetailPage() {
               <XCircle className="h-4 w-4 mr-1" /> {t("cancelRequest")}
             </Button>
           )}
-          {(isSeller || (isReusse && isAssigned)) && request.status === "in_progress" && (
+          {(isSeller || (isMarchand && isAssigned)) && request.status === "in_progress" && (
             <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => completeRequest.mutate()} disabled={completeRequest.isPending} data-testid="button-complete-request">
               <CheckCircle className="h-4 w-4 mr-1" /> {t("completeRequest")}
             </Button>

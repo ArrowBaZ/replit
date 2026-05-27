@@ -36,21 +36,14 @@ export default function CreateRequestPage() {
   const serviceTypes = [
     {
       value: "classic",
-      label: t("classic"),
+      label: t("classicShort"),
       description: t("classicDesc"),
       icon: Package,
       color: "bg-primary/10 text-primary",
     },
     {
-      value: "express",
-      label: t("express"),
-      description: t("expressDesc"),
-      icon: Zap,
-      color: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
-    },
-    {
       value: "sos_dressing",
-      label: t("sosDressing"),
+      label: t("sosDressingShort"),
       description: t("sosDressingDesc"),
       icon: Sparkles,
       color: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",

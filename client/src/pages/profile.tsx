@@ -161,7 +161,7 @@ export default function ProfilePage() {
               </p>
               <div className="flex items-center gap-2 mt-2">
                 <Badge variant="secondary" className="capitalize">{profile?.role || "unknown"}</Badge>
-                {profile?.role === "reusse" && profile.status && (
+                {profile?.role === "marchand" && profile.status && (
                   <Badge variant="secondary" className={
                     profile.status === "approved" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" :
                     profile.status === "pending" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" :
@@ -198,7 +198,7 @@ export default function ProfilePage() {
                 <Label>{t("department")}</Label>
                 <Input value={formData.department || ""} onChange={(e) => updateField("department", e.target.value)} data-testid="input-edit-department" />
               </div>
-              {profile?.role === "reusse" && (
+              {profile?.role === "marchand" && (
                 <>
                   <div className="space-y-2">
                     <Label>{t("bio")}</Label>

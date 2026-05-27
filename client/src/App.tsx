@@ -14,7 +14,7 @@ import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import OnboardingPage from "@/pages/onboarding";
 import SellerDashboard from "@/pages/seller-dashboard";
-import ReusseDashboard from "@/pages/reusse-dashboard";
+import MarchendDashboard from "@/pages/marchand-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import CreateRequestPage from "@/pages/create-request";
 import RequestDetailPage from "@/pages/request-detail";
@@ -24,8 +24,8 @@ import ItemsListPage from "@/pages/items-list";
 import ProfilePage from "@/pages/profile";
 import SchedulePage from "@/pages/schedule";
 import AdminRequestsPage from "@/pages/admin-requests";
-import ResellersPage from "@/pages/resellers";
-import ResellerDetailPage from "@/pages/reseller-detail";
+import MarchangsPage from "@/pages/marchands";
+import MarchendDetailPage from "@/pages/marchand-detail";
 import MyDocumentsPage from "@/pages/my-documents";
 import AgreementDetailPage from "@/pages/agreement-detail";
 import FaqPage from "@/pages/faq";
@@ -55,7 +55,7 @@ function DashboardRoute() {
   }
 
   if (profile.role === "admin") return <AdminDashboard />;
-  if (profile.role === "reusse") return <ReusseDashboard />;
+  if (profile.role === "marchand") return <MarchendDashboard />;
   return <SellerDashboard />;
 }
 
@@ -79,8 +79,8 @@ function AuthenticatedRouter() {
       <Route path="/admin/fee-tiers" component={AdminFeeTiersPage} />
       <Route path="/fee-structure" component={FeeStructurePage} />
       <Route path="/agreements/:id" component={AgreementDetailPage} />
-      <Route path="/resellers/:id" component={ResellerDetailPage} />
-      <Route path="/resellers" component={ResellersPage} />
+      <Route path="/marchands/:id" component={MarchendDetailPage} />
+      <Route path="/marchands" component={MarchangsPage} />
       <Route path="/faq" component={FaqPage} />
       <Route path="/contact" component={ContactPage} />
       <Route path="/terms" component={TermsPage} />

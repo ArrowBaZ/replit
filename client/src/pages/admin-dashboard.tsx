@@ -25,16 +25,16 @@ interface AdminAgreement {
   id: number;
   requestId: number;
   sellerId: string;
-  reusseId: string;
+  marchantId: string;
   status: string;
   itemCount: number;
   totalValue: string;
   generatedAt: string;
   sellerName: string;
-  reusseName: string;
+  marchandName: string;
   signatureCount: number;
   sellerSignedAt: string | null;
-  reusseSignedAt: string | null;
+  marchandSignedAt: string | null;
 }
 
 const agreementStatusColors: Record<string, string> = {
@@ -47,7 +47,7 @@ const agreementStatusColors: Record<string, string> = {
 const agreementStatusLabels: Record<string, string> = {
   pending: "Unsigned",
   seller_signed: "Seller Signed",
-  reseller_signed: "Reseller Signed",
+  reseller_signed: "Marchand Signed",
   fully_signed: "Fully Signed",
 };
 
@@ -126,7 +126,7 @@ export default function AdminDashboard() {
                   <Shield className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">{t("activeResellers")}</p>
+                  <p className="text-sm text-muted-foreground">{t("activeMarchands")}</p>
                   <p className="text-xl font-bold">{stats?.totalReusses || 0}</p>
                 </div>
               </CardContent>
@@ -260,7 +260,7 @@ export default function AdminDashboard() {
                     {u.profile && (
                       <>
                         <Badge variant="secondary">{u.profile.role}</Badge>
-                        {u.profile.role === "reusse" && (
+                        {u.profile.role === "marchand" && (
                           <Badge variant="secondary" className={
                             u.profile.status === "approved" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" :
                             u.profile.status === "pending" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" :
@@ -308,14 +308,14 @@ export default function AdminDashboard() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium">Agreement #{agreement.id} · Request #{agreement.requestId}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Seller: {agreement.sellerName} · Reseller: {agreement.reusseName}
+                          Seller: {agreement.sellerName} · Marchand: {agreement.marchandName}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {agreement.itemCount} item{agreement.itemCount !== 1 ? "s" : ""} · Total: €{parseFloat(agreement.totalValue).toFixed(2)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Seller signed: {agreement.sellerSignedAt ? new Date(agreement.sellerSignedAt).toLocaleString("fr-FR") : "—"} ·{" "}
-                          Reseller signed: {agreement.reusseSignedAt ? new Date(agreement.reusseSignedAt).toLocaleString("fr-FR") : "—"}
+                          Marchand signed: {agreement.marchandSignedAt ? new Date(agreement.marchandSignedAt).toLocaleString("fr-FR") : "—"}
                         </p>
                       </div>
                     </div>

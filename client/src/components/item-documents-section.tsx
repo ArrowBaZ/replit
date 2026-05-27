@@ -377,14 +377,14 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
   const canView =
     profile?.role === "admin" ||
     item.sellerId === userId ||
-    item.reusseId === userId;
+    item.marchantId === userId;
 
   const { data: documents, isLoading: docsLoading } = useQuery<ItemDocument[]>({
     queryKey: ["/api/items", item.id, "documents"],
     enabled: canView && showDocs,
   });
 
-  const isReseller = profile?.role === "reusse" && item.reusseId === userId;
+  const isReseller = profile?.role === "marchand" && item.marchantId === userId;
 
   const { data: docRequestStatus } = useQuery<{ requested: boolean; requestedAt: string | null }>({
     queryKey: ["/api/items", item.id, "document-request-status"],

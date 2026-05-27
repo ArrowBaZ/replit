@@ -372,9 +372,9 @@ export default function SellerReviewPage() {
   }
 
   const serviceTypeLabels: Record<string, string> = {
-    classic: "Classic",
-    express: "Express",
-    sos_dressing: "SOS Dressing",
+    classic: t("classicShort"),
+    express: t("express"),
+    sos_dressing: t("sosDressingShort"),
   };
 
   const dialogItem = showCounterOffer

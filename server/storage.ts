@@ -67,7 +67,7 @@ export interface IStorage {
   ): Promise<Request | undefined>;
   acceptRequest(
     requestId: number,
-    reusseId: string,
+    marchantId: string,
   ): Promise<Request | undefined>;
 
   getItem(id: number): Promise<Item | undefined>;
@@ -121,8 +121,8 @@ export interface IStorage {
   getActivityStats(userId: string, role: string): Promise<any>;
 
   getResellers(): Promise<any[]>;
-  getResellerById(reusseId: string): Promise<any>;
-  getReviews(reusseId: string): Promise<Review[]>;
+  getResellerById(marchantId: string): Promise<any>;
+  getReviews(marchantId: string): Promise<Review[]>;
   createReview(data: InsertReview): Promise<Review>;
   reportRequest(requestId: number, reporterId: string, reason: string): Promise<void>;
 
@@ -131,8 +131,8 @@ export interface IStorage {
   createItemDocument(data: InsertItemDocument): Promise<ItemDocument>;
   deleteItemDocument(docId: number): Promise<void>;
   getDocumentsByUser(userId: string): Promise<any[]>;
-  getDocumentRequestStatus(itemId: number, reusseId: string): Promise<ItemDocumentRequest | undefined>;
-  createDocumentRequest(itemId: number, reusseId: string): Promise<ItemDocumentRequest>;
+  getDocumentRequestStatus(itemId: number, marchantId: string): Promise<ItemDocumentRequest | undefined>;
+  createDocumentRequest(itemId: number, marchantId: string): Promise<ItemDocumentRequest>;
 
   createAgreement(data: InsertAgreement): Promise<Agreement>;
   getAgreement(id: number): Promise<Agreement | undefined>;
@@ -191,11 +191,11 @@ export class DatabaseStorage implements IStorage {
     if (role === "admin") {
       return db.select().from(requests).orderBy(desc(requests.createdAt));
     }
-    if (role === "reusse") {
+    if (role === "marchand") {
       return db
         .select()
         .from(requests)
-        .where(eq(requests.reusseId, userId))
+        .where(eq(requests.marchantId, userId))
         .orderBy(desc(requests.createdAt));
     }
     return db
@@ -209,7 +209,7 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(requests)
-      .where(and(eq(requests.status, "pending"), isNull(requests.reusseId)))
+      .where(and(eq(requests.status, "pending"), isNull(requests.marchantId)))
       .orderBy(desc(requests.createdAt));
   }
 
@@ -240,11 +240,11 @@ export class DatabaseStorage implements IStorage {
 
   async acceptRequest(
     requestId: number,
-    reusseId: string,
+    marchantId: string,
   ): Promise<Request | undefined> {
     const [request] = await db
       .update(requests)
-      .set({ reusseId, status: "matched", updatedAt: new Date() })
+      .set({ marchantId, status: "matched", updatedAt: new Date() })
       .where(and(eq(requests.id, requestId), eq(requests.status, "pending")))
       .returning();
     return request;
@@ -261,11 +261,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getItems(userId: string, role: string): Promise<Item[]> {
-    if (role === "reusse") {
+    if (role === "marchand") {
       return db
         .select()
         .from(items)
-        .where(and(eq(items.reusseId, userId), isNull(items.deletedAt)))
+        .where(and(eq(items.marchantId, userId), isNull(items.deletedAt)))
         .orderBy(desc(items.createdAt));
     }
     return db
@@ -358,7 +358,7 @@ export class DatabaseStorage implements IStorage {
     const userRequests = await db
       .select({ id: requests.id })
       .from(requests)
-      .where(or(eq(requests.sellerId, userId), eq(requests.reusseId, userId)));
+      .where(or(eq(requests.sellerId, userId), eq(requests.marchantId, userId)));
     const requestIds = userRequests.map((r) => r.id);
     if (requestIds.length === 0) return [];
     return db
@@ -563,7 +563,7 @@ export class DatabaseStorage implements IStorage {
     const pendingProfiles = await db
       .select()
       .from(profiles)
-      .where(and(eq(profiles.role, "reusse"), eq(profiles.status, "pending")));
+      .where(and(eq(profiles.role, "marchand"), eq(profiles.status, "pending")));
     if (pendingProfiles.length === 0) return [];
 
     const userIds = pendingProfiles.map((p) => p.userId);
@@ -601,11 +601,11 @@ export class DatabaseStorage implements IStorage {
     const [reusseCount] = await db
       .select({ count: sql<number>`count(*)` })
       .from(profiles)
-      .where(and(eq(profiles.role, "reusse"), eq(profiles.status, "approved")));
+      .where(and(eq(profiles.role, "marchand"), eq(profiles.status, "approved")));
     const [pendingCount] = await db
       .select({ count: sql<number>`count(*)` })
       .from(profiles)
-      .where(and(eq(profiles.role, "reusse"), eq(profiles.status, "pending")));
+      .where(and(eq(profiles.role, "marchand"), eq(profiles.status, "pending")));
     const [requestCount] = await db
       .select({ count: sql<number>`count(*)` })
       .from(requests);
@@ -642,11 +642,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTransactions(userId: string, role: string): Promise<Transaction[]> {
-    if (role === "reusse") {
+    if (role === "marchand") {
       return db
         .select()
         .from(transactions)
-        .where(eq(transactions.reusseId, userId))
+        .where(eq(transactions.marchantId, userId))
         .orderBy(desc(transactions.createdAt));
     }
     return db
@@ -663,8 +663,8 @@ export class DatabaseStorage implements IStorage {
     const txns = await this.getTransactions(userId, role);
     const total = txns.reduce((sum, t) => {
       const earning =
-        role === "reusse"
-          ? parseFloat(t.reusseEarning)
+        role === "marchand"
+          ? parseFloat(t.marchantEarning)
           : parseFloat(t.sellerEarning);
       return sum + (isNaN(earning) ? 0 : earning);
     }, 0);
@@ -718,8 +718,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEarningsSummary(userId: string, role: string): Promise<any[]> {
-    const col = role === "reusse" ? transactions.reusseId : transactions.sellerId;
-    const amountCol = role === "reusse" ? transactions.reusseEarning : transactions.sellerEarning;
+    const col = role === "marchand" ? transactions.marchantId : transactions.sellerId;
+    const amountCol = role === "marchand" ? transactions.marchantEarning : transactions.sellerEarning;
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     const rows = await db
@@ -740,13 +740,13 @@ export class DatabaseStorage implements IStorage {
     firstOfMonth.setDate(1);
     firstOfMonth.setHours(0, 0, 0, 0);
 
-    const col = role === "reusse" ? requests.reusseId : requests.sellerId;
+    const col = role === "marchand" ? requests.marchantId : requests.sellerId;
     const [activeReqs] = await db
       .select({ count: sql<number>`count(*)` })
       .from(requests)
       .where(and(eq(col, userId), inArray(requests.status, ["pending", "matched", "scheduled", "in_progress"])));
 
-    const itemCol = role === "reusse" ? items.reusseId : items.sellerId;
+    const itemCol = role === "marchand" ? items.marchantId : items.sellerId;
     const [soldItems] = await db
       .select({ count: sql<number>`count(*)` })
       .from(items)
@@ -757,7 +757,7 @@ export class DatabaseStorage implements IStorage {
       .from(items)
       .where(and(eq(itemCol, userId), eq(items.status, "sold"), gte(items.soldAt!, firstOfMonth), isNull(items.deletedAt)));
 
-    const msgCol = role === "reusse" ? messages.senderId : messages.senderId;
+    const msgCol = role === "marchand" ? messages.senderId : messages.senderId;
     const [msgsThisMonth] = await db
       .select({ count: sql<number>`count(*)` })
       .from(messages)
@@ -779,7 +779,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(profiles)
       .leftJoin(users, eq(users.id, profiles.userId))
-      .where(and(eq(profiles.role, "reusse"), eq(profiles.status, "approved")));
+      .where(and(eq(profiles.role, "marchand"), eq(profiles.status, "approved")));
 
     const result = await Promise.all(rows.map(async (r) => {
       const [statsRow] = await db
@@ -788,15 +788,15 @@ export class DatabaseStorage implements IStorage {
           reviewCount: sql<number>`count(${reviews.id})`,
         })
         .from(reviews)
-        .where(eq(reviews.reusseId, r.profile.userId));
+        .where(eq(reviews.marchantId, r.profile.userId));
       const [completedRow] = await db
         .select({ count: sql<number>`count(*)` })
         .from(requests)
-        .where(and(eq(requests.reusseId, r.profile.userId), eq(requests.status, "completed")));
+        .where(and(eq(requests.marchantId, r.profile.userId), eq(requests.status, "completed")));
       const [soldRow] = await db
         .select({ count: sql<number>`count(*)` })
         .from(items)
-        .where(and(eq(items.reusseId, r.profile.userId), eq(items.status, "sold"), isNull(items.deletedAt)));
+        .where(and(eq(items.marchantId, r.profile.userId), eq(items.status, "sold"), isNull(items.deletedAt)));
       return {
         userId: r.profile.userId,
         firstName: r.user?.firstName,
@@ -816,12 +816,12 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getResellerById(reusseId: string): Promise<any> {
+  async getResellerById(marchantId: string): Promise<any> {
     const [row] = await db
       .select({ user: users, profile: profiles })
       .from(profiles)
       .leftJoin(users, eq(users.id, profiles.userId))
-      .where(eq(profiles.userId, reusseId));
+      .where(eq(profiles.userId, marchantId));
     if (!row) return undefined;
     const [statsRow] = await db
       .select({
@@ -832,15 +832,15 @@ export class DatabaseStorage implements IStorage {
         avgHandling: sql<number>`coalesce(avg(${reviews.handlingRating}), 0)`,
       })
       .from(reviews)
-      .where(eq(reviews.reusseId, reusseId));
+      .where(eq(reviews.marchantId, marchantId));
     const [completedRow] = await db
       .select({ count: sql<number>`count(*)` })
       .from(requests)
-      .where(and(eq(requests.reusseId, reusseId), eq(requests.status, "completed")));
+      .where(and(eq(requests.marchantId, marchantId), eq(requests.status, "completed")));
     const [soldRow] = await db
       .select({ count: sql<number>`count(*)` })
       .from(items)
-      .where(and(eq(items.reusseId, reusseId), eq(items.status, "sold"), isNull(items.deletedAt)));
+      .where(and(eq(items.marchantId, marchantId), eq(items.status, "sold"), isNull(items.deletedAt)));
     return {
       userId: row.profile.userId,
       firstName: row.user?.firstName,
@@ -861,11 +861,11 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getReviews(reusseId: string): Promise<Review[]> {
+  async getReviews(marchantId: string): Promise<Review[]> {
     return db
       .select()
       .from(reviews)
-      .where(eq(reviews.reusseId, reusseId))
+      .where(eq(reviews.marchantId, marchantId))
       .orderBy(desc(reviews.createdAt));
   }
 
@@ -938,16 +938,16 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getDocumentRequestStatus(itemId: number, reusseId: string): Promise<ItemDocumentRequest | undefined> {
+  async getDocumentRequestStatus(itemId: number, marchantId: string): Promise<ItemDocumentRequest | undefined> {
     const [req] = await db
       .select()
       .from(itemDocumentRequests)
-      .where(and(eq(itemDocumentRequests.itemId, itemId), eq(itemDocumentRequests.reusseId, reusseId)));
+      .where(and(eq(itemDocumentRequests.itemId, itemId), eq(itemDocumentRequests.marchantId, marchantId)));
     return req;
   }
 
-  async createDocumentRequest(itemId: number, reusseId: string): Promise<ItemDocumentRequest> {
-    const [req] = await db.insert(itemDocumentRequests).values({ itemId, reusseId }).returning();
+  async createDocumentRequest(itemId: number, marchantId: string): Promise<ItemDocumentRequest> {
+    const [req] = await db.insert(itemDocumentRequests).values({ itemId, marchantId }).returning();
     return req;
   }
 
@@ -978,7 +978,7 @@ export class DatabaseStorage implements IStorage {
     const sigs = await db.select().from(agreementSignatures).where(eq(agreementSignatures.agreementId, id));
 
     const [sellerUser] = await db.select().from(users).where(eq(users.id, agreement.sellerId));
-    const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.reusseId));
+    const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.marchantId));
     const [request] = await db.select().from(requests).where(eq(requests.id, agreement.requestId));
 
     const sigWithNames = await Promise.all(sigs.map(async (sig) => {
@@ -1002,12 +1002,12 @@ export class DatabaseStorage implements IStorage {
     const rows = await db
       .select()
       .from(agreements)
-      .where(or(eq(agreements.sellerId, userId), eq(agreements.reusseId, userId)))
+      .where(or(eq(agreements.sellerId, userId), eq(agreements.marchantId, userId)))
       .orderBy(desc(agreements.generatedAt));
     return Promise.all(rows.map(async (agreement) => {
       const sigs = await db.select().from(agreementSignatures).where(eq(agreementSignatures.agreementId, agreement.id));
       const [sellerUser] = await db.select().from(users).where(eq(users.id, agreement.sellerId));
-      const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.reusseId));
+      const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.marchantId));
       const [request] = await db.select().from(requests).where(eq(requests.id, agreement.requestId));
       const sigWithNames = await Promise.all(sigs.map(async (sig) => {
         const [u] = await db.select().from(users).where(eq(users.id, sig.userId));
@@ -1031,9 +1031,9 @@ export class DatabaseStorage implements IStorage {
     return Promise.all(rows.map(async (agreement) => {
       const sigs = await db.select().from(agreementSignatures).where(eq(agreementSignatures.agreementId, agreement.id));
       const [sellerUser] = await db.select().from(users).where(eq(users.id, agreement.sellerId));
-      const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.reusseId));
+      const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.marchantId));
       const sellerSig = sigs.find((s) => s.userId === agreement.sellerId);
-      const reusseSig = sigs.find((s) => s.userId === agreement.reusseId);
+      const reusseSig = sigs.find((s) => s.userId === agreement.marchantId);
       return {
         ...agreement,
         sellerName: sellerUser ? `${sellerUser.firstName || ""} ${sellerUser.lastName || ""}`.trim() || sellerUser.email : "Unknown",
@@ -1171,9 +1171,9 @@ export class DatabaseStorage implements IStorage {
     const existing = await db.select({ id: feeTiers.id }).from(feeTiers).limit(1);
     if (existing.length > 0) return;
     const defaults = [
-      { label: "Entry (€0–€150)", minPrice: "0", maxPrice: "150", sellerPercent: "50", resellerPercent: "40", platformPercent: "10", isActive: true },
-      { label: "Standard (€150.01–€500)", minPrice: "150.01", maxPrice: "500", sellerPercent: "55", resellerPercent: "35", platformPercent: "10", isActive: true },
-      { label: "Premium (€500.01+)", minPrice: "500.01", maxPrice: null, sellerPercent: "60", resellerPercent: "30", platformPercent: "10", isActive: true },
+      { label: "Entry (€0–€150)", minPrice: "0", maxPrice: "150", sellerPercent: "50", marchantPercent: "40", platformPercent: "10", isActive: true },
+      { label: "Standard (€150.01–€500)", minPrice: "150.01", maxPrice: "500", sellerPercent: "55", marchantPercent: "35", platformPercent: "10", isActive: true },
+      { label: "Premium (€500.01+)", minPrice: "500.01", maxPrice: null, sellerPercent: "60", marchantPercent: "30", platformPercent: "10", isActive: true },
     ];
     for (const tier of defaults) {
       await db.insert(feeTiers).values(tier);

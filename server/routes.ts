@@ -23,7 +23,7 @@ function resolveItemPrice(i: Pick<Item, "approvedPrice" | "salePrice" | "maxPric
 
 interface TierResolution {
   sellerPct: number;
-  resellerPct: number;
+  marchantPct: number;
   platformPct: number;
   tierId: number | null;
 }
@@ -33,7 +33,7 @@ async function resolveFeePercentages(price: number): Promise<TierResolution> {
   if (tier) {
     return {
       sellerPct: parseFloat(tier.sellerPercent as string),
-      resellerPct: parseFloat(tier.resellerPercent as string),
+      marchantPct: parseFloat(tier.marchantPercent as string),
       platformPct: parseFloat(tier.platformPercent as string),
       tierId: tier.id,
     };
@@ -48,10 +48,10 @@ async function buildAgreementSnapshot(items: Item[]): Promise<{ itemsSnapshot: s
     const feeRes = await resolveFeePercentages(price);
     const fees = {
       sellerAmount: parseFloat(((price * feeRes.sellerPct) / 100).toFixed(2)),
-      resellerAmount: parseFloat(((price * feeRes.resellerPct) / 100).toFixed(2)),
-      platformAmount: parseFloat((price - parseFloat(((price * feeRes.sellerPct) / 100).toFixed(2)) - parseFloat(((price * feeRes.resellerPct) / 100).toFixed(2))).toFixed(2)),
+      marchantAmount: parseFloat(((price * feeRes.marchantPct) / 100).toFixed(2)),
+      platformAmount: parseFloat((price - parseFloat(((price * feeRes.sellerPct) / 100).toFixed(2)) - parseFloat(((price * feeRes.marchantPct) / 100).toFixed(2))).toFixed(2)),
       sellerPct: feeRes.sellerPct,
-      resellerPct: feeRes.resellerPct,
+      marchantPct: feeRes.marchantPct,
       platformPct: feeRes.platformPct,
     };
     return { id: i.id, title: i.title, approvedPrice: price, fees };
@@ -66,18 +66,18 @@ async function buildAgreementSnapshot(items: Item[]): Promise<{ itemsSnapshot: s
 
 async function notifyAgreementByEmail(
   sellerId: string,
-  reusseId: string,
+  marchantId: string,
   requestId: number,
   agreementId: number
 ): Promise<void> {
   try {
     const [sellerUser] = await db.select().from(users).where(eq(users.id, sellerId));
-    const [reusseUser] = await db.select().from(users).where(eq(users.id, reusseId));
+    const [marchantUser] = await db.select().from(users).where(eq(users.id, marchantId));
     const sellerName = sellerUser
       ? `${sellerUser.firstName || ""} ${sellerUser.lastName || ""}`.trim() || sellerUser.email
       : "Seller";
-    const reusseName = reusseUser
-      ? `${reusseUser.firstName || ""} ${reusseUser.lastName || ""}`.trim() || reusseUser.email
+    const marchantName = marchantUser
+      ? `${marchantUser.firstName || ""} ${marchantUser.lastName || ""}`.trim() || marchantUser.email
       : "Reseller";
     if (sellerUser?.email) {
       await sendAgreementReadyEmail({
@@ -87,10 +87,10 @@ async function notifyAgreementByEmail(
         agreementId,
       });
     }
-    if (reusseUser?.email) {
+    if (marchantUser?.email) {
       await sendAgreementReadyEmail({
-        toEmail: reusseUser.email,
-        toName: reusseName || "Reseller",
+        toEmail: marchantUser.email,
+        toName: marchantName || "Reseller",
         requestId,
         agreementId,
       });
@@ -313,7 +313,7 @@ export async function registerRoutes(
           bio: bio || null,
           experience: experience || null,
           siretNumber: siretNumber || null,
-          status: role === "reusse" ? "pending" : "approved",
+          status: role === "marchand" ? "pending" : "approved",
           preferredContactMethod: preferredContactMethod || "email",
         });
         res.json(profile);
@@ -426,11 +426,11 @@ export async function registerRoutes(
         const request = await storage.getRequest(id);
         if (!request)
           return res.status(404).json({ message: "Request not found" });
-        if (userId !== request.sellerId && userId !== request.reusseId) {
+        if (userId !== request.sellerId && userId !== request.marchantId) {
           return res.status(403).json({ message: "Not authorized" });
         }
         const otherUserId =
-          userId === request.sellerId ? request.reusseId : request.sellerId;
+          userId === request.sellerId ? request.marchantId : request.sellerId;
         if (!otherUserId) return res.json(null);
         const profile = await storage.getProfile(otherUserId);
         const [userRow] = await db
@@ -514,7 +514,7 @@ export async function registerRoutes(
       try {
         const userId = req.user.claims.sub;
         const profile = await storage.getProfile(userId);
-        if (!profile || profile.role !== "reusse") {
+        if (!profile || profile.role !== "marchand") {
           return res
             .status(403)
             .json({ message: "Only resellers can accept requests" });
@@ -556,7 +556,7 @@ export async function registerRoutes(
         if (!request) return res.status(404).json({ message: "Request not found" });
         const profile = await storage.getProfile(userId);
         const isAdmin = profile?.role === "admin";
-        const isParty = request.sellerId === userId || request.reusseId === userId;
+        const isParty = request.sellerId === userId || request.marchantId === userId;
         if (!isAdmin && !isParty) {
           return res.status(403).json({ message: "Not authorized to view items for this request" });
         }
@@ -606,22 +606,22 @@ export async function registerRoutes(
           return res.status(400).json({ message: "No pending items to accept" });
         }
 
-        if (request.reusseId) {
+        if (request.marchantId) {
           await storage.createNotification({
-            userId: request.reusseId,
+            userId: request.marchantId,
             type: "items_bulk_approved",
             title: "All Items Approved",
             message: `The seller approved all ${updated.length} pending item(s) for request #${requestId}.`,
             link: `/requests/${requestId}`,
           });
-          broadcastToUser(request.reusseId, {
+          broadcastToUser(request.marchantId, {
             type: "items_bulk_approved",
             requestId,
             count: updated.length,
           });
         }
 
-        if (request.listReadyAt && request.reusseId) {
+        if (request.listReadyAt && request.marchantId) {
           const existingAgreement = await storage.getAgreementByRequest(requestId);
           if (!existingAgreement) {
             const allItems = await storage.getItemsByRequest(requestId);
@@ -631,7 +631,7 @@ export async function registerRoutes(
               const agreement = await storage.createAgreement({
                 requestId,
                 sellerId: request.sellerId,
-                reusseId: request.reusseId,
+                marchantId: request.marchantId,
                 status: "pending",
                 itemCount: allItems.length,
                 totalValue,
@@ -646,15 +646,15 @@ export async function registerRoutes(
                 link: `/agreements/${agreement.id}`,
               });
               await storage.createNotification({
-                userId: request.reusseId,
+                userId: request.marchantId,
                 type: "agreement_ready",
                 title: "Agreement Ready to Sign",
                 message: `An agreement for request #${requestId} is ready for your signature.`,
                 link: `/agreements/${agreement.id}`,
               });
               broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId });
-              broadcastToUser(request.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId });
-              await notifyAgreementByEmail(request.sellerId, request.reusseId, requestId, agreement.id);
+              broadcastToUser(request.marchantId, { type: "agreement_ready", agreementId: agreement.id, requestId });
+              await notifyAgreementByEmail(request.sellerId, request.marchantId, requestId, agreement.id);
             }
           }
         }
@@ -682,7 +682,7 @@ export async function registerRoutes(
         }
 
         // Role check: only the assigned reusse can add items
-        if (request.reusseId !== userId) {
+        if (request.marchantId !== userId) {
           return res
             .status(403)
             .json({ message: "Only the assigned reseller can add items" });
@@ -724,7 +724,7 @@ export async function registerRoutes(
         const item = await storage.createItem({
           requestId,
           sellerId: request.sellerId,
-          reusseId: userId,
+          marchantId: userId,
           title,
           description: description || null,
           brand: brand || null,
@@ -766,7 +766,7 @@ export async function registerRoutes(
           await storage.createPriceOffer({
             itemId: item.id,
             proposedByUserId: userId,
-            proposedByRole: "reusse",
+            proposedByRole: "marchand",
             minPrice: minPrice || null,
             maxPrice: maxPrice || null,
             action: "initial",
@@ -787,7 +787,7 @@ export async function registerRoutes(
       const item = await storage.getItemIncludingDeleted(id);
       if (!item) return res.status(404).json({ message: "Item not found" });
       const userId = req.user.claims.sub;
-      if (item.sellerId !== userId && item.reusseId !== userId) {
+      if (item.sellerId !== userId && item.marchantId !== userId) {
         const profile = await storage.getProfile(userId);
         if (!profile || profile.role !== "admin") {
           return res.status(403).json({ message: "Access denied" });
@@ -858,7 +858,7 @@ export async function registerRoutes(
 
         const notifyUserId =
           req.user.claims.sub === request.sellerId
-            ? request.reusseId
+            ? request.marchantId
             : request.sellerId;
         if (notifyUserId) {
           await storage.createNotification({
@@ -894,14 +894,14 @@ export async function registerRoutes(
           return res.status(404).json({ message: "Request not found" });
         }
         const userId = req.user.claims.sub;
-        if (userId !== request.sellerId && userId !== request.reusseId) {
+        if (userId !== request.sellerId && userId !== request.marchantId) {
           return res.status(403).json({ message: "Not authorized" });
         }
         const updated = await storage.updateMeeting(meetingId, {
           status: "cancelled",
         });
         const notifyUserId =
-          userId === request.sellerId ? request.reusseId : request.sellerId;
+          userId === request.sellerId ? request.marchantId : request.sellerId;
         if (notifyUserId) {
           await storage.createNotification({
             userId: notifyUserId,
@@ -936,7 +936,7 @@ export async function registerRoutes(
           return res.status(404).json({ message: "Request not found" });
         }
         const userId = req.user.claims.sub;
-        if (userId !== request.sellerId && userId !== request.reusseId) {
+        if (userId !== request.sellerId && userId !== request.marchantId) {
           return res.status(403).json({ message: "Not authorized" });
         }
         const { scheduledDate, location, notes } = req.body;
@@ -954,7 +954,7 @@ export async function registerRoutes(
           status: "scheduled",
         });
         const notifyUserId =
-          userId === request.sellerId ? request.reusseId : request.sellerId;
+          userId === request.sellerId ? request.marchantId : request.sellerId;
         if (notifyUserId) {
           await storage.createNotification({
             userId: notifyUserId,
@@ -1231,8 +1231,8 @@ export async function registerRoutes(
       if (!request) return res.status(404).json({ message: "Request not found" });
       const updated = await storage.updateRequest(id, { status: "cancelled" });
       await storage.createNotification({ userId: request.sellerId, title: "Request Rejected", type: "moderation_reject", message: `Your request #${id} has been rejected.${reason ? ` Reason: ${reason}` : ""}` });
-      if (request.reusseId) {
-        await storage.createNotification({ userId: request.reusseId, title: "Request Cancelled", type: "moderation_reject", message: `Request #${id} you were assigned to has been cancelled by an admin.` });
+      if (request.marchantId) {
+        await storage.createNotification({ userId: request.marchantId, title: "Request Cancelled", type: "moderation_reject", message: `Request #${id} you were assigned to has been cancelled by an admin.` });
       }
       await storage.logModerationAction({ requestId: id, adminId, action: "reject", reason });
       res.json(updated);
@@ -1264,7 +1264,7 @@ export async function registerRoutes(
         const id = parseInt(req.params.id);
         const existingItem = await storage.getItem(id);
         if (!existingItem) return res.status(404).json({ message: "Item not found" });
-        if (existingItem.reusseId !== userId) {
+        if (existingItem.marchantId !== userId) {
           return res.status(403).json({ message: "Only the assigned reseller can edit this item" });
         }
         if (existingItem.requestId) {
@@ -1381,18 +1381,18 @@ export async function registerRoutes(
           action: "accepted",
         });
 
-        if (item.reusseId) {
+        if (item.marchantId) {
           await storage.createNotification({
-            userId: item.reusseId,
+            userId: item.marchantId,
             type: "item_approved",
             title: "Price Approved",
             message: `Seller approved pricing for "${item.title}".`,
             link: `/requests/${item.requestId}`,
           });
-          broadcastToUser(item.reusseId, { type: "item_approved", itemId: item.id, itemTitle: item.title, requestId: item.requestId });
+          broadcastToUser(item.marchantId, { type: "item_approved", itemId: item.id, itemTitle: item.title, requestId: item.requestId });
         }
 
-        if (item.requestId && item.reusseId) {
+        if (item.requestId && item.marchantId) {
           const request = await storage.getRequest(item.requestId);
           if (request && request.listReadyAt) {
             const existingAgreement = await storage.getAgreementByRequest(item.requestId);
@@ -1404,7 +1404,7 @@ export async function registerRoutes(
                 const agreement = await storage.createAgreement({
                   requestId: item.requestId,
                   sellerId: request.sellerId,
-                  reusseId: item.reusseId,
+                  marchantId: item.marchantId,
                   status: "pending",
                   itemCount: allItems.length,
                   totalValue,
@@ -1419,15 +1419,15 @@ export async function registerRoutes(
                   link: `/agreements/${agreement.id}`,
                 });
                 await storage.createNotification({
-                  userId: item.reusseId,
+                  userId: item.marchantId,
                   type: "agreement_ready",
                   title: "Agreement Ready to Sign",
                   message: `An agreement for request #${item.requestId} is ready for your signature.`,
                   link: `/agreements/${agreement.id}`,
                 });
                 broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
-                broadcastToUser(item.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
-                await notifyAgreementByEmail(request.sellerId, item.reusseId, item.requestId, agreement.id);
+                broadcastToUser(item.marchantId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
+                await notifyAgreementByEmail(request.sellerId, item.marchantId, item.requestId, agreement.id);
               }
             }
           }
@@ -1545,15 +1545,15 @@ export async function registerRoutes(
           action: "counter_offer",
         });
 
-        if (item.reusseId) {
+        if (item.marchantId) {
           await storage.createNotification({
-            userId: item.reusseId,
+            userId: item.marchantId,
             type: "counter_offer",
             title: "Contre-offre vendeur",
             message: `Le vendeur a proposé un nouveau prix pour "${item.title}" : ${minPrice} - ${maxPrice} EUR.`,
             link: `/requests/${item.requestId}`,
           });
-          broadcastToUser(item.reusseId, {
+          broadcastToUser(item.marchantId, {
             type: "counter_offer",
             itemId: item.id,
             itemTitle: item.title,
@@ -1608,15 +1608,15 @@ export async function registerRoutes(
         const item = await storage.updateItemConditional(id, Number(declineClientVersion), declineNewData);
         if (!item) return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
 
-        if (item.reusseId) {
+        if (item.marchantId) {
           await storage.createNotification({
-            userId: item.reusseId,
+            userId: item.marchantId,
             type: "item_declined",
             title: "Article refusé",
             message: `Le vendeur a refusé "${item.title}". Raison : ${reason.trim()}`,
             link: `/requests/${item.requestId}`,
           });
-          broadcastToUser(item.reusseId, { type: "item_declined", itemId: item.id, itemTitle: item.title, requestId: item.requestId });
+          broadcastToUser(item.marchantId, { type: "item_declined", itemId: item.id, itemTitle: item.title, requestId: item.requestId });
         }
         res.json(item);
       } catch (error) {
@@ -1637,7 +1637,7 @@ export async function registerRoutes(
 
         const existingItem = await storage.getItem(id);
         if (!existingItem) return res.status(404).json({ message: "Item not found" });
-        if (existingItem.reusseId !== userId) {
+        if (existingItem.marchantId !== userId) {
           return res.status(403).json({ message: "Only the assigned reseller can accept a counter-offer" });
         }
         if (!existingItem.sellerCounterOffer) {
@@ -1678,7 +1678,7 @@ export async function registerRoutes(
         await storage.createPriceOffer({
           itemId: id,
           proposedByUserId: userId,
-          proposedByRole: "reusse",
+          proposedByRole: "marchand",
           minPrice: existingItem.minPrice || null,
           maxPrice: existingItem.maxPrice || null,
           action: "accepted",
@@ -1696,7 +1696,7 @@ export async function registerRoutes(
         }
 
         // Trigger agreement generation if all items are now approved
-        if (item.requestId && item.reusseId) {
+        if (item.requestId && item.marchantId) {
           const request = await storage.getRequest(item.requestId);
           if (request && request.listReadyAt) {
             const existingAgreement = await storage.getAgreementByRequest(item.requestId);
@@ -1708,7 +1708,7 @@ export async function registerRoutes(
                 const agreement = await storage.createAgreement({
                   requestId: item.requestId,
                   sellerId: request.sellerId,
-                  reusseId: item.reusseId,
+                  marchantId: item.marchantId,
                   status: "pending",
                   itemCount: allItems.length,
                   totalValue,
@@ -1723,15 +1723,15 @@ export async function registerRoutes(
                   link: `/agreements/${agreement.id}`,
                 });
                 await storage.createNotification({
-                  userId: item.reusseId,
+                  userId: item.marchantId,
                   type: "agreement_ready",
                   title: "Agreement Ready to Sign",
                   message: `An agreement for request #${item.requestId} is ready for your signature.`,
                   link: `/agreements/${agreement.id}`,
                 });
                 broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
-                broadcastToUser(item.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
-                await notifyAgreementByEmail(request.sellerId, item.reusseId, item.requestId, agreement.id);
+                broadcastToUser(item.marchantId, { type: "agreement_ready", agreementId: agreement.id, requestId: item.requestId });
+                await notifyAgreementByEmail(request.sellerId, item.marchantId, item.requestId, agreement.id);
               }
             }
           }
@@ -1757,7 +1757,7 @@ export async function registerRoutes(
 
         const existingItem = await storage.getItem(id);
         if (!existingItem) return res.status(404).json({ message: "Item not found" });
-        if (existingItem.reusseId !== userId) {
+        if (existingItem.marchantId !== userId) {
           return res.status(403).json({ message: "Only the assigned reseller can revise the price" });
         }
 
@@ -1843,7 +1843,7 @@ export async function registerRoutes(
         await storage.createPriceOffer({
           itemId: id,
           proposedByUserId: userId,
-          proposedByRole: "reusse",
+          proposedByRole: "marchand",
           minPrice: minPrice || existingItem.minPrice || null,
           maxPrice: maxPrice || existingItem.maxPrice || null,
           action: "revision",
@@ -1888,7 +1888,7 @@ export async function registerRoutes(
         const original = await storage.getItem(id);
         if (!original)
           return res.status(404).json({ message: "Item not found" });
-        if (original.reusseId !== userId)
+        if (original.marchantId !== userId)
           return res.status(403).json({ message: "Not authorized" });
         if (original.requestId) {
           const parentRequest = await storage.getRequest(original.requestId);
@@ -1900,7 +1900,7 @@ export async function registerRoutes(
         const duplicate = await storage.createItem({
           requestId: original.requestId || undefined,
           sellerId: original.sellerId,
-          reusseId: original.reusseId || undefined,
+          marchantId: original.marchantId || undefined,
           title: original.title,
           description: original.description || undefined,
           brand: original.brand || undefined,
@@ -1950,7 +1950,7 @@ export async function registerRoutes(
         const existingItem = await storage.getItem(id);
         if (!existingItem)
           return res.status(404).json({ message: "Item not found" });
-        if (existingItem.reusseId !== userId) {
+        if (existingItem.marchantId !== userId) {
           return res
             .status(403)
             .json({ message: "Only the assigned reseller can list items" });
@@ -2002,7 +2002,7 @@ export async function registerRoutes(
         const existingItem = await storage.getItem(id);
         if (!existingItem)
           return res.status(404).json({ message: "Item not found" });
-        if (existingItem.reusseId !== userId) {
+        if (existingItem.marchantId !== userId) {
           return res
             .status(403)
             .json({
@@ -2021,8 +2021,8 @@ export async function registerRoutes(
         // price the route returns 400 and the item is left untouched.
         const feeRes = await resolveFeePercentages(salePriceNum);
         const sellerAmt = parseFloat(((salePriceNum * feeRes.sellerPct) / 100).toFixed(2));
-        const resellerAmt = parseFloat(((salePriceNum * feeRes.resellerPct) / 100).toFixed(2));
-        const platformAmt = parseFloat((salePriceNum - sellerAmt - resellerAmt).toFixed(2));
+        const marchantAmt = parseFloat(((salePriceNum * feeRes.marchantPct) / 100).toFixed(2));
+        const platformAmt = parseFloat((salePriceNum - sellerAmt - marchantAmt).toFixed(2));
 
         const item = await storage.updateItem(id, {
           status: "sold",
@@ -2041,11 +2041,11 @@ export async function registerRoutes(
           transaction = (await storage.updateTransaction(existingTxn.id, {
             salePrice: salePrice.toString(),
             sellerEarning: sellerAmt.toString(),
-            reusseEarning: resellerAmt.toString(),
+            marchantEarning: marchantAmt.toString(),
             platformEarning: platformAmt.toString(),
             feeTierId: feeRes.tierId,
             sellerPercent: feeRes.sellerPct.toString(),
-            resellerPercent: feeRes.resellerPct.toString(),
+            marchantPercent: feeRes.marchantPct.toString(),
             platformPercent: feeRes.platformPct.toString(),
             status: "completed",
           })) ?? null;
@@ -2054,14 +2054,14 @@ export async function registerRoutes(
             itemId: item.id,
             requestId: item.requestId || null,
             sellerId: item.sellerId,
-            reusseId: item.reusseId || req.user.claims.sub,
+            marchantId: item.marchantId || req.user.claims.sub,
             salePrice: salePrice.toString(),
             sellerEarning: sellerAmt.toString(),
-            reusseEarning: resellerAmt.toString(),
+            marchantEarning: marchantAmt.toString(),
             platformEarning: platformAmt.toString(),
             feeTierId: feeRes.tierId,
             sellerPercent: feeRes.sellerPct.toString(),
-            resellerPercent: feeRes.resellerPct.toString(),
+            marchantPercent: feeRes.marchantPct.toString(),
             platformPercent: feeRes.platformPct.toString(),
             status: "completed",
           });
@@ -2111,9 +2111,9 @@ export async function registerRoutes(
           status: "cancelled",
         });
 
-        if (request.reusseId) {
+        if (request.marchantId) {
           await storage.createNotification({
-            userId: request.reusseId,
+            userId: request.marchantId,
             type: "request_cancelled",
             title: "Request Cancelled",
             message: `Request #${id} has been cancelled.`,
@@ -2142,7 +2142,7 @@ export async function registerRoutes(
           return res.status(404).json({ message: "Request not found" });
 
         // Ownership check: only seller or assigned reusse can complete
-        if (request.sellerId !== userId && request.reusseId !== userId) {
+        if (request.sellerId !== userId && request.marchantId !== userId) {
           return res
             .status(403)
             .json({
@@ -2158,7 +2158,7 @@ export async function registerRoutes(
 
         const notifyUserId =
           req.user.claims.sub === request.sellerId
-            ? request.reusseId
+            ? request.marchantId
             : request.sellerId;
         if (notifyUserId) {
           await storage.createNotification({
@@ -2234,38 +2234,38 @@ export async function registerRoutes(
   );
 
   app.get(
-    "/api/resellers",
+    "/api/marchands",
     isAuthenticated,
     requireAuth,
     async (req: any, res) => {
       try {
-        const resellers = await storage.getResellers();
-        res.json(resellers);
+        const marchands = await storage.getResellers();
+        res.json(marchands);
       } catch (error) {
-        console.error("Error fetching resellers:", error);
-        res.status(500).json({ message: "Failed to fetch resellers" });
+        console.error("Error fetching marchands:", error);
+        res.status(500).json({ message: "Failed to fetch marchands" });
       }
     },
   );
 
   app.get(
-    "/api/resellers/:id",
+    "/api/marchands/:id",
     isAuthenticated,
     requireAuth,
     async (req: any, res) => {
       try {
-        const reseller = await storage.getResellerById(req.params.id);
-        if (!reseller) return res.status(404).json({ message: "Reseller not found" });
-        res.json(reseller);
+        const marchand = await storage.getResellerById(req.params.id);
+        if (!marchand) return res.status(404).json({ message: "Marchand not found" });
+        res.json(marchand);
       } catch (error) {
-        console.error("Error fetching reseller:", error);
-        res.status(500).json({ message: "Failed to fetch reseller" });
+        console.error("Error fetching marchand:", error);
+        res.status(500).json({ message: "Failed to fetch marchand" });
       }
     },
   );
 
   app.get(
-    "/api/resellers/:id/reviews",
+    "/api/marchands/:id/reviews",
     isAuthenticated,
     requireAuth,
     async (req: any, res) => {
@@ -2295,7 +2295,7 @@ export async function registerRoutes(
           return res.status(403).json({ message: "Not your request" });
         if (request.status !== "completed")
           return res.status(400).json({ message: "Request must be completed to review" });
-        if (!request.reusseId)
+        if (!request.marchantId)
           return res.status(400).json({ message: "No reseller assigned" });
         const schema = z.object({
           rating: z.number().int().min(1).max(5),
@@ -2310,11 +2310,11 @@ export async function registerRoutes(
         const review = await storage.createReview({
           requestId: id,
           sellerId: userId,
-          reusseId: request.reusseId,
+          marchantId: request.marchantId,
           ...parsed.data,
         });
         await storage.createNotification({
-          userId: request.reusseId,
+          userId: request.marchantId,
           type: "review_received",
           title: "Avis reçu",
           message: `Un vendeur a laissé un avis ${parsed.data.rating}/5 pour la demande #${id}.`,
@@ -2340,7 +2340,7 @@ export async function registerRoutes(
         if (!item) return res.status(404).json({ message: "Item not found" });
         const profile = await storage.getProfile(userId);
         const isAdmin = profile?.role === "admin";
-        if (!isAdmin && item.sellerId !== userId && item.reusseId !== userId) {
+        if (!isAdmin && item.sellerId !== userId && item.marchantId !== userId) {
           return res.status(403).json({ message: "Not authorized" });
         }
         const docs = await storage.getItemDocuments(itemId);
@@ -2364,7 +2364,7 @@ export async function registerRoutes(
         if (!item) return res.status(404).json({ message: "Item not found" });
         const profile = await storage.getProfile(userId);
         const isAdmin = profile?.role === "admin";
-        if (!isAdmin && item.sellerId !== userId && item.reusseId !== userId) {
+        if (!isAdmin && item.sellerId !== userId && item.marchantId !== userId) {
           return res.status(403).json({ message: "Not authorized" });
         }
         const ALLOWED_EXTENSIONS = /\.(jpe?g|png|webp|gif|pdf)$/i;
@@ -2421,7 +2421,7 @@ export async function registerRoutes(
           fileSize: parsed.data.fileSize || null,
         });
 
-        const notifyUserId = userId === item.sellerId ? item.reusseId : item.sellerId;
+        const notifyUserId = userId === item.sellerId ? item.marchantId : item.sellerId;
         if (notifyUserId) {
           await storage.createNotification({
             userId: notifyUserId,
@@ -2457,10 +2457,10 @@ export async function registerRoutes(
         const item = await storage.getItem(itemId);
         if (!item) return res.status(404).json({ message: "Item not found" });
         const profile = await storage.getProfile(userId);
-        if (!profile || profile.role !== "reusse") {
+        if (!profile || profile.role !== "marchand") {
           return res.status(403).json({ message: "Only resellers can request documents" });
         }
-        if (item.reusseId !== userId) {
+        if (item.marchantId !== userId) {
           return res.status(403).json({ message: "Not assigned to this item" });
         }
         const existing = await storage.getDocumentRequestStatus(itemId, userId);
@@ -2517,10 +2517,10 @@ export async function registerRoutes(
         if (!item) return res.status(404).json({ message: "Item not found" });
         const profile = await storage.getProfile(userId);
         const isAdmin = profile?.role === "admin";
-        if (!isAdmin && item.sellerId !== userId && item.reusseId !== userId) {
+        if (!isAdmin && item.sellerId !== userId && item.marchantId !== userId) {
           return res.status(403).json({ message: "Not authorized" });
         }
-        const requestUserId = profile?.role === "reusse" ? userId : item.reusseId;
+        const requestUserId = profile?.role === "marchand" ? userId : item.marchantId;
         const existing = requestUserId
           ? await storage.getDocumentRequestStatus(itemId, requestUserId)
           : null;
@@ -2545,7 +2545,7 @@ export async function registerRoutes(
         if (!item) return res.status(404).json({ message: "Item not found" });
         const profile = await storage.getProfile(userId);
         const isAdmin = profile?.role === "admin";
-        if (!isAdmin && item.sellerId !== userId && item.reusseId !== userId) {
+        if (!isAdmin && item.sellerId !== userId && item.marchantId !== userId) {
           return res.status(403).json({ message: "Not authorized" });
         }
         const doc = await storage.getItemDocument(docId);
@@ -2638,12 +2638,12 @@ export async function registerRoutes(
         const userId = req.user.claims.sub;
         const id = parseInt(req.params.id);
         const profile = await storage.getProfile(userId);
-        if (!profile || profile.role !== "reusse") {
+        if (!profile || profile.role !== "marchand") {
           return res.status(403).json({ message: "Only resellers can finalize the item list" });
         }
         const request = await storage.getRequest(id);
         if (!request) return res.status(404).json({ message: "Request not found" });
-        if (request.reusseId !== userId) return res.status(403).json({ message: "Not assigned to this request" });
+        if (request.marchantId !== userId) return res.status(403).json({ message: "Not assigned to this request" });
         if (request.listReadyAt) return res.status(409).json({ message: "List already finalized" });
 
         const existingItems = await storage.getItemsByRequest(id);
@@ -2670,7 +2670,7 @@ export async function registerRoutes(
             const agreement = await storage.createAgreement({
               requestId: id,
               sellerId: request.sellerId,
-              reusseId: userId,
+              marchantId: userId,
               status: "pending",
               itemCount: items.length,
               totalValue,
@@ -2718,7 +2718,7 @@ export async function registerRoutes(
         const request = await storage.getRequest(id);
         if (!request) return res.status(404).json({ message: "Request not found" });
         const isAdmin = profile?.role === "admin";
-        const isParticipant = request.sellerId === userId || request.reusseId === userId;
+        const isParticipant = request.sellerId === userId || request.marchantId === userId;
         if (!isAdmin && !isParticipant) {
           return res.status(403).json({ message: "Not authorized to view this agreement" });
         }
@@ -2744,14 +2744,14 @@ export async function registerRoutes(
         const request = await storage.getRequest(requestId);
         if (!request) return res.status(404).json({ message: "Request not found" });
         const isAdmin = profile?.role === "admin";
-        const isParticipant = request.sellerId === userId || request.reusseId === userId;
+        const isParticipant = request.sellerId === userId || request.marchantId === userId;
         if (!isAdmin && !isParticipant) {
           return res.status(403).json({ message: "Not authorized" });
         }
         if (!request.listReadyAt) {
           return res.status(400).json({ message: "Item list not yet finalized" });
         }
-        if (!request.reusseId) {
+        if (!request.marchantId) {
           return res.status(400).json({ message: "No reseller assigned" });
         }
         const existing = await storage.getAgreementByRequest(requestId);
@@ -2768,7 +2768,7 @@ export async function registerRoutes(
         const agreement = await storage.createAgreement({
           requestId,
           sellerId: request.sellerId,
-          reusseId: request.reusseId,
+          marchantId: request.marchantId,
           status: "pending",
           itemCount: items.length,
           totalValue,
@@ -2783,15 +2783,15 @@ export async function registerRoutes(
           link: `/agreements/${agreement.id}`,
         });
         await storage.createNotification({
-          userId: request.reusseId,
+          userId: request.marchantId,
           type: "agreement_ready",
           title: "Agreement Ready to Sign",
           message: `An agreement for request #${requestId} is ready for your signature.`,
           link: `/agreements/${agreement.id}`,
         });
         broadcastToUser(request.sellerId, { type: "agreement_ready", agreementId: agreement.id, requestId });
-        broadcastToUser(request.reusseId, { type: "agreement_ready", agreementId: agreement.id, requestId });
-        await notifyAgreementByEmail(request.sellerId, request.reusseId, requestId, agreement.id);
+        broadcastToUser(request.marchantId, { type: "agreement_ready", agreementId: agreement.id, requestId });
+        await notifyAgreementByEmail(request.sellerId, request.marchantId, requestId, agreement.id);
         res.json(agreement);
       } catch (error: any) {
         if (error?.statusCode === 400) return res.status(400).json({ message: error.message });
@@ -2812,7 +2812,7 @@ export async function registerRoutes(
         const profile = await storage.getProfile(userId);
         const agreement = await storage.getAgreementWithDetails(id);
         if (!agreement) return res.status(404).json({ message: "Agreement not found" });
-        if (profile?.role !== "admin" && agreement.sellerId !== userId && agreement.reusseId !== userId) {
+        if (profile?.role !== "admin" && agreement.sellerId !== userId && agreement.marchantId !== userId) {
           return res.status(403).json({ message: "Not authorized" });
         }
         res.json(agreement);
@@ -2842,7 +2842,7 @@ export async function registerRoutes(
         const agreement = await storage.getAgreement(id);
         if (!agreement) return res.status(404).json({ message: "Agreement not found" });
 
-        if (agreement.sellerId !== userId && agreement.reusseId !== userId) {
+        if (agreement.sellerId !== userId && agreement.marchantId !== userId) {
           return res.status(403).json({ message: "Not a party to this agreement" });
         }
 
@@ -2850,13 +2850,13 @@ export async function registerRoutes(
         if (existingSig) return res.status(409).json({ message: "Already signed this agreement" });
 
         const ipAddress = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
-        const role = agreement.sellerId === userId ? "seller" : "reusse";
+        const role = agreement.sellerId === userId ? "seller" : "marchand";
 
         await storage.createAgreementSignature({ agreementId: id, userId, role, ipAddress });
 
         const allSigs = await storage.getAgreementSignatures(id);
         const hasSeller = allSigs.some((s) => s.userId === agreement.sellerId);
-        const hasReusse = allSigs.some((s) => s.userId === agreement.reusseId);
+        const hasReusse = allSigs.some((s) => s.userId === agreement.marchantId);
 
         let newStatus = agreement.status;
         if (hasSeller && hasReusse) {
@@ -2869,7 +2869,7 @@ export async function registerRoutes(
 
         await storage.updateAgreementStatus(id, newStatus);
 
-        const otherUserId = agreement.sellerId === userId ? agreement.reusseId : agreement.sellerId;
+        const otherUserId = agreement.sellerId === userId ? agreement.marchantId : agreement.sellerId;
         await storage.createNotification({
           userId: otherUserId,
           type: "agreement_signed",
@@ -2891,20 +2891,20 @@ export async function registerRoutes(
               if (!existingTxn) {
                 const feeRes = await resolveFeePercentages(price);
                 const sellerAmt = parseFloat(((price * feeRes.sellerPct) / 100).toFixed(2));
-                const resellerAmt = parseFloat(((price * feeRes.resellerPct) / 100).toFixed(2));
-                const platformAmt = parseFloat((price - sellerAmt - resellerAmt).toFixed(2));
+                const marchantAmt = parseFloat(((price * feeRes.marchantPct) / 100).toFixed(2));
+                const platformAmt = parseFloat((price - sellerAmt - marchantAmt).toFixed(2));
                 await storage.createTransaction({
                   itemId: matchingItem.id,
                   requestId: agreement.requestId,
                   sellerId: agreement.sellerId,
-                  reusseId: agreement.reusseId,
+                  marchantId: agreement.marchantId,
                   salePrice: price.toString(),
                   sellerEarning: sellerAmt.toString(),
-                  reusseEarning: resellerAmt.toString(),
+                  marchantEarning: marchantAmt.toString(),
                   platformEarning: platformAmt.toString(),
                   feeTierId: feeRes.tierId,
                   sellerPercent: feeRes.sellerPct.toString(),
-                  resellerPercent: feeRes.resellerPct.toString(),
+                  marchantPercent: feeRes.marchantPct.toString(),
                   platformPercent: feeRes.platformPct.toString(),
                   status: "completed",
                 });
@@ -2941,7 +2941,7 @@ export async function registerRoutes(
         const agreement = await storage.getAgreementWithDetails(id);
         if (!agreement) return res.status(404).json({ message: "Agreement not found" });
 
-        if (agreement.sellerId !== userId && agreement.reusseId !== userId && profile.role !== "admin") {
+        if (agreement.sellerId !== userId && agreement.marchantId !== userId && profile.role !== "admin") {
           return res.status(403).json({ message: "Not authorized" });
         }
 
@@ -2960,10 +2960,10 @@ export async function registerRoutes(
           approvedPrice: number;
           fees: {
             sellerAmount: number;
-            resellerAmount: number;
+            marchantAmount: number;
             platformAmount: number;
             sellerPct?: number;
-            resellerPct?: number;
+            marchantPct?: number;
             platformPct?: number;
           };
         }>;
@@ -2971,7 +2971,7 @@ export async function registerRoutes(
         const sellerName = agreement.seller
           ? `${agreement.seller.firstName || ""} ${agreement.seller.lastName || ""}`.trim() || agreement.seller.email || "Unknown"
           : "Unknown";
-        const reusseName = agreement.reusse
+        const marchantName = agreement.reusse
           ? `${agreement.reusse.firstName || ""} ${agreement.reusse.lastName || ""}`.trim() || agreement.reusse.email || "Unknown"
           : "Unknown";
 
@@ -2987,15 +2987,15 @@ export async function registerRoutes(
           status: agreement.status,
           generatedAt: agreement.generatedAt,
           seller: agreement.seller ? { name: sellerName, email: agreement.seller.email } : null,
-          reusse: agreement.reusse ? { name: reusseName, email: agreement.reusse.email } : null,
+          marchand: agreement.marchand ? { name: marchantName, email: agreement.marchand.email } : null,
           items: parsedItems.map((item) => ({
             title: item.title,
             approvedPrice: item.approvedPrice,
             sellerAmount: item.fees.sellerAmount,
-            resellerAmount: item.fees.resellerAmount,
+            marchantAmount: item.fees.marchantAmount,
             platformAmount: item.fees.platformAmount,
             sellerPct: item.fees.sellerPct,
-            resellerPct: item.fees.resellerPct,
+            marchantPct: item.fees.marchantPct,
             platformPct: item.fees.platformPct,
           })),
           signatures: (agreement.signatures as Array<{ role: string; userName: string; signedAt: string }>).map((sig) => ({
@@ -3035,7 +3035,7 @@ export async function registerRoutes(
     minPrice: z.string().min(1),
     maxPrice: z.string().optional().nullable(),
     sellerPercent: z.string().min(1),
-    resellerPercent: z.string().min(1),
+    marchantPercent: z.string().min(1),
     platformPercent: z.string().min(1),
     currencyNote: z.string().optional(),
     isActive: z.boolean().optional(),
@@ -3053,10 +3053,10 @@ export async function registerRoutes(
       }
     }
     const s = parseFloat(data.sellerPercent);
-    const r = parseFloat(data.resellerPercent);
+    const r = parseFloat(data.marchantPercent);
     const p = parseFloat(data.platformPercent);
     if (isNaN(s) || s < 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "sellerPercent must be a non-negative number", path: ["sellerPercent"] });
-    if (isNaN(r) || r < 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "resellerPercent must be a non-negative number", path: ["resellerPercent"] });
+    if (isNaN(r) || r < 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "marchantPercent must be a non-negative number", path: ["marchantPercent"] });
     if (isNaN(p) || p < 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "platformPercent must be a non-negative number", path: ["platformPercent"] });
     const total = s + r + p;
     if (Math.abs(total - 100) > 0.01) {
@@ -3093,7 +3093,7 @@ export async function registerRoutes(
   app.post("/api/admin/fee-tiers", isAuthenticated, requireAdmin, validate(feeTierSchema), async (req: any, res) => {
     try {
       const adminId = req.user.claims.sub;
-      const { label, minPrice, maxPrice, sellerPercent, resellerPercent, platformPercent, currencyNote } = req.body;
+      const { label, minPrice, maxPrice, sellerPercent, marchantPercent, platformPercent, currencyNote } = req.body;
       const overlapError = await checkTierOverlap(minPrice, maxPrice);
       if (overlapError) return res.status(400).json({ message: overlapError, errorCode: "TIER_OVERLAP" });
       const tier = await storage.createFeeTier({
@@ -3101,7 +3101,7 @@ export async function registerRoutes(
         minPrice,
         maxPrice: maxPrice || null,
         sellerPercent,
-        resellerPercent,
+        marchantPercent,
         platformPercent,
         currencyNote: currencyNote || "EUR/CHF",
         isActive: true,
@@ -3125,7 +3125,7 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const existing = await storage.getFeeTier(id);
       if (!existing) return res.status(404).json({ message: "Fee tier not found" });
-      const { label, minPrice, maxPrice, sellerPercent, resellerPercent, platformPercent, currencyNote, isActive } = req.body;
+      const { label, minPrice, maxPrice, sellerPercent, marchantPercent, platformPercent, currencyNote, isActive } = req.body;
       const willBeActive = isActive !== undefined ? isActive : existing.isActive;
       if (willBeActive) {
         const overlapError = await checkTierOverlap(minPrice, maxPrice, id);
@@ -3136,7 +3136,7 @@ export async function registerRoutes(
         minPrice,
         maxPrice: maxPrice || null,
         sellerPercent,
-        resellerPercent,
+        marchantPercent,
         platformPercent,
         currencyNote: currencyNote || "EUR/CHF",
         isActive: isActive !== undefined ? isActive : existing.isActive,
@@ -3228,7 +3228,7 @@ export async function registerRoutes(
         const id = parseInt(req.params.id);
         const userId = req.user.claims.sub;
         const profile = await storage.getProfile(userId);
-        if (!profile || profile.role !== "reusse")
+        if (!profile || profile.role !== "marchand")
           return res.status(403).json({ message: "Only resellers can report requests" });
         const request = await storage.getRequest(id);
         if (!request)

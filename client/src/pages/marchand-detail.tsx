@@ -62,7 +62,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-export default function ResellerDetailPage() {
+export default function MarchendDetailPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { t } = useI18n();
@@ -72,19 +72,19 @@ export default function ResellerDetailPage() {
   const { data: profile } = useQuery<Profile>({ queryKey: ["/api/profile"] });
   const isSeller = profile?.role === "seller";
 
-  const { data: reseller, isLoading: resellerLoading } = useQuery<any>({
-    queryKey: ["/api/resellers", params.id],
+  const { data: marchand, isLoading: marchandLoading } = useQuery<any>({
+    queryKey: ["/api/marchands", params.id],
     queryFn: async () => {
-      const res = await fetch(`/api/resellers/${params.id}`, { credentials: "include" });
+      const res = await fetch(`/api/marchands/${params.id}`, { credentials: "include" });
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
   });
 
   const { data: reviews, isLoading: reviewsLoading } = useQuery<any[]>({
-    queryKey: ["/api/resellers", params.id, "reviews"],
+    queryKey: ["/api/marchands", params.id, "reviews"],
     queryFn: async () => {
-      const res = await fetch(`/api/resellers/${params.id}/reviews`, { credentials: "include" });
+      const res = await fetch(`/api/marchands/${params.id}/reviews`, { credentials: "include" });
       return res.json();
     },
   });
@@ -95,7 +95,7 @@ export default function ResellerDetailPage() {
   });
 
   const completedWithThis = (myRequests || []).filter(
-    (r: any) => r.reusseId === params.id && r.status === "completed"
+    (r: any) => r.marchantId === params.id && r.status === "completed"
   );
   const canReview = isSeller && completedWithThis.length > 0;
 
@@ -122,8 +122,8 @@ export default function ResellerDetailPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/resellers", params.id, "reviews"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/resellers", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/marchands", params.id, "reviews"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/marchands", params.id] });
       setShowReviewForm(false);
       setRating(0);
       setCommRating(0);
@@ -134,7 +134,7 @@ export default function ResellerDetailPage() {
     },
   });
 
-  if (resellerLoading) {
+  if (marchandLoading) {
     return (
       <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-4">
         <Skeleton className="h-8 w-32" />
@@ -144,10 +144,10 @@ export default function ResellerDetailPage() {
     );
   }
 
-  if (!reseller) {
+  if (!marchand) {
     return (
       <div className="p-4 sm:p-6 max-w-3xl mx-auto text-center text-muted-foreground">
-        <p>Reseller not found.</p>
+        <p>Marchand not found.</p>
       </div>
     );
   }
@@ -155,50 +155,50 @@ export default function ResellerDetailPage() {
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Button size="icon" variant="ghost" onClick={() => setLocation("/resellers")} data-testid="button-back-resellers">
+        <Button size="icon" variant="ghost" onClick={() => setLocation("/marchands")} data-testid="button-back-marchands">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-bold" data-testid="text-reseller-profile-title">{t("resellerProfile")}</h1>
+        <h1 className="text-xl font-bold" data-testid="text-marchand-profile-title">{t("marchandProfile")}</h1>
       </div>
 
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-start gap-4">
             <Avatar className="h-16 w-16 shrink-0">
-              <AvatarImage src={reseller.profileImageUrl || ""} />
+              <AvatarImage src={marchand.profileImageUrl || ""} />
               <AvatarFallback className="bg-[hsl(var(--success))]/20 text-[hsl(var(--success))] text-xl font-semibold">
-                {getInitials(reseller.firstName, reseller.lastName)}
+                {getInitials(marchand.firstName, marchand.lastName)}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-semibold" data-testid="text-reseller-name">
-                {reseller.firstName || reseller.email?.split("@")[0] || "Reseller"}
-                {reseller.lastName ? ` ${reseller.lastName}` : ""}
+              <h2 className="text-lg font-semibold" data-testid="text-marchand-name">
+                {marchand.firstName || marchand.email?.split("@")[0] || "Marchand"}
+                {marchand.lastName ? ` ${marchand.lastName}` : ""}
               </h2>
-              {(reseller.department || reseller.city) && (
+              {(marchand.department || marchand.city) && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
                   <MapPin className="h-3.5 w-3.5" />
-                  {reseller.city ? `${reseller.city}, ` : ""}{reseller.department}
+                  {marchand.city ? `${marchand.city}, ` : ""}{marchand.department}
                 </p>
               )}
               <div className="flex items-center gap-2 mt-2">
-                <StarDisplay rating={reseller.avgRating} size="md" />
+                <StarDisplay rating={marchand.avgRating} size="md" />
                 <span className="text-sm font-medium" data-testid="text-avg-rating">
-                  {reseller.avgRating > 0 ? reseller.avgRating.toFixed(1) : "—"}
+                  {marchand.avgRating > 0 ? marchand.avgRating.toFixed(1) : "—"}
                 </span>
-                {reseller.reviewCount > 0 && (
-                  <span className="text-xs text-muted-foreground">({reseller.reviewCount} {t("reviews")})</span>
+                {marchand.reviewCount > 0 && (
+                  <span className="text-xs text-muted-foreground">({marchand.reviewCount} {t("reviews")})</span>
                 )}
               </div>
-              {reseller.bio ? (
-                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{reseller.bio}</p>
+              {marchand.bio ? (
+                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{marchand.bio}</p>
               ) : (
                 <p className="text-sm text-muted-foreground/50 mt-2 italic">{t("noBio")}</p>
               )}
-              {reseller.experience && (
+              {marchand.experience && (
                 <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                   <span className="font-medium not-italic text-foreground">{t("resaleExperience")}: </span>
-                  {reseller.experience}
+                  {marchand.experience}
                 </p>
               )}
             </div>
@@ -208,14 +208,14 @@ export default function ResellerDetailPage() {
 
       <Card>
         <CardHeader className="pb-0 pt-4 px-4">
-          <CardTitle className="text-sm font-semibold">{t("resellerStats")}</CardTitle>
+          <CardTitle className="text-sm font-semibold">{t("marchandStats")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 border-t">
-            <StatCard label={t("completedRequests")} value={reseller.completedRequests} />
-            <StatCard label={t("soldItems")} value={reseller.soldItems} />
-            <StatCard label={t("avgCommunication")} value={reseller.avgCommunication > 0 ? reseller.avgCommunication.toFixed(1) : "—"} />
-            <StatCard label={t("avgReliability")} value={reseller.avgReliability > 0 ? reseller.avgReliability.toFixed(1) : "—"} />
+            <StatCard label={t("completedRequests")} value={marchand.completedRequests} />
+            <StatCard label={t("soldItems")} value={marchand.soldItems} />
+            <StatCard label={t("avgCommunication")} value={marchand.avgCommunication > 0 ? marchand.avgCommunication.toFixed(1) : "—"} />
+            <StatCard label={t("avgReliability")} value={marchand.avgReliability > 0 ? marchand.avgReliability.toFixed(1) : "—"} />
           </div>
         </CardContent>
       </Card>
@@ -240,7 +240,7 @@ export default function ResellerDetailPage() {
 
               {completedWithThis.length > 1 && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs">{t("request")}</Label>
+                  <Label className="text-xs">{t("selectRequest")}</Label>
                   <select
                     className="w-full text-sm border rounded-md p-2 bg-background"
                     value={selectedRequest ?? ""}

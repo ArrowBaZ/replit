@@ -69,7 +69,7 @@ const translations = {
     availableRequests: "Available Requests",
     myAssignments: "My Assignments",
     administration: "Administration",
-    reusse: "Reseller",
+    marchand: "Marchand",
 
     // Onboarding
     welcomeToSellzy: "Welcome to Sellzy",
@@ -80,6 +80,8 @@ const translations = {
     resellerDesc: "I'm a resale expert looking for items to sell.",
     continue: "Continue",
     back: "Back",
+    cancel: "Cancel",
+    selectRequest: "Select Request",
     contactInfo: "Contact Information",
     phoneNumber: "Phone Number",
     address: "Address",
@@ -121,7 +123,7 @@ const translations = {
     quickActions: "Quick Actions",
 
     // Reusse Dashboard
-    reusseDashSubtitle: "Manage your assignments and earnings.",
+    marchandDashSubtitle: "Manage your assignments and earnings.",
     applicationUnderReview: "Application Under Review",
     applicationReviewMsg: "Your reseller application is being reviewed by our team. We'll notify you once it's approved. This usually takes 1-2 business days.",
     assignedItems: "Assigned Items",
@@ -187,10 +189,12 @@ const translations = {
     newRequestTitle: "New Request",
     serviceType: "Service Type",
     classic: "Classic",
+    classicShort: "Classic (few items)",
     classicDesc: "Standard pickup and resale of your items.",
     express: "Express",
     expressDesc: "Priority handling with faster turnaround.",
     sosDressing: "SOS Dressing",
+    sosDressingShort: "SOS: Help marchand assess items",
     sosDressingDesc: "Full wardrobe cleanout and resale.",
     numberOfItems: "Estimated Number of Items",
     estimatedValue: "Estimated Value",
@@ -363,7 +367,7 @@ const translations = {
     duplicateItem: "Duplicate",
     sellerAvailability: "Seller availability",
     sellerContact: "Seller contact",
-    reusseContact: "Reseller contact",
+    marchandContact: "Marchand contact",
     availableFrom: "From",
     availableTo: "To",
     notSpecified: "Not specified",
@@ -392,7 +396,7 @@ const translations = {
     noEarningsYet: "No earnings yet",
     earningsWillAppear: "Earnings will appear here once items are sold.",
     sellerEarning: "Seller Earning",
-    reusseEarning: "Reseller Earning",
+    marchandEarning: "Marchand Earning",
 
     // Static pages
     faq: "FAQ",
@@ -420,17 +424,17 @@ const translations = {
     photoGuidanceCert: "For luxury items: include the authenticity certificate",
 
     // Reseller discovery (T004)
-    discoverResellers: "Discover Resellers",
-    resellerSearchPlaceholder: "Search by name, city or department...",
+    discoverMarchands: "Discover Marchands",
+    marchandSearchPlaceholder: "Search by name, city or department...",
     sortBy: "Sort by",
     sortRating: "Best rated",
     sortCompleted: "Most experienced",
-    noResellersFound: "No resellers found",
+    noMarchangsFound: "No marchands found",
     viewProfile: "View Profile",
     reviews: "reviews",
     completedRequests: "Completed",
-    resellerProfile: "Reseller Profile",
-    resellerStats: "Statistics",
+    marchandProfile: "Marchand Profile",
+    marchandStats: "Statistics",
     avgRating: "Avg. rating",
     avgCommunication: "Communication",
     avgReliability: "Reliability",
@@ -571,7 +575,7 @@ const translations = {
     availableRequests: "Demandes disponibles",
     myAssignments: "Mes missions",
     administration: "Administration",
-    reusse: "Revendeur",
+    marchand: "Marchand",
 
     // Onboarding
     welcomeToSellzy: "Bienvenue sur Sellzy",
@@ -582,6 +586,8 @@ const translations = {
     resellerDesc: "Je suis un expert en revente a la recherche d'articles a vendre.",
     continue: "Continuer",
     back: "Retour",
+    cancel: "Annuler",
+    selectRequest: "Sélectionner la demande",
     contactInfo: "Coordonnees",
     phoneNumber: "Numero de telephone",
     address: "Adresse",
@@ -623,7 +629,7 @@ const translations = {
     quickActions: "Actions rapides",
 
     // Reusse Dashboard
-    reusseDashSubtitle: "Gerez vos missions et vos gains.",
+    marchandDashSubtitle: "Gerez vos missions et vos gains.",
     applicationUnderReview: "Candidature en cours d'examen",
     applicationReviewMsg: "Votre candidature de revendeur est en cours d'examen par notre equipe. Nous vous notifierons une fois approuvee. Cela prend generalement 1 a 2 jours ouvrables.",
     assignedItems: "Articles assignes",
@@ -689,10 +695,12 @@ const translations = {
     newRequestTitle: "Nouvelle demande",
     serviceType: "Type de service",
     classic: "Classique",
+    classicShort: "Classique (peu d'articles)",
     classicDesc: "Collecte et revente standard de vos articles.",
     express: "Express",
     expressDesc: "Traitement prioritaire avec un delai plus rapide.",
     sosDressing: "SOS Dressing",
+    sosDressingShort: "SOS: Aide du marchand a evaluer les articles",
     sosDressingDesc: "Vidage complet de garde-robe et revente.",
     numberOfItems: "Nombre estime d'articles",
     estimatedValue: "Valeur estimee",
@@ -865,7 +873,7 @@ const translations = {
     duplicateItem: "Dupliquer",
     sellerAvailability: "Disponibilite du vendeur",
     sellerContact: "Contact vendeur",
-    reusseContact: "Contact revendeur",
+    marchandContact: "Contact marchand",
     availableFrom: "A partir du",
     availableTo: "Jusqu'au",
     notSpecified: "Non specifie",
@@ -894,7 +902,7 @@ const translations = {
     noEarningsYet: "Pas encore de gains",
     earningsWillAppear: "Les gains apparaitront ici une fois les articles vendus.",
     sellerEarning: "Gain vendeur",
-    reusseEarning: "Gain revendeur",
+    marchandEarning: "Gain marchand",
 
     // Static pages
     faq: "FAQ",
@@ -922,12 +930,12 @@ const translations = {
     photoGuidanceCert: "Pour les articles de luxe : incluez le certificat d'authenticité",
 
     // Reseller discovery (T004)
-    discoverResellers: "Découvrir les revendeurs",
+    discoverMarchands: "Découvrir les marchands",
     resellerSearchPlaceholder: "Rechercher par nom, ville ou département...",
     sortBy: "Trier par",
     sortRating: "Mieux notés",
     sortCompleted: "Plus expérimentés",
-    noResellersFound: "Aucun revendeur trouvé",
+    noMarchangsFound: "Aucun marchand trouvé",
     viewProfile: "Voir le profil",
     reviews: "avis",
     completedRequests: "Complétées",

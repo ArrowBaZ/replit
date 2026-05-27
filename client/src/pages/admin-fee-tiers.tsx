@@ -58,13 +58,13 @@ const tierFormSchema = z
     minPrice: z.string().min(1, "Min price is required"),
     maxPrice: z.string().optional(),
     sellerPercent: z.string().min(1, "Required"),
-    resellerPercent: z.string().min(1, "Required"),
+    marchantPercent: z.string().min(1, "Required"),
     platformPercent: z.string().min(1, "Required"),
     currencyNote: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     const s = parseFloat(data.sellerPercent);
-    const r = parseFloat(data.resellerPercent);
+    const r = parseFloat(data.marchantPercent);
     const p = parseFloat(data.platformPercent);
     const total = s + r + p;
     if (Math.abs(total - 100) > 0.01) {
@@ -98,7 +98,7 @@ function TierForm({
       minPrice: "",
       maxPrice: "",
       sellerPercent: "",
-      resellerPercent: "",
+      marchantPercent: "",
       platformPercent: "",
       currencyNote: "EUR/CHF",
       ...defaultValues,
@@ -106,9 +106,9 @@ function TierForm({
   });
 
   const seller = parseFloat(form.watch("sellerPercent") || "0");
-  const reseller = parseFloat(form.watch("resellerPercent") || "0");
+  const marchand = parseFloat(form.watch("marchantPercent") || "0");
   const platform = parseFloat(form.watch("platformPercent") || "0");
-  const total = isNaN(seller + reseller + platform) ? 0 : seller + reseller + platform;
+  const total = isNaN(seller + marchand + platform) ? 0 : seller + marchand + platform;
   const totalOk = Math.abs(total - 100) < 0.01;
 
   return (
@@ -189,12 +189,12 @@ function TierForm({
             />
             <FormField
               control={form.control}
-              name="resellerPercent"
+              name="marchantPercent"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Reseller %</FormLabel>
+                  <FormLabel>Marchand %</FormLabel>
                   <FormControl>
-                    <Input type="number" min="0" max="100" step="0.01" placeholder="40" {...field} data-testid="input-reseller-percent" />
+                    <Input type="number" min="0" max="100" step="0.01" placeholder="40" {...field} data-testid="input-marchand-percent" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -576,7 +576,7 @@ export default function AdminFeeTiersPage() {
       minPrice: tier.minPrice?.toString() || "",
       maxPrice: tier.maxPrice?.toString() || "",
       sellerPercent: tier.sellerPercent?.toString() || "",
-      resellerPercent: tier.resellerPercent?.toString() || "",
+      marchantPercent: tier.marchantPercent?.toString() || "",
       platformPercent: tier.platformPercent?.toString() || "",
       currencyNote: tier.currencyNote || "EUR/CHF",
     };
@@ -654,9 +654,9 @@ export default function AdminFeeTiersPage() {
                           <p className="text-xs text-muted-foreground">Seller</p>
                           <p className="font-bold text-emerald-600 dark:text-emerald-400">{formatPercent(tier.sellerPercent)}</p>
                         </div>
-                        <div className="text-center" data-testid={`text-reseller-pct-${tier.id}`}>
-                          <p className="text-xs text-muted-foreground">Reseller</p>
-                          <p className="font-bold text-blue-600 dark:text-blue-400">{formatPercent(tier.resellerPercent)}</p>
+                        <div className="text-center" data-testid={`text-marchand-pct-${tier.id}`}>
+                          <p className="text-xs text-muted-foreground">Marchand</p>
+                          <p className="font-bold text-blue-600 dark:text-blue-400">{formatPercent(tier.marchantPercent)}</p>
                         </div>
                         <div className="text-center" data-testid={`text-platform-pct-${tier.id}`}>
                           <p className="text-xs text-muted-foreground">Platform</p>
@@ -749,7 +749,7 @@ export default function AdminFeeTiersPage() {
                       )}
                       {entry.action === "create" && next && (
                         <div className="mt-2 text-xs text-muted-foreground">
-                          {["sellerPercent","resellerPercent","platformPercent"].map((k) => (
+                          {["sellerPercent","marchantPercent","platformPercent"].map((k) => (
                             <span key={k} className="mr-3">{k}: <span className="font-medium text-foreground">{String(next[k] ?? "—")}%</span></span>
                           ))}
                           <span>range: {String(next.minPrice ?? "0")}–{String(next.maxPrice ?? "∞")}</span>

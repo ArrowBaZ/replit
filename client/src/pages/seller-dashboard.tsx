@@ -54,9 +54,9 @@ export default function SellerDashboard() {
   const totalEarnings = soldItems.reduce((sum, i) => sum + (parseFloat(i.salePrice || "0") * 0.8), 0);
 
   const serviceTypeLabels: Record<string, string> = {
-    classic: t("classic"),
+    classic: t("classicShort"),
     express: t("express"),
-    sos_dressing: t("sosDressing"),
+    sos_dressing: t("sosDressingShort"),
   };
 
   const translateStatus = (status: string) => {

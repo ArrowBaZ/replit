@@ -53,7 +53,7 @@ export default function AdminRequestsPage() {
   const [showMessageModal, setShowMessageModal] = useState<number | null>(null);
   const [messageText, setMessageText] = useState("");
   const [messageChecks, setMessageChecks] = useState<Record<string, boolean>>({});
-  const [showRejectModal, setShowRejectModal] = useState<{ id: number; hasReusse: boolean } | null>(null);
+  const [showRejectModal, setShowRejectModal] = useState<{ id: number; hasMarchand: boolean } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
   const { data: requests, isLoading } = useQuery<any[]>({
@@ -92,9 +92,9 @@ export default function AdminRequestsPage() {
   };
 
   const serviceTypeLabels: Record<string, string> = {
-    classic: t("classic"),
+    classic: t("classicShort"),
     express: t("express"),
-    sos_dressing: t("sosDressing"),
+    sos_dressing: t("sosDressingShort"),
   };
 
   const flagRequest = useMutation({
@@ -243,8 +243,8 @@ export default function AdminRequestsPage() {
                     {request.meetingLocation}
                   </span>
                 )}
-                {request.reusseId && (
-                  <span className="text-blue-600 dark:text-blue-400">Reseller assigned</span>
+                {request.marchantId && (
+                  <span className="text-blue-600 dark:text-blue-400">Marchand assigned</span>
                 )}
               </div>
 
@@ -276,7 +276,7 @@ export default function AdminRequestsPage() {
                   size="sm"
                   variant="outline"
                   className="text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  onClick={() => { setShowRejectModal({ id: request.id, hasReusse: !!request.reusseId }); setRejectReason(""); }}
+                  onClick={() => { setShowRejectModal({ id: request.id, hasMarchand: !!request.marchantId }); setRejectReason(""); }}
                   disabled={request.status === "cancelled" || request.status === "completed"}
                   data-testid={`button-reject-${request.id}`}
                 >
@@ -379,7 +379,7 @@ export default function AdminRequestsPage() {
         <DialogContent>
           <DialogHeader><DialogTitle className="flex items-center gap-2"><XCircle className="h-4 w-4 text-red-500" />{t("confirmReject")}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            {showRejectModal?.hasReusse && (
+            {showRejectModal?.hasMarchand && (
               <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-800">
                 <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                 <p className="text-sm text-amber-700 dark:text-amber-400">{t("rejectWarning")}</p>

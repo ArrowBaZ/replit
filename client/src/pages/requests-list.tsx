@@ -39,9 +39,9 @@ export default function RequestsListPage() {
   const title = isAvailable ? t("availableRequests") : isSeller ? t("myRequests") : t("myAssignments");
 
   const serviceTypeLabels: Record<string, string> = {
-    classic: t("classic"),
+    classic: t("classicShort"),
     express: t("express"),
-    sos_dressing: t("sosDressing"),
+    sos_dressing: t("sosDressingShort"),
   };
 
   const translateStatus = (status: string) => {

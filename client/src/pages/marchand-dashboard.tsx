@@ -19,7 +19,7 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
 };
 
-export default function ReusseDashboard() {
+export default function MarchendDashboard() {
   const { user } = useAuth();
   const { t } = useI18n();
 
@@ -57,9 +57,9 @@ export default function ReusseDashboard() {
   }));
 
   const serviceTypeLabels: Record<string, string> = {
-    classic: t("classic"),
+    classic: t("classicShort"),
     express: t("express"),
-    sos_dressing: t("sosDressing"),
+    sos_dressing: t("sosDressingShort"),
   };
 
   const translateStatus = (status: string) => {
@@ -99,10 +99,10 @@ export default function ReusseDashboard() {
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-6xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-reusse-dashboard-title">
+        <h1 className="text-2xl font-bold" data-testid="text-marchand-dashboard-title">
           {t("welcomeBack")}{user?.firstName ? `, ${user.firstName}` : ""}
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">{t("reusseDashSubtitle")}</p>
+        <p className="text-sm text-muted-foreground mt-1">{t("marchandDashSubtitle")}</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -88,16 +88,16 @@ export default function AgreementDetailPage() {
   const totalFees = items.reduce(
     (acc, item) => ({
       seller: acc.seller + item.fees.sellerAmount,
-      reseller: acc.reseller + item.fees.resellerAmount,
+      marchand: acc.marchand + item.fees.marchantAmount,
       platform: acc.platform + item.fees.platformAmount,
     }),
-    { seller: 0, reseller: 0, platform: 0 }
+    { seller: 0, marchand: 0, platform: 0 }
   );
 
   const sellerSig = agreement.signatures.find((s) => s.userId === agreement.sellerId);
-  const reusseSig = agreement.signatures.find((s) => s.userId === agreement.reusseId);
+  const marchandSig = agreement.signatures.find((s) => s.userId === agreement.marchantId);
   const mySignature = agreement.signatures.find((s) => s.userId === user?.id);
-  const canSign = (user?.id === agreement.sellerId || user?.id === agreement.reusseId) && !mySignature;
+  const canSign = (user?.id === agreement.sellerId || user?.id === agreement.marchantId) && !mySignature;
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
@@ -157,9 +157,9 @@ export default function AgreementDetailPage() {
               <User className="h-4 w-4 text-[hsl(var(--success))]" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Reseller</p>
-              <p className="font-medium text-sm" data-testid="text-reseller-name">{userName(agreement.reusse)}</p>
-              {agreement.reusse?.email && <p className="text-xs text-muted-foreground">{agreement.reusse.email}</p>}
+              <p className="text-xs text-muted-foreground">Marchand</p>
+              <p className="font-medium text-sm" data-testid="text-marchand-name">{userName(agreement.marchand)}</p>
+              {agreement.marchand?.email && <p className="text-xs text-muted-foreground">{agreement.marchand.email}</p>}
             </div>
           </div>
         </CardContent>
@@ -179,7 +179,7 @@ export default function AgreementDetailPage() {
                   <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Item</th>
                   <th className="text-right py-2 px-2 font-medium text-muted-foreground">Price</th>
                   <th className="text-right py-2 px-2 font-medium text-muted-foreground">Seller</th>
-                  <th className="text-right py-2 px-2 font-medium text-muted-foreground">Reseller</th>
+                  <th className="text-right py-2 px-2 font-medium text-muted-foreground">Marchand</th>
                   <th className="text-right py-2 pl-2 font-medium text-muted-foreground">Platform</th>
                 </tr>
               </thead>
@@ -193,8 +193,8 @@ export default function AgreementDetailPage() {
                       <span className="text-xs text-muted-foreground ml-1">({item.fees.sellerPct}%)</span>
                     </td>
                     <td className="text-right py-2 px-2 text-blue-700 dark:text-blue-400">
-                      €{item.fees.resellerAmount.toFixed(2)}
-                      <span className="text-xs text-muted-foreground ml-1">({item.fees.resellerPct}%)</span>
+                      €{item.fees.marchantAmount.toFixed(2)}
+                      <span className="text-xs text-muted-foreground ml-1">({item.fees.marchantPct}%)</span>
                     </td>
                     <td className="text-right py-2 pl-2 text-muted-foreground">
                       €{item.fees.platformAmount.toFixed(2)}
@@ -210,7 +210,7 @@ export default function AgreementDetailPage() {
                   <td className="pt-3 pr-4">Totals ({agreement.itemCount} items)</td>
                   <td className="text-right pt-3 px-2">€{totalValue.toFixed(2)}</td>
                   <td className="text-right pt-3 px-2 text-emerald-700 dark:text-emerald-400">€{totalFees.seller.toFixed(2)}</td>
-                  <td className="text-right pt-3 px-2 text-blue-700 dark:text-blue-400">€{totalFees.reseller.toFixed(2)}</td>
+                  <td className="text-right pt-3 px-2 text-blue-700 dark:text-blue-400">€{totalFees.marchand.toFixed(2)}</td>
                   <td className="text-right pt-3 pl-2 text-muted-foreground">€{totalFees.platform.toFixed(2)}</td>
                 </tr>
               </tfoot>
@@ -221,8 +221,8 @@ export default function AgreementDetailPage() {
             const splits = Array.from(
               new Map(
                 items
-                  .filter((it) => it.fees.sellerPct != null && it.fees.resellerPct != null && it.fees.platformPct != null)
-                  .map((it) => [`${it.fees.sellerPct}-${it.fees.resellerPct}-${it.fees.platformPct}`, it.fees] as [string, SnapshotFees])
+                  .filter((it) => it.fees.sellerPct != null && it.fees.marchantPct != null && it.fees.platformPct != null)
+                  .map((it) => [`${it.fees.sellerPct}-${it.fees.marchantPct}-${it.fees.platformPct}`, it.fees] as [string, SnapshotFees])
               ).values()
             );
             if (splits.length === 0) return null;
@@ -230,7 +230,7 @@ export default function AgreementDetailPage() {
               <div className="mt-2 p-3 rounded-md bg-muted/50 text-xs text-muted-foreground" data-testid="div-fee-tiers-note">
                 <p className="font-medium mb-1">Fee splits applied in this agreement:</p>
                 {splits.map((f, i) => (
-                  <p key={i}>Seller {f.sellerPct}% / Reseller {f.resellerPct}% / Platform {f.platformPct}%</p>
+                  <p key={i}>Seller {f.sellerPct}% / Marchand {f.marchantPct}% / Platform {f.platformPct}%</p>
                 ))}
               </div>
             );
@@ -261,17 +261,17 @@ export default function AgreementDetailPage() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg border" data-testid="status-reseller-signature">
-              {reusseSig ? (
+            <div className="flex items-center gap-3 p-3 rounded-lg border" data-testid="status-marchand-signature">
+              {marchandSig ? (
                 <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
               ) : (
                 <Clock className="h-5 w-5 text-muted-foreground shrink-0" />
               )}
               <div>
-                <p className="text-sm font-medium">Reseller — {userName(agreement.reusse)}</p>
-                {reusseSig ? (
+                <p className="text-sm font-medium">Marchand — {userName(agreement.marchand)}</p>
+                {marchandSig ? (
                   <p className="text-xs text-muted-foreground">
-                    Signed on {new Date(reusseSig.signedAt).toLocaleString("fr-FR")}
+                    Signed on {new Date(marchandSig.signedAt).toLocaleString("fr-FR")}
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground">Awaiting signature</p>

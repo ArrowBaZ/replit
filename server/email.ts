@@ -13,15 +13,15 @@ interface AgreementPdfEmailParams {
   status: string;
   generatedAt: string;
   seller: { name: string; email: string | null } | null;
-  reusse: { name: string; email: string | null } | null;
+  marchand: { name: string; email: string | null } | null;
   items: Array<{
     title: string;
     approvedPrice: number;
     sellerAmount: number;
-    resellerAmount: number;
+    marchantAmount: number;
     platformAmount: number;
     sellerPct?: number;
-    resellerPct?: number;
+    marchantPct?: number;
     platformPct?: number;
   }>;
   signatures: Array<{ role: string; name: string; signedAt: string }>;
@@ -107,7 +107,7 @@ function buildAgreementSummaryHtml(params: AgreementPdfEmailParams): string {
   const statusLabels: Record<string, string> = {
     pending: "Unsigned",
     seller_signed: "Seller Signed",
-    reseller_signed: "Reseller Signed",
+    marchand_signed: "Marchand Signed",
     fully_signed: "Fully Signed",
   };
 
@@ -118,7 +118,7 @@ function buildAgreementSummaryHtml(params: AgreementPdfEmailParams): string {
       <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">${item.title}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">${fmt(item.approvedPrice)}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">${fmt(item.sellerAmount)}${item.sellerPct != null ? ` (${item.sellerPct}%)` : ""}</td>
-      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">${fmt(item.resellerAmount)}${item.resellerPct != null ? ` (${item.resellerPct}%)` : ""}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">${fmt(item.marchantAmount)}${item.marchantPct != null ? ` (${item.marchantPct}%)` : ""}</td>
       <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">${fmt(item.platformAmount)}${item.platformPct != null ? ` (${item.platformPct}%)` : ""}</td>
     </tr>`
     )
@@ -146,7 +146,7 @@ function buildAgreementSummaryHtml(params: AgreementPdfEmailParams): string {
 
   <h3 style="font-size:15px;margin-bottom:8px;">Parties</h3>
   <p style="margin:4px 0;font-size:13px;"><strong>Seller:</strong> ${params.seller?.name || "Unknown"}${params.seller?.email ? ` &lt;${params.seller.email}&gt;` : ""}</p>
-  <p style="margin:4px 0;font-size:13px;"><strong>Reseller:</strong> ${params.reusse?.name || "Unknown"}${params.reusse?.email ? ` &lt;${params.reusse.email}&gt;` : ""}</p>
+  <p style="margin:4px 0;font-size:13px;"><strong>Marchand:</strong> ${params.marchand?.name || "Unknown"}${params.marchand?.email ? ` &lt;${params.marchand.email}&gt;` : ""}</p>
 
   <h3 style="font-size:15px;margin:16px 0 8px;">Item List &amp; Fee Breakdown</h3>
   <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -167,7 +167,7 @@ function buildAgreementSummaryHtml(params: AgreementPdfEmailParams): string {
         <td style="padding:6px 8px;">Totals (${params.items.length} items)</td>
         <td style="padding:6px 8px;text-align:right;">${fmt(params.totalValue)}</td>
         <td style="padding:6px 8px;text-align:right;">${fmt(params.items.reduce((s, i) => s + i.sellerAmount, 0))}</td>
-        <td style="padding:6px 8px;text-align:right;">${fmt(params.items.reduce((s, i) => s + i.resellerAmount, 0))}</td>
+        <td style="padding:6px 8px;text-align:right;">${fmt(params.items.reduce((s, i) => s + i.marchantAmount, 0))}</td>
         <td style="padding:6px 8px;text-align:right;">${fmt(params.items.reduce((s, i) => s + i.platformAmount, 0))}</td>
       </tr>
     </tfoot>

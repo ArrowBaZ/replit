@@ -7,10 +7,10 @@ interface JsPDFWithAutoTable extends jsPDF {
 
 interface SnapshotFees {
   sellerAmount: number;
-  resellerAmount: number;
+  marchantAmount: number;
   platformAmount: number;
   sellerPct?: number;
-  resellerPct?: number;
+  marchantPct?: number;
   platformPct?: number;
 }
 
@@ -28,7 +28,7 @@ export interface AgreementForPdf {
   id: number;
   requestId: number;
   sellerId: string;
-  reusseId: string;
+  marchantId: string;
   status: string;
   itemCount: number;
   totalValue: string;
@@ -71,14 +71,14 @@ export function generateAgreementPdfBytes(agreement: AgreementForPdf): Buffer {
   const totalFees = items.reduce(
     (acc, item) => ({
       seller: acc.seller + item.fees.sellerAmount,
-      reseller: acc.reseller + item.fees.resellerAmount,
+      reseller: acc.reseller + item.fees.marchantAmount,
       platform: acc.platform + item.fees.platformAmount,
     }),
     { seller: 0, reseller: 0, platform: 0 }
   );
 
   const sellerSig = agreement.signatures.find((s) => s.userId === agreement.sellerId);
-  const reusseSig = agreement.signatures.find((s) => s.userId === agreement.reusseId);
+  const marchandSig = agreement.signatures.find((s) => s.userId === agreement.marchantId);
 
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
@@ -126,7 +126,7 @@ export function generateAgreementPdfBytes(agreement: AgreementForPdf): Buffer {
     item.title,
     fmt(item.approvedPrice),
     `${fmt(item.fees.sellerAmount)}${pctStr(item.fees.sellerPct)}`,
-    `${fmt(item.fees.resellerAmount)}${pctStr(item.fees.resellerPct)}`,
+    `${fmt(item.fees.marchantAmount)}${pctStr(item.fees.marchantPct)}`,
     `${fmt(item.fees.platformAmount)}${pctStr(item.fees.platformPct)}`,
   ]);
 
@@ -158,8 +158,8 @@ export function generateAgreementPdfBytes(agreement: AgreementForPdf): Buffer {
   const splits = Array.from(
     new Map(
       items
-        .filter((it) => it.fees.sellerPct != null && it.fees.resellerPct != null && it.fees.platformPct != null)
-        .map((it) => [`${it.fees.sellerPct}-${it.fees.resellerPct}-${it.fees.platformPct}`, it.fees] as [string, SnapshotFees])
+        .filter((it) => it.fees.sellerPct != null && it.fees.marchantPct != null && it.fees.platformPct != null)
+        .map((it) => [`${it.fees.sellerPct}-${it.fees.marchantPct}-${it.fees.platformPct}`, it.fees] as [string, SnapshotFees])
     ).values()
   );
   if (splits.length > 0) {
@@ -170,7 +170,7 @@ export function generateAgreementPdfBytes(agreement: AgreementForPdf): Buffer {
     doc.text("Fee splits applied in this agreement:", margin, y);
     y += 5;
     splits.forEach((f) => {
-      doc.text(`Seller ${f.sellerPct ?? "?"}% / Reseller ${f.resellerPct ?? "?"}% / Platform ${f.platformPct ?? "?"}%`, margin + 4, y);
+      doc.text(`Seller ${f.sellerPct ?? "?"}% / Reseller ${f.marchantPct ?? "?"}% / Platform ${f.platformPct ?? "?"}%`, margin + 4, y);
       y += 5;
     });
     doc.setTextColor(0);
@@ -192,8 +192,8 @@ export function generateAgreementPdfBytes(agreement: AgreementForPdf): Buffer {
     doc.text(`Seller \u2014 ${userName(agreement.seller)}: Awaiting signature`, margin, y);
   }
   y += 5;
-  if (reusseSig) {
-    doc.text(`Reseller \u2014 ${userName(agreement.reusse)}: Signed on ${new Date(reusseSig.signedAt).toLocaleString("fr-FR")}`, margin, y);
+  if (marchandSig) {
+    doc.text(`Reseller \u2014 ${userName(agreement.reusse)}: Signed on ${new Date(marchandSig.signedAt).toLocaleString("fr-FR")}`, margin, y);
   } else {
     doc.text(`Reseller \u2014 ${userName(agreement.reusse)}: Awaiting signature`, margin, y);
   }

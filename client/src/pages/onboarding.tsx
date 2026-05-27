@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Shirt, Star, ArrowRight, ArrowLeft } from "lucide-react";
 import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
 
-type Role = "seller" | "reusse";
+type Role = "seller" | "marchand";
 
 const departments = [
   "Paris", "Marseille", "Lyon", "Toulouse", "Nice", "Nantes", "Strasbourg",
@@ -45,7 +45,7 @@ export default function OnboardingPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-      toast({ title: t("profileCreated"), description: role === "reusse" ? t("applicationReview") : t("welcomeMsg") });
+      toast({ title: t("profileCreated"), description: role === "marchand" ? t("applicationReview") : t("welcomeMsg") });
     },
     onError: () => {
       toast({ title: t("error"), description: t("failedCreateProfile"), variant: "destructive" });
@@ -95,7 +95,7 @@ export default function OnboardingPage() {
             </Card>
 
             <Card
-              className={`cursor-pointer transition-all hover-elevate ${role === "reusse" ? "ring-2 ring-[hsl(var(--success))]" : ""}`}
+              className={`cursor-pointer transition-all hover-elevate ${role === "marchand" ? "ring-2 ring-[hsl(var(--success))]" : ""}`}
               onClick={() => setRole("reusse")}
               data-testid="card-role-reusse"
             >
@@ -130,7 +130,7 @@ export default function OnboardingPage() {
               </Button>
               <div>
                 <h3 className="font-semibold">{t("contactInfo")}</h3>
-                <p className="text-xs text-muted-foreground">Step 2 of {role === "reusse" ? "3" : "2"}</p>
+                <p className="text-xs text-muted-foreground">Step 2 of {role === "marchand" ? "3" : "2"}</p>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -191,18 +191,18 @@ export default function OnboardingPage() {
               </div>
               <Button
                 className="w-full bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white"
-                onClick={() => role === "reusse" ? setStep(3) : handleSubmit()}
+                onClick={() => role === "marchand" ? setStep(3) : handleSubmit()}
                 disabled={createProfile.isPending}
                 data-testid="button-continue-contact"
               >
-                {role === "reusse" ? t("continue") : createProfile.isPending ? "Creating..." : t("completeSetup")}
+                {role === "marchand" ? t("continue") : createProfile.isPending ? "Creating..." : t("completeSetup")}
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {step === 3 && role === "reusse" && (
+        {step === 3 && role === "marchand" && (
           <Card>
             <CardHeader className="flex flex-row items-center gap-2 pb-4">
               <Button size="icon" variant="ghost" onClick={() => setStep(2)}>

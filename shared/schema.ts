@@ -35,7 +35,7 @@ export const profilesRelations = relations(profiles, ({ one }) => ({
 export const requests = pgTable("requests", {
   id: serial("id").primaryKey(),
   sellerId: varchar("seller_id").notNull().references(() => users.id),
-  reusseId: varchar("reusse_id").references(() => users.id),
+  marchantId: varchar("marchand_id").references(() => users.id),
   serviceType: varchar("service_type", { length: 20 }).notNull(),
   status: varchar("status", { length: 20 }).notNull().default("pending"),
   itemCount: integer("item_count").notNull(),
@@ -47,19 +47,20 @@ export const requests = pgTable("requests", {
   preferredDateStart: timestamp("preferred_date_start"),
   preferredDateEnd: timestamp("preferred_date_end"),
   notes: text("notes"),
+  hasInsurance: boolean("has_insurance").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   completedAt: timestamp("completed_at"),
   listReadyAt: timestamp("list_ready_at"),
 }, (table) => [
   index("idx_requests_seller").on(table.sellerId),
-  index("idx_requests_reusse").on(table.reusseId),
+  index("idx_requests_marchand").on(table.marchantId),
   index("idx_requests_status").on(table.status),
 ]);
 
 export const requestsRelations = relations(requests, ({ one, many }) => ({
   seller: one(users, { fields: [requests.sellerId], references: [users.id], relationName: "sellerRequests" }),
-  reusse: one(users, { fields: [requests.reusseId], references: [users.id], relationName: "reusseRequests" }),
+  marchand: one(users, { fields: [requests.marchantId], references: [users.id], relationName: "marchantRequests" }),
   items: many(items),
   meetings: many(meetings),
   messages: many(messages),
@@ -69,7 +70,7 @@ export const items = pgTable("items", {
   id: serial("id").primaryKey(),
   requestId: integer("request_id").references(() => requests.id),
   sellerId: varchar("seller_id").notNull().references(() => users.id),
-  reusseId: varchar("reusse_id").references(() => users.id),
+  marchantId: varchar("marchand_id").references(() => users.id),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   brand: varchar("brand", { length: 100 }),
@@ -98,6 +99,10 @@ export const items = pgTable("items", {
   maxPrice: numeric("max_price"),
   approvedPrice: numeric("approved_price"),
   priceApprovedBySeller: boolean("price_approved_by_seller").default(false),
+  marchantPriceApproved: boolean("marchand_price_approved").default(false),
+  marchantRejectionReason: text("marchand_rejection_reason"),
+  hasInsurance: boolean("has_insurance").default(false),
+  insuranceCost: numeric("insurance_cost"),
   sellerCounterOffer: boolean("seller_counter_offer").default(false),
   declineReason: text("decline_reason"),
   status: varchar("status", { length: 20 }).notNull().default("pending_approval"),
@@ -111,14 +116,14 @@ export const items = pgTable("items", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("idx_items_seller").on(table.sellerId),
-  index("idx_items_reusse").on(table.reusseId),
+  index("idx_items_marchand").on(table.marchantId),
   index("idx_items_status").on(table.status),
 ]);
 
 export const itemsRelations = relations(items, ({ one, many }) => ({
   request: one(requests, { fields: [items.requestId], references: [requests.id] }),
   seller: one(users, { fields: [items.sellerId], references: [users.id], relationName: "sellerItems" }),
-  reusse: one(users, { fields: [items.reusseId], references: [users.id], relationName: "reusseItems" }),
+  marchand: one(users, { fields: [items.marchantId], references: [users.id], relationName: "marchantItems" }),
   documents: many(itemDocuments),
 }));
 
@@ -144,17 +149,17 @@ export const itemDocumentsRelations = relations(itemDocuments, ({ one }) => ({
 export const itemDocumentRequests = pgTable("item_document_requests", {
   id: serial("id").primaryKey(),
   itemId: integer("item_id").notNull().references(() => items.id),
-  reusseId: varchar("reusse_id").notNull().references(() => users.id),
+  marchantId: varchar("marchand_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_item_doc_requests_item").on(table.itemId),
-  index("idx_item_doc_requests_reusse").on(table.reusseId),
-  uniqueIndex("uq_item_doc_request_item_reusse").on(table.itemId, table.reusseId),
+  index("idx_item_doc_requests_marchand").on(table.marchantId),
+  uniqueIndex("uq_item_doc_request_item_marchand").on(table.itemId, table.marchantId),
 ]);
 
 export const itemDocumentRequestsRelations = relations(itemDocumentRequests, ({ one }) => ({
   item: one(items, { fields: [itemDocumentRequests.itemId], references: [items.id] }),
-  reusse: one(users, { fields: [itemDocumentRequests.reusseId], references: [users.id] }),
+  marchand: one(users, { fields: [itemDocumentRequests.marchantId], references: [users.id] }),
 }));
 
 export const meetings = pgTable("meetings", {
@@ -215,7 +220,7 @@ export const feeTiers = pgTable("fee_tiers", {
   minPrice: numeric("min_price").notNull(),
   maxPrice: numeric("max_price"),
   sellerPercent: numeric("seller_percent").notNull(),
-  resellerPercent: numeric("reseller_percent").notNull(),
+  marchantPercent: numeric("marchand_percent").notNull(),
   platformPercent: numeric("platform_percent").notNull(),
   currencyNote: varchar("currency_note", { length: 50 }).default("EUR/CHF"),
   isActive: boolean("is_active").default(true),
@@ -251,20 +256,20 @@ export const transactions = pgTable("transactions", {
   itemId: integer("item_id").references(() => items.id),
   requestId: integer("request_id").references(() => requests.id),
   sellerId: varchar("seller_id").notNull().references(() => users.id),
-  reusseId: varchar("reusse_id").notNull().references(() => users.id),
+  marchantId: varchar("marchand_id").notNull().references(() => users.id),
   salePrice: numeric("sale_price").notNull(),
   sellerEarning: numeric("seller_earning").notNull(),
-  reusseEarning: numeric("reusse_earning").notNull(),
+  marchantEarning: numeric("marchand_earning").notNull(),
   platformEarning: numeric("platform_earning"),
   feeTierId: integer("fee_tier_id").references(() => feeTiers.id),
   sellerPercent: numeric("seller_percent"),
-  resellerPercent: numeric("reseller_percent"),
+  marchantPercent: numeric("marchand_percent"),
   platformPercent: numeric("platform_percent"),
   status: varchar("status", { length: 20 }).notNull().default("completed"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_transactions_seller").on(table.sellerId),
-  index("idx_transactions_reusse").on(table.reusseId),
+  index("idx_transactions_marchand").on(table.marchantId),
   index("idx_transactions_item").on(table.itemId),
 ]);
 
@@ -272,7 +277,7 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
   item: one(items, { fields: [transactions.itemId], references: [items.id] }),
   request: one(requests, { fields: [transactions.requestId], references: [requests.id] }),
   seller: one(users, { fields: [transactions.sellerId], references: [users.id], relationName: "sellerTransactions" }),
-  reusse: one(users, { fields: [transactions.reusseId], references: [users.id], relationName: "reusseTransactions" }),
+  marchand: one(users, { fields: [transactions.marchantId], references: [users.id], relationName: "marchantTransactions" }),
   feeTier: one(feeTiers, { fields: [transactions.feeTierId], references: [feeTiers.id] }),
 }));
 
@@ -298,7 +303,7 @@ export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
   requestId: integer("request_id").notNull().references(() => requests.id),
   sellerId: varchar("seller_id").notNull().references(() => users.id),
-  reusseId: varchar("reusse_id").notNull().references(() => users.id),
+  marchantId: varchar("marchand_id").notNull().references(() => users.id),
   rating: integer("rating").notNull(),
   comment: text("comment"),
   communicationRating: integer("communication_rating"),
@@ -306,7 +311,7 @@ export const reviews = pgTable("reviews", {
   handlingRating: integer("handling_rating"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
-  index("idx_reviews_reusse").on(table.reusseId),
+  index("idx_reviews_marchand").on(table.marchantId),
   index("idx_reviews_seller").on(table.sellerId),
   index("idx_reviews_request").on(table.requestId),
 ]);
@@ -314,14 +319,14 @@ export const reviews = pgTable("reviews", {
 export const reviewsRelations = relations(reviews, ({ one }) => ({
   request: one(requests, { fields: [reviews.requestId], references: [requests.id] }),
   seller: one(users, { fields: [reviews.sellerId], references: [users.id], relationName: "sellerReviews" }),
-  reusse: one(users, { fields: [reviews.reusseId], references: [users.id], relationName: "reusseReviews" }),
+  marchand: one(users, { fields: [reviews.marchantId], references: [users.id], relationName: "marchantReviews" }),
 }));
 
 export const agreements = pgTable("agreements", {
   id: serial("id").primaryKey(),
   requestId: integer("request_id").notNull().references(() => requests.id),
   sellerId: varchar("seller_id").notNull().references(() => users.id),
-  reusseId: varchar("reusse_id").notNull().references(() => users.id),
+  marchantId: varchar("marchand_id").notNull().references(() => users.id),
   status: varchar("status", { length: 30 }).notNull().default("pending"),
   itemCount: integer("item_count").notNull(),
   totalValue: numeric("total_value").notNull(),
@@ -331,13 +336,13 @@ export const agreements = pgTable("agreements", {
 }, (table) => [
   index("idx_agreements_request").on(table.requestId),
   index("idx_agreements_seller").on(table.sellerId),
-  index("idx_agreements_reusse").on(table.reusseId),
+  index("idx_agreements_marchand").on(table.marchantId),
 ]);
 
 export const agreementsRelations = relations(agreements, ({ one, many }) => ({
   request: one(requests, { fields: [agreements.requestId], references: [requests.id] }),
   seller: one(users, { fields: [agreements.sellerId], references: [users.id], relationName: "sellerAgreements" }),
-  reusse: one(users, { fields: [agreements.reusseId], references: [users.id], relationName: "reusseAgreements" }),
+  marchand: one(users, { fields: [agreements.marchantId], references: [users.id], relationName: "marchantAgreements" }),
   signatures: many(agreementSignatures),
 }));
 

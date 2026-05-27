@@ -14,7 +14,23 @@
       "Bash(find /Users/fabienplart/Projects/local/replit/server/src/routes -type f -name *.ts)",
       "Bash(grep -r \"i18n\\\\|react-intl\\\\|next-intl\\\\|@fluent\" /Users/fabienplart/Projects/local/replit --include=*.ts --include=*.tsx --include=*.json)",
       "Bash(xargs ls:*)",
-      "Bash(grep -r 'as const' /Users/fabienplart/Projects/local/replit --include=*.ts --include=*.tsx -l)"
+      "Bash(grep -r 'as const' /Users/fabienplart/Projects/local/replit --include=*.ts --include=*.tsx -l)",
+      "Bash(grep -r \"fee\\\\|commission\\\\|earning\\\\|split\" /Users/fabienplart/Projects/local/replit/server --include=\"*.ts\" --include=\"*.js\" ! -path \"*/node_modules/*\" -l)",
+      "Bash(grep -r \"profile.*incomplete\\\\|incomplete.*profile\\\\|validation\\\\|required.*fields\" /Users/fabienplart/Projects/local/replit --type ts --type js -i -l)",
+      "Bash(npm run *)",
+      "Bash(git checkout *)",
+      "Bash(npx drizzle-kit *)",
+      "Bash(cat)",
+      "Bash(chmod +x /tmp/drizzle_select.sh)",
+      "Bash(/tmp/drizzle_select.sh)",
+      "Bash(node *)",
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "Read(//tmp/**)",
+      "Bash(awk '{print $NF}')",
+      "mcp__plugin_compound-engineering_context7__resolve-library-id",
+      "mcp__plugin_compound-engineering_context7__query-docs",
+      "Bash(git add *)",
+      "Bash(git commit -m 'feat: Restructure service type options - remove Express, update labels *)"
     ]
   }
 }

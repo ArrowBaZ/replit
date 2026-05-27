@@ -24,7 +24,7 @@ const itemStatusColors: Record<string, string> = {
 function ResellerGroupHeader({
   group,
 }: {
-  group: { reusseId: string; requestId: number | null; items: Item[]; totalMin: number; totalMax: number };
+  group: { marchantId: string; requestId: number | null; items: Item[]; totalMin: number; totalMax: number };
 }) {
   const { t } = useI18n();
   const { data: contact } = useQuery<{ firstName?: string; lastName?: string } | null>({
@@ -46,7 +46,7 @@ function ResellerGroupHeader({
           {" "}— {group.items.length} {t("items")}
         </span>
         {(group.totalMin > 0 || group.totalMax > 0) && (
-          <span className="text-xs text-amber-600 dark:text-amber-400" data-testid={`text-group-total-${group.reusseId}`}>
+          <span className="text-xs text-amber-600 dark:text-amber-400" data-testid={`text-group-total-${group.marchantId}`}>
             {group.totalMin > 0 && group.totalMax > 0
               ? `(${group.totalMin.toFixed(0)}–${group.totalMax.toFixed(0)} EUR total)`
               : group.totalMin > 0
@@ -202,19 +202,19 @@ export default function ItemsListPage() {
 
   const { groupedPending, otherItems } = useMemo(() => {
     if (!isSeller) return { groupedPending: [], otherItems: filteredItems };
-    const pending = filteredItems.filter((i) => i.status === "pending_approval" && i.reusseId);
-    const other = filteredItems.filter((i) => i.status !== "pending_approval" || !i.reusseId);
-    const byReseller: Record<string, { reusseId: string; requestId: number | null; items: Item[]; totalMin: number; totalMax: number }> = {};
+    const pending = filteredItems.filter((i) => i.status === "pending_approval" && i.marchantId);
+    const other = filteredItems.filter((i) => i.status !== "pending_approval" || !i.marchantId);
+    const byMarchand: Record<string, { marchantId: string; requestId: number | null; items: Item[]; totalMin: number; totalMax: number }> = {};
     for (const item of pending) {
-      const key = item.reusseId!;
-      if (!byReseller[key]) {
-        byReseller[key] = { reusseId: key, requestId: item.requestId ?? null, items: [], totalMin: 0, totalMax: 0 };
+      const key = item.marchantId!;
+      if (!byMarchand[key]) {
+        byMarchand[key] = { marchantId: key, requestId: item.requestId ?? null, items: [], totalMin: 0, totalMax: 0 };
       }
-      byReseller[key].items.push(item);
-      if (item.minPrice) byReseller[key].totalMin += parseFloat(item.minPrice);
-      if (item.maxPrice) byReseller[key].totalMax += parseFloat(item.maxPrice);
+      byMarchand[key].items.push(item);
+      if (item.minPrice) byMarchand[key].totalMin += parseFloat(item.minPrice);
+      if (item.maxPrice) byMarchand[key].totalMax += parseFloat(item.maxPrice);
     }
-    return { groupedPending: Object.values(byReseller), otherItems: other };
+    return { groupedPending: Object.values(byMarchand), otherItems: other };
   }, [filteredItems, isSeller]);
 
   return (
@@ -273,7 +273,7 @@ export default function ItemsListPage() {
           {isSeller && groupedPending.length > 0 && (
             <div className="space-y-4">
               {groupedPending.map((group) => (
-                <div key={group.reusseId} className="space-y-2" data-testid={`group-reseller-${group.reusseId}`}>
+                <div key={group.marchantId} className="space-y-2" data-testid={`group-reseller-${group.marchantId}`}>
                   <ResellerGroupHeader group={group} />
                   <div className="space-y-2 pl-2 border-l-2 border-amber-200 dark:border-amber-800">
                     {group.items.map((item) => (

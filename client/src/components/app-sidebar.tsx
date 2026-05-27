@@ -348,13 +348,13 @@ export function AppSidebar() {
     { title: t("myRequests"), url: "/requests", icon: ClipboardList },
     { title: t("myItems"), url: "/items", icon: Shirt },
     { title: "My Documents", url: "/documents", icon: FolderOpen, badge: documentCount > 0 ? documentCount : null },
-    { title: t("discoverResellers"), url: "/resellers", icon: Star },
+    { title: t("discoverMarchands"), url: "/marchands", icon: Star },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
     { title: "Fee Structure", url: "/fee-structure", icon: Percent },
     { title: t("profile"), url: "/profile", icon: User },
   ];
 
-  const reusseItems = [
+  const marchandItems = [
     { title: t("dashboard"), url: "/dashboard", icon: LayoutDashboard },
     { title: t("availableRequests"), url: "/available", icon: Package },
     { title: t("myAssignments"), url: "/requests", icon: ClipboardList },
@@ -373,7 +373,7 @@ export function AppSidebar() {
     { title: t("messages"), url: "/messages", icon: MessageSquare },
   ];
 
-  const menuItems = role === "admin" ? adminItems : role === "reusse" ? reusseItems : sellerItems;
+  const menuItems = role === "admin" ? adminItems : role === "marchand" ? marchandItems : sellerItems;
 
   return (
     <Sidebar>
@@ -398,7 +398,7 @@ export function AppSidebar() {
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel>{role === "admin" ? t("administration") : role === "reusse" ? t("reusse") : t("seller")}</SidebarGroupLabel>
+          <SidebarGroupLabel>{role === "admin" ? t("administration") : role === "marchand" ? t("marchand") : t("seller")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
@@ -437,7 +437,7 @@ export function AppSidebar() {
               {user?.firstName || "User"}
             </p>
             <p className="text-xs text-muted-foreground truncate">
-              {role === "reusse" ? t("reusse") : role === "admin" ? "Admin" : t("seller")}
+              {role === "marchand" ? t("marchand") : role === "admin" ? "Admin" : t("seller")}
             </p>
           </div>
           {user?.id && <NotificationBell userId={user.id} notifPrefs={profile?.notificationPrefs} />}
