@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, getServiceTypeLabels } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -91,11 +91,7 @@ export default function AdminRequestsPage() {
     return map[status] || status.replace(/_/g, " ");
   };
 
-  const serviceTypeLabels: Record<string, string> = {
-    classic: t("classicShort"),
-    express: t("express"),
-    sos_dressing: t("sosDressingShort"),
-  };
+  const serviceTypeLabels = getServiceTypeLabels(t);
 
   const flagRequest = useMutation({
     mutationFn: async ({ id, reason }: { id: number; reason: string }) => {

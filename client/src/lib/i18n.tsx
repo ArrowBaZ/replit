@@ -137,6 +137,7 @@ const translations = {
     // Admin Dashboard
     totalUsers: "Total Users",
     activeResellers: "Active Resellers",
+    activeMarchands: "Active Marchands",
     pendingApplications: "Pending Applications",
     totalRequests: "Total Requests",
     applications: "Applications",
@@ -191,8 +192,6 @@ const translations = {
     classic: "Classic",
     classicShort: "Classic (few items)",
     classicDesc: "Standard pickup and resale of your items.",
-    express: "Express",
-    expressDesc: "Priority handling with faster turnaround.",
     sosDressing: "SOS Dressing",
     sosDressingShort: "SOS: Help marchand assess items",
     sosDressingDesc: "Full wardrobe cleanout and resale.",
@@ -643,6 +642,7 @@ const translations = {
     // Admin Dashboard
     totalUsers: "Utilisateurs totaux",
     activeResellers: "Revendeurs actifs",
+    activeMarchands: "Marchands actifs",
     pendingApplications: "Candidatures en attente",
     totalRequests: "Demandes totales",
     applications: "Candidatures",
@@ -697,8 +697,6 @@ const translations = {
     classic: "Classique",
     classicShort: "Classique (peu d'articles)",
     classicDesc: "Collecte et revente standard de vos articles.",
-    express: "Express",
-    expressDesc: "Traitement prioritaire avec un delai plus rapide.",
     sosDressing: "SOS Dressing",
     sosDressingShort: "SOS: Aide du marchand a evaluer les articles",
     sosDressingDesc: "Vidage complet de garde-robe et revente.",
@@ -939,8 +937,8 @@ const translations = {
     viewProfile: "Voir le profil",
     reviews: "avis",
     completedRequests: "Complétées",
-    resellerProfile: "Profil du revendeur",
-    resellerStats: "Statistiques",
+    marchandProfile: "Profil du Marchand",
+    marchandStats: "Statistiques",
     avgRating: "Note moyenne",
     avgCommunication: "Communication",
     avgReliability: "Fiabilité",
@@ -1075,4 +1073,11 @@ export function useTranslateStatus(status: string): string {
     returned: "statusReturned",
   };
   return statusMap[status] ? t(statusMap[status]) : status.replace(/_/g, " ");
+}
+
+export function getServiceTypeLabels(t: ReturnType<typeof useI18n>["t"]): Record<string, string> {
+  return {
+    classic: t("classicShort"),
+    sos_dressing: t("sosDressingShort"),
+  };
 }

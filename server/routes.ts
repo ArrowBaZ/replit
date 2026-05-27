@@ -6,11 +6,6 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users } from "../shared/models/auth";
-import {
-  setupAuth,
-  isAuthenticated,
-  registerAuthRoutes,
-} from "./replit_integrations/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS, NOTIF_PREF_KEYS } from "@shared/constants";
@@ -214,18 +209,26 @@ export function broadcastToUser(userId: string, data: unknown) {
     }
   });
 }
+
+function isAuthenticated(req: any, res: Response, next: NextFunction) {
+  if (!req.user?.id) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  next();
+}
+
 function requireAuth(req: any, res: Response, next: NextFunction) {
-  if (!req.user?.claims?.sub) {
+  if (!req.user?.id) {
     return res.status(401).json({ message: "Unauthorized" });
   }
   next();
 }
 
 async function requireAdmin(req: any, res: Response, next: NextFunction) {
-  if (!req.user?.claims?.sub) {
+  if (!req.user?.id) {
     return res.status(401).json({ message: "Unauthorized" });
   }
-  const profile = await storage.getProfile(req.user.claims.sub);
+  const profile = await storage.getProfile(req.user.id);
   if (!profile || profile.role !== "admin") {
     return res.status(403).json({ message: "Forbidden" });
   }
@@ -236,8 +239,6 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
-  await setupAuth(app);
-  registerAuthRoutes(app);
   registerObjectStorageRoutes(app);
 
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
@@ -265,7 +266,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const profile = await storage.getProfile(userId);
         if (!profile) {
           return res.status(404).json({ message: "Profile not found" });
@@ -285,7 +286,7 @@ export async function registerRoutes(
     validate(createProfileBody),
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const existing = await storage.getProfile(userId);
         if (existing) {
           return res.status(400).json({ message: "Profile already exists" });
@@ -330,7 +331,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const body = req.body as Record<string, unknown>;
 
         if (body.notificationPrefs !== undefined) {
@@ -367,7 +368,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const profile = await storage.getProfile(userId);
         if (!profile) {
           return res.status(400).json({ message: "Profile required" });
@@ -421,7 +422,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
         const request = await storage.getRequest(id);
         if (!request)
@@ -458,7 +459,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
 
         // Role check: only sellers can create requests
         const profile = await storage.getProfile(userId);
@@ -512,7 +513,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const profile = await storage.getProfile(userId);
         if (!profile || profile.role !== "marchand") {
           return res
@@ -550,7 +551,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
         const request = await storage.getRequest(id);
         if (!request) return res.status(404).json({ message: "Request not found" });
@@ -575,7 +576,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const requestId = parseInt(req.params.id);
 
         const profile = await storage.getProfile(userId);
@@ -674,7 +675,7 @@ export async function registerRoutes(
     validate(createItemBody),
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const requestId = parseInt(req.params.id);
         const request = await storage.getRequest(requestId);
         if (!request) {
@@ -786,7 +787,7 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const item = await storage.getItemIncludingDeleted(id);
       if (!item) return res.status(404).json({ message: "Item not found" });
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       if (item.sellerId !== userId && item.marchantId !== userId) {
         const profile = await storage.getProfile(userId);
         if (!profile || profile.role !== "admin") {
@@ -803,7 +804,7 @@ export async function registerRoutes(
 
   app.get("/api/items", isAuthenticated, requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const profile = await storage.getProfile(userId);
       if (!profile) {
         return res.status(400).json({ message: "Profile required" });
@@ -857,7 +858,7 @@ export async function registerRoutes(
         await storage.updateRequest(requestId, { status: "scheduled" });
 
         const notifyUserId =
-          req.user.claims.sub === request.sellerId
+          req.user.id === request.sellerId
             ? request.marchantId
             : request.sellerId;
         if (notifyUserId) {
@@ -893,7 +894,7 @@ export async function registerRoutes(
         if (!request) {
           return res.status(404).json({ message: "Request not found" });
         }
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         if (userId !== request.sellerId && userId !== request.marchantId) {
           return res.status(403).json({ message: "Not authorized" });
         }
@@ -935,7 +936,7 @@ export async function registerRoutes(
         if (!request) {
           return res.status(404).json({ message: "Request not found" });
         }
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         if (userId !== request.sellerId && userId !== request.marchantId) {
           return res.status(403).json({ message: "Not authorized" });
         }
@@ -979,7 +980,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const result = await storage.getMeetings(userId);
         res.json(result);
       } catch (error) {
@@ -995,7 +996,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const result = await storage.getConversations(userId);
         res.json(result);
       } catch (error) {
@@ -1011,7 +1012,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const currentUserId = req.user.claims.sub;
+        const currentUserId = req.user.id;
         const otherUserId = req.params.userId;
         const result = await storage.getMessagesBetween(
           currentUserId,
@@ -1032,7 +1033,7 @@ export async function registerRoutes(
     validate(createMessageBody),
     async (req: any, res) => {
       try {
-        const senderId = req.user.claims.sub;
+        const senderId = req.user.id;
         const { receiverId, content, requestId } = req.body;
         const message = await storage.createMessage({
           senderId,
@@ -1056,7 +1057,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const result = await storage.getNotifications(userId);
         res.json(result);
       } catch (error) {
@@ -1072,7 +1073,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
         await storage.markNotificationRead(id, userId);
         res.json({ success: true });
@@ -1089,7 +1090,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         await storage.markAllNotificationsRead(userId);
         res.json({ success: true });
       } catch (error) {
@@ -1191,7 +1192,7 @@ export async function registerRoutes(
 
   app.post("/api/admin/requests/:id/flag", isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
-      const adminId = req.user.claims.sub;
+      const adminId = req.user.id;
       const id = parseInt(req.params.id);
       const { reason } = req.body;
       const request = await storage.getRequest(id);
@@ -1208,7 +1209,7 @@ export async function registerRoutes(
 
   app.post("/api/admin/requests/:id/message", isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
-      const adminId = req.user.claims.sub;
+      const adminId = req.user.id;
       const id = parseInt(req.params.id);
       const { message } = req.body;
       const request = await storage.getRequest(id);
@@ -1224,7 +1225,7 @@ export async function registerRoutes(
 
   app.post("/api/admin/requests/:id/reject", isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
-      const adminId = req.user.claims.sub;
+      const adminId = req.user.id;
       const id = parseInt(req.params.id);
       const { reason } = req.body;
       const request = await storage.getRequest(id);
@@ -1260,7 +1261,7 @@ export async function registerRoutes(
     validate(updateItemBody),
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
         const existingItem = await storage.getItem(id);
         if (!existingItem) return res.status(404).json({ message: "Item not found" });
@@ -1332,7 +1333,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
 
         // Ownership check: only the seller can approve
@@ -1454,7 +1455,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
 
         // Ownership check: only the seller can counter-offer
@@ -1576,7 +1577,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
         const { reason } = req.body;
         if (!reason || !reason.trim()) {
@@ -1632,7 +1633,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
 
         const existingItem = await storage.getItem(id);
@@ -1752,7 +1753,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
 
         const existingItem = await storage.getItem(id);
@@ -1884,7 +1885,7 @@ export async function registerRoutes(
     async (req: any, res) => {
       try {
         const id = parseInt(req.params.id);
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const original = await storage.getItem(id);
         if (!original)
           return res.status(404).json({ message: "Item not found" });
@@ -1943,7 +1944,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
 
         // Ownership check: only the assigned reusse can list
@@ -1995,7 +1996,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
 
         // Ownership check: only the assigned reusse can mark as sold
@@ -2054,7 +2055,7 @@ export async function registerRoutes(
             itemId: item.id,
             requestId: item.requestId || null,
             sellerId: item.sellerId,
-            marchantId: item.marchantId || req.user.claims.sub,
+            marchantId: item.marchantId || req.user.id,
             salePrice: salePrice.toString(),
             sellerEarning: sellerAmt.toString(),
             marchantEarning: marchantAmt.toString(),
@@ -2094,7 +2095,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
         const request = await storage.getRequest(id);
         if (!request)
@@ -2135,7 +2136,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
         const request = await storage.getRequest(id);
         if (!request)
@@ -2157,7 +2158,7 @@ export async function registerRoutes(
         });
 
         const notifyUserId =
-          req.user.claims.sub === request.sellerId
+          req.user.id === request.sellerId
             ? request.marchantId
             : request.sellerId;
         if (notifyUserId) {
@@ -2184,7 +2185,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const profile = await storage.getProfile(userId);
         if (!profile)
           return res.status(400).json({ message: "Profile required" });
@@ -2203,7 +2204,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const profile = await storage.getProfile(userId);
         if (!profile) return res.status(400).json({ message: "Profile required" });
         const summary = await storage.getEarningsSummary(userId, profile.role);
@@ -2221,7 +2222,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const profile = await storage.getProfile(userId);
         if (!profile) return res.status(400).json({ message: "Profile required" });
         const stats = await storage.getActivityStats(userId, profile.role);
@@ -2286,7 +2287,7 @@ export async function registerRoutes(
     async (req: any, res) => {
       try {
         const id = parseInt(req.params.id);
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const profile = await storage.getProfile(userId);
         if (!profile || profile.role !== "seller")
           return res.status(403).json({ message: "Only sellers can leave reviews" });
@@ -2334,7 +2335,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const itemId = parseInt(req.params.id);
         const item = await storage.getItem(itemId);
         if (!item) return res.status(404).json({ message: "Item not found" });
@@ -2358,7 +2359,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const itemId = parseInt(req.params.id);
         const item = await storage.getItem(itemId);
         if (!item) return res.status(404).json({ message: "Item not found" });
@@ -2452,7 +2453,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const itemId = parseInt(req.params.id);
         const item = await storage.getItem(itemId);
         if (!item) return res.status(404).json({ message: "Item not found" });
@@ -2511,7 +2512,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const itemId = parseInt(req.params.id);
         const item = await storage.getItem(itemId);
         if (!item) return res.status(404).json({ message: "Item not found" });
@@ -2538,7 +2539,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const itemId = parseInt(req.params.id);
         const docId = parseInt(req.params.docId);
         const item = await storage.getItem(itemId);
@@ -2576,7 +2577,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const docs = await storage.getDocumentsByUser(userId);
         res.json(docs.map(({ fileUrl: _omit, ...rest }) => rest));
       } catch (error) {
@@ -2592,7 +2593,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const userAgreements = await storage.getUserAgreements(userId);
         res.json(userAgreements);
       } catch (error) {
@@ -2608,7 +2609,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const itemId = parseInt(req.params.id);
         const docId = parseInt(req.params.docId);
         const doc = await storage.getItemDocument(docId);
@@ -2635,7 +2636,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
         const profile = await storage.getProfile(userId);
         if (!profile || profile.role !== "marchand") {
@@ -2712,7 +2713,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
         const profile = await storage.getProfile(userId);
         const request = await storage.getRequest(id);
@@ -2738,7 +2739,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const requestId = parseInt(req.params.id);
         const profile = await storage.getProfile(userId);
         const request = await storage.getRequest(requestId);
@@ -2807,7 +2808,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
         const profile = await storage.getProfile(userId);
         const agreement = await storage.getAgreementWithDetails(id);
@@ -2829,7 +2830,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
         const profile = await storage.getProfile(userId);
         if (!profile) return res.status(400).json({ message: "Profile required" });
@@ -2856,15 +2857,15 @@ export async function registerRoutes(
 
         const allSigs = await storage.getAgreementSignatures(id);
         const hasSeller = allSigs.some((s) => s.userId === agreement.sellerId);
-        const hasReusse = allSigs.some((s) => s.userId === agreement.marchantId);
+        const hasMarchand = allSigs.some((s) => s.userId === agreement.marchantId);
 
         let newStatus = agreement.status;
-        if (hasSeller && hasReusse) {
+        if (hasSeller && hasMarchand) {
           newStatus = "fully_signed";
         } else if (hasSeller) {
           newStatus = "seller_signed";
-        } else if (hasReusse) {
-          newStatus = "reseller_signed";
+        } else if (hasMarchand) {
+          newStatus = "marchand_signed";
         }
 
         await storage.updateAgreementStatus(id, newStatus);
@@ -2931,7 +2932,7 @@ export async function registerRoutes(
     requireAuth,
     async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const id = parseInt(req.params.id);
 
         const [currentUser] = await db.select().from(users).where(eq(users.id, userId));
@@ -3092,7 +3093,7 @@ export async function registerRoutes(
 
   app.post("/api/admin/fee-tiers", isAuthenticated, requireAdmin, validate(feeTierSchema), async (req: any, res) => {
     try {
-      const adminId = req.user.claims.sub;
+      const adminId = req.user.id;
       const { label, minPrice, maxPrice, sellerPercent, marchantPercent, platformPercent, currencyNote } = req.body;
       const overlapError = await checkTierOverlap(minPrice, maxPrice);
       if (overlapError) return res.status(400).json({ message: overlapError, errorCode: "TIER_OVERLAP" });
@@ -3121,7 +3122,7 @@ export async function registerRoutes(
 
   app.patch("/api/admin/fee-tiers/:id", isAuthenticated, requireAdmin, validate(feeTierSchema), async (req: any, res) => {
     try {
-      const adminId = req.user.claims.sub;
+      const adminId = req.user.id;
       const id = parseInt(req.params.id);
       const existing = await storage.getFeeTier(id);
       if (!existing) return res.status(404).json({ message: "Fee tier not found" });
@@ -3157,7 +3158,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/fee-tiers/:id", isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
-      const adminId = req.user.claims.sub;
+      const adminId = req.user.id;
       const id = parseInt(req.params.id);
       const existing = await storage.getFeeTier(id);
       if (!existing) return res.status(404).json({ message: "Fee tier not found" });
@@ -3226,7 +3227,7 @@ export async function registerRoutes(
     async (req: any, res) => {
       try {
         const id = parseInt(req.params.id);
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const profile = await storage.getProfile(userId);
         if (!profile || profile.role !== "marchand")
           return res.status(403).json({ message: "Only resellers can report requests" });

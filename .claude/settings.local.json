@@ -30,7 +30,9 @@
       "mcp__plugin_compound-engineering_context7__resolve-library-id",
       "mcp__plugin_compound-engineering_context7__query-docs",
       "Bash(git add *)",
-      "Bash(git commit -m 'feat: Restructure service type options - remove Express, update labels *)"
+      "Bash(git commit -m 'feat: Restructure service type options - remove Express, update labels *)",
+      "Bash(awk '/export default function SellerReviewPage/,/^}$/' /Users/fabienplart/Projects/local/replit/client/src/pages/seller-review.tsx)",
+      "Bash(npm install *)"
     ]
   }
 }

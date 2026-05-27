@@ -35,7 +35,7 @@ export interface AgreementForPdf {
   itemsSnapshot: string;
   generatedAt: string;
   seller: { id: string; firstName: string | null; lastName: string | null; email: string | null } | null;
-  reusse: { id: string; firstName: string | null; lastName: string | null; email: string | null } | null;
+  marchand: { id: string; firstName: string | null; lastName: string | null; email: string | null } | null;
   signatures: AgreementSignatureRecord[];
 }
 
@@ -102,7 +102,7 @@ export function generateAgreementPdfBytes(agreement: AgreementForPdf): Buffer {
   doc.setFontSize(10);
   doc.text(`Seller: ${userName(agreement.seller)}${agreement.seller?.email ? `  <${agreement.seller.email}>` : ""}`, margin, y);
   y += 5;
-  doc.text(`Reseller: ${userName(agreement.reusse)}${agreement.reusse?.email ? `  <${agreement.reusse.email}>` : ""}`, margin, y);
+  doc.text(`Marchand: ${userName(agreement.marchand)}${agreement.marchand?.email ? `  <${agreement.marchand.email}>` : ""}`, margin, y);
   y += 10;
 
   doc.setFontSize(11);
@@ -193,9 +193,9 @@ export function generateAgreementPdfBytes(agreement: AgreementForPdf): Buffer {
   }
   y += 5;
   if (marchandSig) {
-    doc.text(`Reseller \u2014 ${userName(agreement.reusse)}: Signed on ${new Date(marchandSig.signedAt).toLocaleString("fr-FR")}`, margin, y);
+    doc.text(`Marchand \u2014 ${userName(agreement.marchand)}: Signed on ${new Date(marchandSig.signedAt).toLocaleString("fr-FR")}`, margin, y);
   } else {
-    doc.text(`Reseller \u2014 ${userName(agreement.reusse)}: Awaiting signature`, margin, y);
+    doc.text(`Marchand \u2014 ${userName(agreement.marchand)}: Awaiting signature`, margin, y);
   }
   y += 10;
 

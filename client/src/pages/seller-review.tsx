@@ -3,6 +3,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useI18n, getServiceTypeLabels } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -236,6 +237,7 @@ export default function SellerReviewPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { t } = useI18n();
 
   const { data: profile } = useQuery<Profile>({ queryKey: ["/api/profile"] });
 
@@ -371,11 +373,7 @@ export default function SellerReviewPage() {
     );
   }
 
-  const serviceTypeLabels: Record<string, string> = {
-    classic: t("classicShort"),
-    express: t("express"),
-    sos_dressing: t("sosDressingShort"),
-  };
+  const serviceTypeLabels = getServiceTypeLabels(t);
 
   const dialogItem = showCounterOffer
     ? requestItems?.find((i) => i.id === showCounterOffer.itemId) ?? null

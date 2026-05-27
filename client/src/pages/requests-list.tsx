@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, getServiceTypeLabels } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,11 +38,7 @@ export default function RequestsListPage() {
   const isSeller = profile?.role === "seller";
   const title = isAvailable ? t("availableRequests") : isSeller ? t("myRequests") : t("myAssignments");
 
-  const serviceTypeLabels: Record<string, string> = {
-    classic: t("classicShort"),
-    express: t("express"),
-    sos_dressing: t("sosDressingShort"),
-  };
+  const serviceTypeLabels = getServiceTypeLabels(t);
 
   const translateStatus = (status: string) => {
     const statusMap: Record<string, string> = {

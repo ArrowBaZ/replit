@@ -1,32 +1,17 @@
 import { vi } from "vitest";
-import type { Request, Response, NextFunction } from "express";
 
 /**
- * Mock the Replit auth integration module.
+ * Setup test auth user.
  * Call this at the top of test files that test authenticated routes.
  *
  * Usage:
- *   mockAuth();
- *   // then in tests:
  *   setTestUser("user-123");
+ *   // request.user.id will be "user-123" in your route handlers
  */
 
-let currentTestUser: { sub: string } | null = null;
+let currentTestUser: { id: string; email: string } | null = null;
 
 export function mockAuth() {
-  vi.mock("../replit_integrations/auth", () => ({
-    setupAuth: vi.fn().mockResolvedValue(undefined),
-    isAuthenticated: (req: any, res: Response, next: NextFunction) => {
-      if (!currentTestUser) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      req.isAuthenticated = () => true;
-      req.user = { claims: currentTestUser, expires_at: Math.floor(Date.now() / 1000) + 3600 };
-      next();
-    },
-    registerAuthRoutes: vi.fn(),
-  }));
-
   vi.mock("../replit_integrations/object_storage/routes", () => ({
     registerObjectStorageRoutes: vi.fn(),
   }));
@@ -36,8 +21,15 @@ export function mockAuth() {
  * Set the authenticated user for subsequent requests.
  * Pass null to simulate unauthenticated state.
  */
-export function setTestUser(userId: string | null) {
-  currentTestUser = userId ? { sub: userId } : null;
+export function setTestUser(userId: string | null, email: string = "test@example.com") {
+  currentTestUser = userId ? { id: userId, email } : null;
+}
+
+/**
+ * Get the current test user object.
+ */
+export function getTestUser() {
+  return currentTestUser;
 }
 
 /**

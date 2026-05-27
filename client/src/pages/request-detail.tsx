@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, getServiceTypeLabels } from "@/lib/i18n";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -718,11 +718,7 @@ export default function RequestDetailPage() {
     };
   }, [user?.id]);
 
-  const serviceTypeLabels: Record<string, string> = {
-    classic: t("classicShort"),
-    express: t("express"),
-    sos_dressing: t("sosDressingShort"),
-  };
+  const serviceTypeLabels = getServiceTypeLabels(t);
 
   const translateStatus = (status: string) => {
     const statusMap: Record<string, string> = {

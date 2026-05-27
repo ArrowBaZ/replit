@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, getServiceTypeLabels } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,11 +56,7 @@ export default function MarchendDashboard() {
     total: Number(row.total || 0),
   }));
 
-  const serviceTypeLabels: Record<string, string> = {
-    classic: t("classicShort"),
-    express: t("express"),
-    sos_dressing: t("sosDressingShort"),
-  };
+  const serviceTypeLabels = getServiceTypeLabels(t);
 
   const translateStatus = (status: string) => {
     const statusMap: Record<string, string> = {
