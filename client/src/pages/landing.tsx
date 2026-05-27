@@ -46,9 +46,9 @@ export default function LandingPage() {
               <img src={sellzyLogo} alt="Sellzy" className="h-10" data-testid="text-brand-name" />
             </div>
             <div className="hidden md:flex items-center gap-6">
-              <a href="#features" className="text-sm text-muted-foreground transition-colors hover-elevate rounded-md px-3 py-2">{t("features")}</a>
-              <a href="#how-it-works" className="text-sm text-muted-foreground transition-colors hover-elevate rounded-md px-3 py-2">{t("howItWorks")}</a>
-              <a href="#testimonials" className="text-sm text-muted-foreground transition-colors hover-elevate rounded-md px-3 py-2">{t("testimonials")}</a>
+              <a href="#features" className="text-sm text-foreground/70 transition-colors hover-elevate rounded-md px-3 py-2">{t("features")}</a>
+              <a href="#how-it-works" className="text-sm text-foreground/70 transition-colors hover-elevate rounded-md px-3 py-2">{t("howItWorks")}</a>
+              <a href="#testimonials" className="text-sm text-foreground/70 transition-colors hover-elevate rounded-md px-3 py-2">{t("testimonials")}</a>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1 mr-1">
@@ -104,7 +104,7 @@ export default function LandingPage() {
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32 lg:py-40">
           <div className="max-w-2xl">
-            <p className="text-sm font-medium tracking-wider uppercase text-[hsl(var(--success))] mb-4">
+            <p className="text-sm font-medium tracking-wider uppercase text-[hsl(145,65%,52%)] mb-4">
               {lang === "fr" ? "La marketplace de revente entre particuliers" : "The Peer Resale Marketplace"}
             </p>
             <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
@@ -153,7 +153,7 @@ export default function LandingPage() {
       <section id="features" className="py-20 sm:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <p className="text-sm font-medium tracking-wider uppercase text-[hsl(var(--success))] mb-3">
+            <p className="text-sm font-medium tracking-wider uppercase text-[hsl(145,65%,28%)] dark:text-[hsl(var(--success))] mb-3">
               {t("whySellzy")}
             </p>
             <h2 className="font-serif text-3xl sm:text-4xl font-bold mb-4">
@@ -182,7 +182,7 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-20 sm:py-24 bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <p className="text-sm font-medium tracking-wider uppercase text-[hsl(var(--success))] mb-3">
+            <p className="text-sm font-medium tracking-wider uppercase text-[hsl(145,65%,28%)] dark:text-[hsl(var(--success))] mb-3">
               {t("howItWorks")}
             </p>
             <h2 className="font-serif text-3xl sm:text-4xl font-bold mb-4">
@@ -195,7 +195,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-8">
             {steps.map((step, i) => (
               <div key={step.number} className="relative">
-                <div className="text-6xl font-serif font-bold text-[hsl(var(--success)/0.15)] mb-4">
+                <div aria-hidden="true" className="text-6xl font-serif font-bold text-[hsl(var(--success)/0.25)] mb-4">
                   {step.number}
                 </div>
                 <h3 className="font-semibold text-lg mb-2">{step.title}</h3>
@@ -214,7 +214,7 @@ export default function LandingPage() {
       <section id="testimonials" className="py-20 sm:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <p className="text-sm font-medium tracking-wider uppercase text-[hsl(var(--success))] mb-3">
+            <p className="text-sm font-medium tracking-wider uppercase text-[hsl(145,65%,28%)] dark:text-[hsl(var(--success))] mb-3">
               {t("testimonials")}
             </p>
             <h2 className="font-serif text-3xl sm:text-4xl font-bold mb-4">
