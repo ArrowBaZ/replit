@@ -507,6 +507,25 @@ const translations = {
     toastItemApproved: "Item pricing approved",
     toastItemDeclined: "Item pricing declined",
     toastViewItem: "View",
+
+    // Auth
+    signIn: "Sign In",
+    signUp: "Sign Up",
+    signOut: "Sign Out",
+    emailLabel: "Email",
+    passwordLabel: "Password",
+    confirmPasswordLabel: "Confirm Password",
+    firstName: "First Name",
+    lastName: "Last Name",
+    forgotPassword: "Forgot your password?",
+    noAccount: "Don't have an account?",
+    alreadyHaveAccount: "Already have an account?",
+    authError: "Authentication error",
+    invalidCredentials: "Invalid email or password",
+    emailTaken: "Email already in use",
+    createAccount: "Create Account",
+    welcomeBack: "Welcome back!",
+    passwordMinLength: "Password must be at least 8 characters",
   },
   fr: {
     // Nav
@@ -1012,6 +1031,25 @@ const translations = {
     toastItemApproved: "Tarification approuvee",
     toastItemDeclined: "Tarification refusee",
     toastViewItem: "Voir",
+
+    // Auth
+    signIn: "Se connecter",
+    signUp: "S'inscrire",
+    signOut: "Se déconnecter",
+    emailLabel: "Email",
+    passwordLabel: "Mot de passe",
+    confirmPasswordLabel: "Confirmer le mot de passe",
+    firstName: "Prénom",
+    lastName: "Nom",
+    forgotPassword: "Mot de passe oublié?",
+    noAccount: "Vous n'avez pas de compte?",
+    alreadyHaveAccount: "Vous avez déjà un compte?",
+    authError: "Erreur d'authentification",
+    invalidCredentials: "Email ou mot de passe invalide",
+    emailTaken: "Cet email est déjà utilisé",
+    createAccount: "Créer un compte",
+    welcomeBack: "Bienvenue!",
+    passwordMinLength: "Le mot de passe doit contenir au moins 8 caractères",
   },
 } as const;
 

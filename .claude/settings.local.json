@@ -50,7 +50,8 @@
       "Bash(grep -n \"db.execute.*sql\\\\`\" /Users/fabienplart/Projects/local/replit/server/routes.ts)",
       "Bash(grep -n \"sql\\\\`\" /Users/fabienplart/Projects/local/replit/server/routes.ts)",
       "Bash(npx tsc *)",
-      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes\" npm run db:migrate:reset)"
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes\" npm run db:migrate:reset)",
+      "Bash(git push *)"
     ]
   }
 }

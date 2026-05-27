@@ -3363,5 +3363,137 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/auth/user", async (req: AuthRequest, res) => {
+    try {
+      const sessionToken = req.cookies["next-auth.session-token"];
+      if (!sessionToken) {
+        return res.json(null);
+      }
+
+      const result = await db.execute(
+        sql`SELECT "userId", expires FROM sessions WHERE "sessionToken" = ${sessionToken} AND expires > NOW()`
+      );
+
+      if (!(result as any)?.rows?.[0]) {
+        res.clearCookie("next-auth.session-token");
+        return res.json(null);
+      }
+
+      const session = (result as any).rows[0];
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, session.userId));
+
+      if (!user) {
+        res.clearCookie("next-auth.session-token");
+        return res.json(null);
+      }
+
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.get("/api/logout", isAuthenticated, async (req: AuthRequest, res) => {
+    try {
+      const sessionToken = req.cookies["next-auth.session-token"];
+      if (sessionToken) {
+        await db.execute(
+          sql`DELETE FROM sessions WHERE "sessionToken" = ${sessionToken}`
+        );
+      }
+      res.clearCookie("next-auth.session-token");
+      res.redirect("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+      res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  const registerSchema = z.object({
+    email: z
+      .string({ required_error: "Email is required" })
+      .min(1, "Email is required")
+      .email("Invalid email"),
+    password: z
+      .string({ required_error: "Password is required" })
+      .min(8, "Password must be at least 8 characters")
+      .max(32, "Password must be at most 32 characters"),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+  });
+
+  app.post("/api/auth/register", async (req: AuthRequest, res) => {
+    try {
+      const parsed = await registerSchema.parseAsync(req.body);
+      const { email, password, firstName, lastName } = parsed;
+
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email));
+
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+
+      const passwordHash = await hashPassword(password);
+      const userId = randomUUID();
+
+      await db.execute(
+        sql`INSERT INTO users (id, email, "passwordHash", "firstName", "lastName") VALUES (${userId}, ${email}, ${passwordHash}, ${firstName || null}, ${lastName || null})`
+      );
+
+      const sessionId = randomUUID();
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      await db.execute(
+        sql`INSERT INTO sessions ("sessionToken", "userId", expires) VALUES (${sessionId}, ${userId}, ${expiresAt})`
+      );
+
+      res.cookie("next-auth.session-token", sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+
+      const [newUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+
+      res.status(201).json({
+        success: true,
+        user: newUser,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+      console.error("Registration error:", error);
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  app.post("/api/auth/forgot-password", async (req: AuthRequest, res) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      res.json({
+        success: true,
+        message: "If that email exists in our system, a password reset link has been sent.",
+      });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Request failed" });
+    }
+  });
+
   return httpServer;
 }

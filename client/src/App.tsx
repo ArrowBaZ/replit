@@ -35,6 +35,9 @@ import PrivacyPage from "@/pages/privacy";
 import AdminFeeTiersPage from "@/pages/admin-fee-tiers";
 import FeeStructurePage from "@/pages/fee-structure";
 import SellerReviewPage from "@/pages/seller-review";
+import { LoginPage } from "@/pages/login";
+import { SignupPage } from "@/pages/signup";
+import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 
 function DashboardRoute() {
@@ -134,6 +137,8 @@ function AppContent() {
   if (!user) {
     return (
       <Switch>
+        <Route path="/login" component={LoginPage} />
+        <Route path="/signup" component={SignupPage} />
         <Route path="/faq" component={FaqPage} />
         <Route path="/contact" component={ContactPage} />
         <Route path="/terms" component={TermsPage} />

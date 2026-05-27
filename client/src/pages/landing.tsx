@@ -84,10 +84,10 @@ export default function LandingPage() {
                 </button>
               </div>
               <ThemeToggle />
-              <a href="/api/login">
+              <a href="/login">
                 <Button variant="outline" data-testid="button-login">{t("logIn")}</Button>
               </a>
-              <a href="/api/login">
+              <a href="/signup">
                 <Button className="bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" data-testid="button-get-started">
                   {t("getStarted")}
                 </Button>
@@ -114,7 +114,7 @@ export default function LandingPage() {
               {t("heroSubtitle")}
             </p>
             <div className="flex flex-wrap items-center gap-3 mb-10">
-              <a href="/api/login">
+              <a href="/signup">
                 <Button size="lg" className="bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white text-base" data-testid="button-hero-cta">
                   {t("startSelling")}
                   <ArrowRight className="h-4 w-4 ml-2" />
@@ -256,12 +256,12 @@ export default function LandingPage() {
             {t("ctaSubtitle")}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <a href="/api/login">
+            <a href="/signup">
               <Button size="lg" className="bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" data-testid="button-cta-sell">
                 {lang === "fr" ? "Je veux vendre" : "I Want to Sell"}
               </Button>
             </a>
-            <a href="/api/login">
+            <a href="/signup">
               <Button size="lg" variant="outline" className="text-primary-foreground border-primary-foreground/30 bg-primary-foreground/10">
                 {lang === "fr" ? "Je suis revendeur" : "I'm a Reseller"}
               </Button>
