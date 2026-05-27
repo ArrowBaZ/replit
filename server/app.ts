@@ -6,6 +6,7 @@ import { storage } from "./storage";
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
+    cookies?: Record<string, string>;
   }
 }
 
@@ -20,9 +21,29 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+function parseCookies(cookieHeader: string): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  if (!cookieHeader) return cookies;
+
+  cookieHeader.split(";").forEach((cookie) => {
+    const [name, value] = cookie.split("=");
+    if (name && value) {
+      cookies[name.trim()] = decodeURIComponent(value.trim());
+    }
+  });
+
+  return cookies;
+}
+
 export async function createApp() {
   const app = express();
   const httpServer = createServer(app);
+
+  // Cookie parsing middleware
+  app.use((req, res, next) => {
+    req.cookies = parseCookies(req.headers.cookie || "");
+    next();
+  });
 
   app.use(
     express.json({

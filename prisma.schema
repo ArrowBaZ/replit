@@ -89,9 +89,9 @@ CREATE TABLE "requests" (
 	"preferred_date_end" timestamp
 );
 CREATE TABLE "sessions" (
-	"sid" varchar PRIMARY KEY,
-	"sess" jsonb NOT NULL,
-	"expire" timestamp NOT NULL
+	"sessionToken" text PRIMARY KEY,
+	"userId" varchar NOT NULL,
+	"expires" timestamp NOT NULL
 );
 CREATE TABLE "transactions" (
 	"id" serial PRIMARY KEY,
@@ -110,6 +110,8 @@ CREATE TABLE "users" (
 	"email" varchar CONSTRAINT "users_email_unique" UNIQUE,
 	"first_name" varchar,
 	"last_name" varchar,
+	"password_hash" text,
+	"email_verified" timestamp,
 	"profile_image_url" varchar,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now()
@@ -129,6 +131,7 @@ ALTER TABLE "transactions" ADD CONSTRAINT "transactions_item_id_items_id_fk" FOR
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_request_id_requests_id_fk" FOREIGN KEY ("request_id") REFERENCES "requests"("id");
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_reusse_id_users_id_fk" FOREIGN KEY ("reusse_id") REFERENCES "users"("id");
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_seller_id_users_id_fk" FOREIGN KEY ("seller_id") REFERENCES "users"("id");
+ALTER TABLE "sessions" ADD CONSTRAINT "sessions_userId_users_id_fk" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE;
 CREATE INDEX "idx_items_reusse" ON "items" ("reusse_id");
 CREATE INDEX "idx_items_seller" ON "items" ("seller_id");
 CREATE INDEX "idx_items_status" ON "items" ("status");
@@ -146,8 +149,9 @@ CREATE INDEX "idx_requests_reusse" ON "requests" ("reusse_id");
 CREATE INDEX "idx_requests_seller" ON "requests" ("seller_id");
 CREATE INDEX "idx_requests_status" ON "requests" ("status");
 CREATE UNIQUE INDEX "requests_pkey" ON "requests" ("id");
-CREATE INDEX "IDX_session_expire" ON "sessions" ("expire");
-CREATE UNIQUE INDEX "sessions_pkey" ON "sessions" ("sid");
+CREATE INDEX "idx_sessions_userId" ON "sessions" ("userId");
+CREATE INDEX "idx_sessions_expires" ON "sessions" ("expires");
+CREATE UNIQUE INDEX "sessions_pkey" ON "sessions" ("sessionToken");
 CREATE INDEX "idx_transactions_item" ON "transactions" ("item_id");
 CREATE INDEX "idx_transactions_reusse" ON "transactions" ("reusse_id");
 CREATE INDEX "idx_transactions_seller" ON "transactions" ("seller_id");

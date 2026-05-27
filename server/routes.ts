@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -11,6 +11,13 @@ import { ObjectStorageService } from "./replit_integrations/object_storage/objec
 import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS, NOTIF_PREF_KEYS } from "@shared/constants";
 import type { Item, Transaction } from "@shared/schema";
 import { sendAgreementReadyEmail } from "./email";
+import { signInSchema, hashPassword, verifyPassword } from "./auth";
+import { randomUUID } from "crypto";
+
+interface AuthRequest extends Request {
+  user?: { id: string };
+  cookies: Record<string, string>;
+}
 
 function resolveItemPrice(i: Pick<Item, "approvedPrice" | "salePrice" | "maxPrice" | "minPrice">): number {
   return parseFloat(i.approvedPrice || i.salePrice || i.maxPrice || i.minPrice || "0");
@@ -210,14 +217,7 @@ export function broadcastToUser(userId: string, data: unknown) {
   });
 }
 
-function isAuthenticated(req: any, res: Response, next: NextFunction) {
-  if (!req.user?.id) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  next();
-}
-
-function requireAuth(req: any, res: Response, next: NextFunction) {
+function isAuthenticated(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user?.id) {
     return res.status(401).json({ message: "Unauthorized" });
   }
@@ -241,29 +241,77 @@ export async function registerRoutes(
 ): Promise<Server> {
   registerObjectStorageRoutes(app);
 
-  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
-  wss.on("connection", (ws, req) => {
-    let userId: string | null = null;
-    ws.on("message", (data) => {
+  // Session loading middleware
+  app.use(async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const sessionToken = req.cookies["next-auth.session-token"];
+    if (sessionToken) {
       try {
-        const msg = JSON.parse(data.toString());
-        if (msg.type === "auth" && typeof msg.userId === "string") {
-          userId = msg.userId;
-          const uid = userId as string;
-          if (!wsClients.has(uid)) wsClients.set(uid, new Set());
-          wsClients.get(uid)!.add(ws);
+        const result = await db.execute(
+          sql`SELECT "userId" FROM sessions WHERE "sessionToken" = ${sessionToken} AND expires > NOW()`
+        );
+        if ((result as any)?.rows?.[0]) {
+          req.user = { id: (result as any).rows[0].userId };
         }
-      } catch {}
-    });
-    ws.on("close", () => {
-      if (userId) wsClients.get(userId as string)?.delete(ws);
-    });
+      } catch (error) {
+        console.error("Error loading session:", error);
+      }
+    }
+    next();
+  });
+
+  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+  wss.on("connection", async (ws, req: AuthRequest) => {
+    // Extract session token from cookies for WebSocket auth
+    const cookies = req.headers.cookie?.split('; ').reduce((acc: Record<string, string>, cookie: string) => {
+      const [key, value] = cookie.split('=');
+      acc[key] = decodeURIComponent(value);
+      return acc;
+    }, {}) || {};
+
+    const sessionToken = cookies["next-auth.session-token"];
+
+    // Verify session and extract userId
+    if (!sessionToken) {
+      ws.close(1008, "Unauthorized");
+      return;
+    }
+
+    try {
+      const result = await db.execute(
+        sql`SELECT "userId" FROM sessions WHERE "sessionToken" = ${sessionToken} AND expires > NOW()`
+      );
+      const row = (result as any)?.rows?.[0];
+      if (!row || !row.userId) {
+        ws.close(1008, "Unauthorized");
+        return;
+      }
+
+      const userId: string = row.userId;
+      if (!wsClients.has(userId)) wsClients.set(userId, new Set());
+      wsClients.get(userId)!.add(ws);
+
+      ws.on("message", (data) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          // userId is already authenticated; reject any attempts to change it
+          if (msg.type === "auth") {
+            ws.send(JSON.stringify({ type: "auth", success: true, userId }));
+          }
+        } catch {}
+      });
+
+      ws.on("close", () => {
+        wsClients.get(userId)?.delete(ws);
+      });
+    } catch (error) {
+      console.error("WebSocket session lookup error:", error);
+      ws.close(1011, "Session error");
+    }
   });
 
   app.get(
     "/api/profile",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -282,7 +330,6 @@ export async function registerRoutes(
   app.post(
     "/api/profile",
     isAuthenticated,
-    requireAuth,
     validate(createProfileBody),
     async (req: any, res) => {
       try {
@@ -328,7 +375,6 @@ export async function registerRoutes(
   app.patch(
     "/api/profile",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -365,7 +411,6 @@ export async function registerRoutes(
   app.get(
     "/api/requests",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -385,7 +430,6 @@ export async function registerRoutes(
   app.get(
     "/api/requests/available",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const result = await storage.getAvailableRequests();
@@ -400,7 +444,6 @@ export async function registerRoutes(
   app.get(
     "/api/requests/:id",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const id = parseInt(req.params.id);
@@ -419,7 +462,6 @@ export async function registerRoutes(
   app.get(
     "/api/requests/:id/contact",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -456,7 +498,6 @@ export async function registerRoutes(
   app.post(
     "/api/requests",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -510,7 +551,6 @@ export async function registerRoutes(
   app.post(
     "/api/requests/:id/accept",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -548,7 +588,6 @@ export async function registerRoutes(
   app.get(
     "/api/requests/:id/items",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -573,7 +612,6 @@ export async function registerRoutes(
   app.post(
     "/api/requests/:id/items/accept-all",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -671,7 +709,6 @@ export async function registerRoutes(
   app.post(
     "/api/requests/:id/items",
     isAuthenticated,
-    requireAuth,
     validate(createItemBody),
     async (req: any, res) => {
       try {
@@ -782,7 +819,7 @@ export async function registerRoutes(
     },
   );
 
-  app.get("/api/items/:id/price-history", isAuthenticated, requireAuth, async (req: any, res) => {
+  app.get("/api/items/:id/price-history", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const item = await storage.getItemIncludingDeleted(id);
@@ -802,7 +839,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/items", isAuthenticated, requireAuth, async (req: any, res) => {
+  app.get("/api/items", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const profile = await storage.getProfile(userId);
@@ -820,7 +857,6 @@ export async function registerRoutes(
   app.get(
     "/api/requests/:id/meetings",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const id = parseInt(req.params.id);
@@ -836,7 +872,6 @@ export async function registerRoutes(
   app.post(
     "/api/requests/:id/meetings",
     isAuthenticated,
-    requireAuth,
     validate(createMeetingBody),
     async (req: any, res) => {
       try {
@@ -882,7 +917,6 @@ export async function registerRoutes(
   app.patch(
     "/api/meetings/:meetingId/cancel",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const meetingId = parseInt(req.params.meetingId);
@@ -924,7 +958,6 @@ export async function registerRoutes(
   app.patch(
     "/api/meetings/:meetingId/reschedule",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const meetingId = parseInt(req.params.meetingId);
@@ -977,7 +1010,6 @@ export async function registerRoutes(
   app.get(
     "/api/meetings",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -993,7 +1025,6 @@ export async function registerRoutes(
   app.get(
     "/api/messages/conversations",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -1009,7 +1040,6 @@ export async function registerRoutes(
   app.get(
     "/api/messages/:userId",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const currentUserId = req.user.id;
@@ -1029,7 +1059,6 @@ export async function registerRoutes(
   app.post(
     "/api/messages",
     isAuthenticated,
-    requireAuth,
     validate(createMessageBody),
     async (req: any, res) => {
       try {
@@ -1054,7 +1083,6 @@ export async function registerRoutes(
   app.get(
     "/api/notifications",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -1070,7 +1098,6 @@ export async function registerRoutes(
   app.patch(
     "/api/notifications/:id/read",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -1087,7 +1114,6 @@ export async function registerRoutes(
   app.patch(
     "/api/notifications/read-all",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -1257,7 +1283,6 @@ export async function registerRoutes(
   app.patch(
     "/api/items/:id",
     isAuthenticated,
-    requireAuth,
     validate(updateItemBody),
     async (req: any, res) => {
       try {
@@ -1330,7 +1355,6 @@ export async function registerRoutes(
   app.post(
     "/api/items/:id/approve",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -1452,7 +1476,6 @@ export async function registerRoutes(
   app.post(
     "/api/items/:id/counter-offer",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -1574,7 +1597,6 @@ export async function registerRoutes(
   app.post(
     "/api/items/:id/decline",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -1630,7 +1652,6 @@ export async function registerRoutes(
   app.post(
     "/api/items/:id/accept-counter-offer",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -1750,7 +1771,6 @@ export async function registerRoutes(
   app.post(
     "/api/items/:id/revise-price",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -1881,7 +1901,6 @@ export async function registerRoutes(
   app.post(
     "/api/items/:id/duplicate",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const id = parseInt(req.params.id);
@@ -1941,7 +1960,6 @@ export async function registerRoutes(
   app.post(
     "/api/items/:id/list",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -1993,7 +2011,6 @@ export async function registerRoutes(
   app.post(
     "/api/items/:id/mark-sold",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2092,7 +2109,6 @@ export async function registerRoutes(
   app.patch(
     "/api/requests/:id/cancel",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2133,7 +2149,6 @@ export async function registerRoutes(
   app.patch(
     "/api/requests/:id/complete",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2182,7 +2197,6 @@ export async function registerRoutes(
   app.get(
     "/api/earnings",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2201,7 +2215,6 @@ export async function registerRoutes(
   app.get(
     "/api/earnings-summary",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2219,7 +2232,6 @@ export async function registerRoutes(
   app.get(
     "/api/stats/activity",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2237,7 +2249,6 @@ export async function registerRoutes(
   app.get(
     "/api/marchands",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const marchands = await storage.getResellers();
@@ -2252,7 +2263,6 @@ export async function registerRoutes(
   app.get(
     "/api/marchands/:id",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const marchand = await storage.getResellerById(req.params.id);
@@ -2268,7 +2278,6 @@ export async function registerRoutes(
   app.get(
     "/api/marchands/:id/reviews",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const revs = await storage.getReviews(req.params.id);
@@ -2283,7 +2292,6 @@ export async function registerRoutes(
   app.post(
     "/api/requests/:id/review",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const id = parseInt(req.params.id);
@@ -2332,7 +2340,6 @@ export async function registerRoutes(
   app.get(
     "/api/items/:id/documents",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2356,7 +2363,6 @@ export async function registerRoutes(
   app.post(
     "/api/items/:id/documents",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2450,7 +2456,6 @@ export async function registerRoutes(
   app.post(
     "/api/items/:id/document-request",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2509,7 +2514,6 @@ export async function registerRoutes(
   app.get(
     "/api/items/:id/document-request-status",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2536,7 +2540,6 @@ export async function registerRoutes(
   app.get(
     "/api/items/:id/documents/:docId/download",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2574,7 +2577,6 @@ export async function registerRoutes(
   app.get(
     "/api/documents",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2590,7 +2592,6 @@ export async function registerRoutes(
   app.get(
     "/api/user/agreements",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2606,7 +2607,6 @@ export async function registerRoutes(
   app.delete(
     "/api/items/:id/documents/:docId",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2633,7 +2633,6 @@ export async function registerRoutes(
   app.post(
     "/api/requests/:id/finalize-list",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2710,7 +2709,6 @@ export async function registerRoutes(
   app.get(
     "/api/requests/:id/agreement",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2736,7 +2734,6 @@ export async function registerRoutes(
   app.post(
     "/api/requests/:id/generate-agreement",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2805,7 +2802,6 @@ export async function registerRoutes(
   app.get(
     "/api/agreements/:id",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2827,7 +2823,6 @@ export async function registerRoutes(
   app.post(
     "/api/agreements/:id/sign",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -2929,7 +2924,6 @@ export async function registerRoutes(
   app.post(
     "/api/agreements/:id/send-pdf",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const userId = req.user.id;
@@ -3196,7 +3190,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/fee-tiers", isAuthenticated, requireAuth, async (req: any, res) => {
+  app.get("/api/fee-tiers", isAuthenticated, async (req: any, res) => {
     try {
       const tiers = await storage.getFeeTiers(true);
       res.json(tiers);
@@ -3206,7 +3200,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/fee-tiers/for-price", isAuthenticated, requireAuth, async (req: any, res) => {
+  app.get("/api/fee-tiers/for-price", isAuthenticated, async (req: any, res) => {
     try {
       const amount = parseFloat(req.query.amount as string);
       if (isNaN(amount) || amount < 0) {
@@ -3223,7 +3217,6 @@ export async function registerRoutes(
   app.post(
     "/api/requests/:id/report",
     isAuthenticated,
-    requireAuth,
     async (req: any, res) => {
       try {
         const id = parseInt(req.params.id);
@@ -3261,6 +3254,114 @@ export async function registerRoutes(
       }
     },
   );
+
+  // Auth endpoints
+  app.post("/api/auth/signin", async (req: AuthRequest, res) => {
+    try {
+      const parsed = await signInSchema.parseAsync(req.body);
+      const { email, password } = parsed;
+
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email));
+
+      if (!user || !user.passwordHash) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      const isPasswordValid = await verifyPassword(password, user.passwordHash);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      const sessionId = randomUUID();
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+      await db.execute(
+        sql`INSERT INTO sessions ("sessionToken", "userId", expires) VALUES (${sessionId}, ${user.id}, ${expiresAt})`
+      );
+
+      res.cookie("next-auth.session-token", sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : undefined,
+        },
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid credentials" });
+      }
+      console.error("Sign in error:", error);
+      res.status(500).json({ message: "Sign in failed" });
+    }
+  });
+
+  app.post("/api/auth/signout", isAuthenticated, async (req: AuthRequest, res) => {
+    try {
+      const sessionToken = req.cookies["next-auth.session-token"];
+      if (sessionToken) {
+        await db.execute(
+          sql`DELETE FROM sessions WHERE "sessionToken" = ${sessionToken}`
+        );
+      }
+      res.clearCookie("next-auth.session-token");
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Sign out error:", error);
+      res.status(500).json({ message: "Sign out failed" });
+    }
+  });
+
+  app.get("/api/auth/session", async (req: AuthRequest, res) => {
+    try {
+      const sessionToken = req.cookies["next-auth.session-token"];
+      if (!sessionToken) {
+        return res.json(null);
+      }
+
+      const result = await db.execute(
+        sql`SELECT "userId", expires FROM sessions WHERE "sessionToken" = ${sessionToken} AND expires > NOW()`
+      );
+
+      if (!(result as any)?.rows?.[0]) {
+        res.clearCookie("next-auth.session-token");
+        return res.json(null);
+      }
+
+      const session = (result as any).rows[0];
+
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, session.userId));
+
+      if (!user) {
+        return res.json(null);
+      }
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : undefined,
+        },
+        expires: session.expires,
+      });
+    } catch (error) {
+      console.error("Get session error:", error);
+      res.status(500).json({ message: "Failed to get session" });
+    }
+  });
 
   return httpServer;
 }

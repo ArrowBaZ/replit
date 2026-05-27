@@ -57,6 +57,13 @@
       "when": 1780076400000,
       "tag": "0007_add_password_and_email_verified_to_users",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780162800000,
+      "tag": "0008_add_sessions_table",
+      "breakpoints": true
     }
   ]
 }
