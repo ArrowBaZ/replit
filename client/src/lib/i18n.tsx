@@ -12,8 +12,8 @@ const translations = {
     getStarted: "Get Started",
 
     // Landing hero
-    heroTitle: "Turn Your Closet Into Cash",
-    heroSubtitle: "Connect with expert resellers who handle everything — from pricing to shipping. You earn, they sell.",
+    heroTitle: "Turn Your Unused Items Into Cash",
+    heroSubtitle: "Connect with expert resellers who handle everything — from pricing to shipping. Whether it's a watch, a bike, electronics, or more — you earn, they sell.",
     startSelling: "Start Selling Now",
     learnMore: "Learn More",
 
@@ -26,35 +26,35 @@ const translations = {
     // Landing features
     whySellzy: "Why Sellzy",
     betterWayToResell: "A Better Way to Resell",
-    featuresSubtitle: "We connect sellers with trusted, local resale experts who do the hard work for you.",
+    featuresSubtitle: "We connect sellers with trusted, local resale experts who do the hard work for you — across all categories of valuables.",
     featureExpertTitle: "Expert Resale",
-    featureExpertDesc: "Expert resellers evaluate, price, and list your clothing on the best platforms for maximum return.",
+    featureExpertDesc: "Expert resellers evaluate, price, and list your items — watches, bikes, electronics, instruments, and more — on the best platforms for maximum return.",
     featureMatchingTitle: "Personal Matching",
-    featureMatchingDesc: "Get matched with a local resale expert based on your location and the type of items you have.",
+    featureMatchingDesc: "Get matched with a local resale expert based on your location and the type of items you want to sell.",
     featureEarningsTitle: "Transparent Earnings",
     featureEarningsDesc: "Track every item from pickup to sale. See exactly what you earn with our clear commission structure.",
 
     // Landing how it works
     threeSimpleSteps: "Three Simple Steps",
-    stepsSubtitle: "From closet to cash in just a few steps. Our experts handle the rest.",
+    stepsSubtitle: "From unused items to cash in just a few steps. Our experts handle the rest.",
     step1Title: "Submit a Request",
-    step1Desc: "Tell us about your clothing items, preferred service type, and your location.",
+    step1Desc: "Tell us about your items — watches, bicycles, electronics, gear, and more — your preferred service type, and your location.",
     step2Title: "Meet Your Reseller",
-    step2Desc: "A verified resale expert near you picks up and evaluates your items in person.",
+    step2Desc: "A verified resale expert near you picks up and evaluates your valuables in person.",
     step3Title: "Earn from Sales",
     step3Desc: "Your reseller lists items on premium platforms. You get paid when they sell.",
 
     // Landing testimonials
     lovedBy: "Loved by Sellers and Resellers",
-    testimonial1: "I cleared out my closet and made over 800 euros without lifting a finger. My reseller was professional, friendly, and got great prices.",
-    testimonial2: "As a reseller, this platform gives me a steady stream of quality items and handles the logistics. I've grown my business 3x.",
+    testimonial1: "I sold my old bike and a vintage watch and made over 800 euros without lifting a finger. My reseller was professional, friendly, and got great prices.",
+    testimonial2: "As a reseller, this platform gives me a steady stream of quality items across many categories and handles all the logistics. I've grown my business 3x.",
     testimonial3: "The transparency is amazing. I can see exactly where each item is in the process and what I'll earn. Highly recommend!",
     seller: "Seller",
     reseller: "Reseller",
 
     // Landing CTA
     readyToStart: "Ready to Start?",
-    ctaSubtitle: "Join thousands of sellers and resellers on Sellzy. Turn your unused clothes into money today.",
+    ctaSubtitle: "Join thousands of sellers and resellers on Sellzy. Turn your unused valuables into money today.",
 
     // Landing footer
     allRightsReserved: "2026 Sellzy. All rights reserved.",
@@ -514,8 +514,8 @@ const translations = {
     getStarted: "Commencer",
 
     // Landing hero
-    heroTitle: "Transformez votre garde-robe en argent",
-    heroSubtitle: "Connectez-vous avec des experts en revente qui s'occupent de tout — de la tarification a l'expedition. Vous gagnez, ils vendent.",
+    heroTitle: "Transformez vos objets inutilises en argent",
+    heroSubtitle: "Connectez-vous avec des experts en revente qui s'occupent de tout — de la tarification a l'expedition. Montres, velos, electronique et plus encore — vous gagnez, ils vendent.",
     startSelling: "Commencer a vendre",
     learnMore: "En savoir plus",
 
@@ -528,35 +528,35 @@ const translations = {
     // Landing features
     whySellzy: "Pourquoi Sellzy",
     betterWayToResell: "Une meilleure facon de revendre",
-    featuresSubtitle: "Nous connectons les vendeurs avec des experts en revente locaux et de confiance qui font le travail pour vous.",
+    featuresSubtitle: "Nous connectons les vendeurs avec des experts en revente locaux et de confiance qui font le travail pour vous — pour toutes les categories d'objets.",
     featureExpertTitle: "Revente experte",
-    featureExpertDesc: "Des revendeurs experts evaluent, fixent les prix et listent vos vetements sur les meilleures plateformes pour un maximum de retour.",
+    featureExpertDesc: "Des revendeurs experts evaluent, fixent les prix et listent vos objets — montres, velos, electronique, instruments et plus — sur les meilleures plateformes pour un maximum de retour.",
     featureMatchingTitle: "Mise en relation personnalisee",
-    featureMatchingDesc: "Soyez mis en relation avec un expert en revente local en fonction de votre emplacement et du type d'articles que vous avez.",
+    featureMatchingDesc: "Soyez mis en relation avec un expert en revente local en fonction de votre emplacement et du type d'articles que vous souhaitez vendre.",
     featureEarningsTitle: "Gains transparents",
     featureEarningsDesc: "Suivez chaque article de la collecte a la vente. Voyez exactement ce que vous gagnez avec notre structure de commission claire.",
 
     // Landing how it works
     threeSimpleSteps: "Trois etapes simples",
-    stepsSubtitle: "De l'armoire a l'argent en quelques etapes. Nos experts s'occupent du reste.",
+    stepsSubtitle: "De vos objets inutilises a l'argent en quelques etapes. Nos experts s'occupent du reste.",
     step1Title: "Soumettez une demande",
-    step1Desc: "Parlez-nous de vos vetements, du type de service souhaite et de votre localisation.",
+    step1Desc: "Parlez-nous de vos articles — montres, velos, electronique, equipements et plus — du type de service souhaite et de votre localisation.",
     step2Title: "Rencontrez votre revendeur",
-    step2Desc: "Un expert en revente verifie pres de chez vous recupere et evalue vos articles en personne.",
+    step2Desc: "Un expert en revente verifie pres de chez vous recupere et evalue vos objets en personne.",
     step3Title: "Gagnez sur les ventes",
     step3Desc: "Votre revendeur liste les articles sur des plateformes premium. Vous etes paye quand ils sont vendus.",
 
     // Landing testimonials
     lovedBy: "Apprecie par les vendeurs et revendeurs",
-    testimonial1: "J'ai vide mon placard et gagne plus de 800 euros sans lever le petit doigt. Mon revendeur etait professionnel, sympathique et a obtenu d'excellents prix.",
-    testimonial2: "En tant que revendeur, cette plateforme me donne un flux constant d'articles de qualite et gere la logistique. J'ai triple mon activite.",
+    testimonial1: "J'ai vendu mon vieux velo et une montre vintage et gagne plus de 800 euros sans lever le petit doigt. Mon revendeur etait professionnel, sympathique et a obtenu d'excellents prix.",
+    testimonial2: "En tant que revendeur, cette plateforme me donne un flux constant d'articles de qualite dans de nombreuses categories et gere la logistique. J'ai triple mon activite.",
     testimonial3: "La transparence est incroyable. Je peux voir exactement ou en est chaque article et ce que je vais gagner. Je recommande vivement !",
     seller: "Vendeur",
     reseller: "Revendeur",
 
     // Landing CTA
     readyToStart: "Pret a commencer ?",
-    ctaSubtitle: "Rejoignez des milliers de vendeurs et revendeurs sur Sellzy. Transformez vos vetements inutilises en argent aujourd'hui.",
+    ctaSubtitle: "Rejoignez des milliers de vendeurs et revendeurs sur Sellzy. Transformez vos objets inutilises en argent aujourd'hui.",
 
     // Landing footer
     allRightsReserved: "2026 Sellzy. Tous droits reserves.",

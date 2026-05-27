@@ -3,17 +3,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Shirt, HandshakeIcon, TrendingUp, ArrowRight, Star, Shield, Zap } from "lucide-react";
+import { Package, HandshakeIcon, TrendingUp, ArrowRight, Star, Shield, Zap } from "lucide-react";
 import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
 import { useI18n } from "@/lib/i18n";
 
-const heroImage = "/images/hero-fashion.png";
+const heroImage = "/images/hero-resale.png";
 
 export default function LandingPage() {
   const { t, lang, setLang } = useI18n();
 
   const features = [
-    { icon: Shirt, title: t("featureExpertTitle"), description: t("featureExpertDesc") },
+    { icon: Package, title: t("featureExpertTitle"), description: t("featureExpertDesc") },
     { icon: HandshakeIcon, title: t("featureMatchingTitle"), description: t("featureMatchingDesc") },
     { icon: TrendingUp, title: t("featureEarningsTitle"), description: t("featureEarningsDesc") },
   ];
@@ -99,13 +99,13 @@ export default function LandingPage() {
 
       <section className="relative pt-16 overflow-hidden">
         <div className="absolute inset-0">
-          <img src={heroImage} alt="Fashion items" className="w-full h-full object-cover" />
+          <img src={heroImage} alt="Diverse resale items" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/40" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32 lg:py-40">
           <div className="max-w-2xl">
             <p className="text-sm font-medium tracking-wider uppercase text-[hsl(var(--success))] mb-4">
-              {lang === "fr" ? "La marketplace de revente mode" : "The Fashion Resale Marketplace"}
+              {lang === "fr" ? "La marketplace de revente entre particuliers" : "The Peer Resale Marketplace"}
             </p>
             <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
               {t("heroTitle")}
