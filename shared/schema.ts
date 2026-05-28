@@ -21,6 +21,8 @@ export const profiles = pgTable("profiles", {
   bio: text("bio"),
   experience: text("experience"),
   siretNumber: varchar("siret_number", { length: 20 }),
+  vatNumber: varchar("vat_number", { length: 20 }),
+  dviNumber: varchar("dvi_number", { length: 20 }),
   status: varchar("status", { length: 20 }).default("approved"),
   preferredContactMethod: varchar("preferred_contact_method", { length: 20 }),
   notificationPrefs: jsonb("notification_prefs").$type<Record<string, boolean>>(),

@@ -37,6 +37,9 @@ import FeeStructurePage from "@/pages/fee-structure";
 import SellerReviewPage from "@/pages/seller-review";
 import { LoginPage } from "@/pages/login";
 import { SignupPage } from "@/pages/signup";
+import { VerifyEmailPage } from "@/pages/verify-email";
+import { ForgotPasswordPage } from "@/pages/forgot-password";
+import { ResetPasswordPage } from "@/pages/reset-password";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 
@@ -139,6 +142,9 @@ function AppContent() {
       <Switch>
         <Route path="/login" component={LoginPage} />
         <Route path="/signup" component={SignupPage} />
+        <Route path="/verify-email" component={VerifyEmailPage} />
+        <Route path="/forgot-password" component={ForgotPasswordPage} />
+        <Route path="/reset-password" component={ResetPasswordPage} />
         <Route path="/faq" component={FaqPage} />
         <Route path="/contact" component={ContactPage} />
         <Route path="/terms" component={TermsPage} />

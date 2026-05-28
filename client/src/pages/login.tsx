@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
 import { apiRequest } from "@/lib/queryClient";
+import { validateEmail, validatePassword } from "@/lib/auth-validation";
+import { OAuthButtons } from "@/components/oauth-buttons";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -37,14 +39,29 @@ export function LoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
+
+    // Validate email
+    let error = validateEmail(email);
+    if (error) {
       toast({
         title: t("authError"),
-        description: "Email and password are required",
+        description: t(error.message as any),
         variant: "destructive",
       });
       return;
     }
+
+    // Validate password
+    error = validatePassword(password);
+    if (error) {
+      toast({
+        title: t("authError"),
+        description: t(error.message as any),
+        variant: "destructive",
+      });
+      return;
+    }
+
     signInMutation.mutate();
   };
 
@@ -71,7 +88,12 @@ export function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">{t("passwordLabel")}</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">{t("passwordLabel")}</Label>
+                <a href="/forgot-password" className="text-sm text-primary hover:underline">
+                  {t("forgotPassword")}
+                </a>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -99,16 +121,7 @@ export function LoginPage() {
               </a>
             </div>
 
-            {/* OAuth providers — enable when credentials are configured
-            <div className="pt-2 space-y-2 border-t">
-              <Button variant="outline" className="w-full" disabled>
-                Continue with Google
-              </Button>
-              <Button variant="outline" className="w-full" disabled>
-                Continue with Microsoft
-              </Button>
-            </div>
-            */}
+            <OAuthButtons disabled={true} />
           </form>
         </CardContent>
       </Card>

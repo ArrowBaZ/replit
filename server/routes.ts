@@ -12,7 +12,7 @@ import { ObjectStorageService } from "./replit_integrations/object_storage/objec
 import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS, NOTIF_PREF_KEYS } from "@shared/constants";
 import type { Item, Transaction } from "@shared/schema";
 import { sendAgreementReadyEmail } from "./email";
-import { signInSchema, hashPassword, verifyPassword } from "./auth";
+import { signInSchema, registerSchema, hashPassword, verifyPassword } from "./auth";
 import { randomUUID, randomBytes } from "crypto";
 
 interface AuthRequest extends Request {
@@ -3480,7 +3480,7 @@ export async function registerRoutes(
   app.post("/api/auth/register", registerLimiter, async (req: AuthRequest, res) => {
     try {
       const parsed = await registerSchema.parseAsync(req.body);
-      const { email, password, firstName, lastName } = parsed;
+      const { email, password, firstName, lastName, profileType, siretNumber, vatNumber, dviNumber } = parsed;
 
       const [existingUser] = await db
         .select()
@@ -3498,11 +3498,34 @@ export async function registerRoutes(
         sql`INSERT INTO users (id, email, "passwordHash", "firstName", "lastName") VALUES (${userId}, ${email}, ${passwordHash}, ${firstName || null}, ${lastName || null})`
       );
 
-      const sessionId = randomUUID();
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      // Create profile during registration
+      await storage.createProfile({
+        userId,
+        role: profileType,
+        siretNumber: siretNumber || null,
+        vatNumber: vatNumber || null,
+        dviNumber: dviNumber || null,
+        status: profileType === "marchand" ? "pending" : "approved",
+        preferredContactMethod: "email",
+      });
+
+      // Create email verification code
+      const verificationCode = generateVerificationCode();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      const codeId = randomUUID();
 
       await db.execute(
-        sql`INSERT INTO sessions ("sessionToken", "userId", expires) VALUES (${sessionId}, ${userId}, ${expiresAt})`
+        sql`INSERT INTO email_verification_codes (id, "userId", code, "expiresAt") VALUES (${codeId}, ${userId}, ${verificationCode}, ${expiresAt})`
+      );
+
+      // TODO: Send verification email with code
+      console.log(`Verification code for ${email}: ${verificationCode}`);
+
+      const sessionId = randomUUID();
+      const expiresAtSession = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      await db.execute(
+        sql`INSERT INTO sessions ("sessionToken", "userId", expires) VALUES (${sessionId}, ${userId}, ${expiresAtSession})`
       );
 
       res.cookie("next-auth.session-token", sessionId, {

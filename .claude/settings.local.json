@@ -1,57 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(obsidian read:*)",
-      "Bash(obsidian files:*)",
-      "Bash(grep -i \"test\\\\|vitest\\\\|jest\\\\|coverage\\\\|regression\" /Users/fabienplart/Projects/local/replit/docs/*.md | head -50)",
+      "Bash",
       "WebSearch",
-      "Bash(obsidian search:*)",
-      "Bash(find /Users/fabienplart/Projects/local/replit/docs -type f -name \"*.md\" 2>/dev/null | head -20)",
-      "Bash(find /Users/fabienplart/Projects/local/replit/docs -type f -name *.md)",
-      "Bash(wc -l /Users/fabienplart/Projects/local/replit/client/src/pages/*.tsx)",
-      "Bash(find /Users/fabienplart/Projects/local/replit/client/src -type f -name *admin* -o -name *Dashboard*)",
-      "Bash(find /Users/fabienplart/Projects/local/replit/server/src -type f -name *admin*)",
-      "Bash(find /Users/fabienplart/Projects/local/replit/server/src/routes -type f -name *.ts)",
-      "Bash(grep -r \"i18n\\\\|react-intl\\\\|next-intl\\\\|@fluent\" /Users/fabienplart/Projects/local/replit --include=*.ts --include=*.tsx --include=*.json)",
-      "Bash(xargs ls:*)",
-      "Bash(grep -r 'as const' /Users/fabienplart/Projects/local/replit --include=*.ts --include=*.tsx -l)",
-      "Bash(grep -r \"fee\\\\|commission\\\\|earning\\\\|split\" /Users/fabienplart/Projects/local/replit/server --include=\"*.ts\" --include=\"*.js\" ! -path \"*/node_modules/*\" -l)",
-      "Bash(grep -r \"profile.*incomplete\\\\|incomplete.*profile\\\\|validation\\\\|required.*fields\" /Users/fabienplart/Projects/local/replit --type ts --type js -i -l)",
-      "Bash(npm run *)",
-      "Bash(git checkout *)",
-      "Bash(npx drizzle-kit *)",
-      "Bash(cat)",
-      "Bash(chmod +x /tmp/drizzle_select.sh)",
-      "Bash(/tmp/drizzle_select.sh)",
-      "Bash(node *)",
-      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
-      "Read(//tmp/**)",
-      "Bash(awk '{print $NF}')",
-      "mcp__plugin_compound-engineering_context7__resolve-library-id",
-      "mcp__plugin_compound-engineering_context7__query-docs",
-      "Bash(git add *)",
-      "Bash(git commit -m 'feat: Restructure service type options - remove Express, update labels *)",
-      "Bash(awk '/export default function SellerReviewPage/,/^}$/' /Users/fabienplart/Projects/local/replit/client/src/pages/seller-review.tsx)",
-      "Bash(npm install *)",
-      "Bash(git commit *)",
-      "Bash(curl -X POST http://localhost:5173/api/auth/signin -H 'Content-Type: application/json' -d '{\"email\":\"test@example.com\",\"password\":\"password123\"}')",
-      "Bash(pkill -f \"tsx server/index.ts\")",
-      "Bash(curl -s http://localhost:5173/api/auth/session)",
-      "Bash(curl -v http://localhost:5173/api/auth/session)",
-      "Bash(curl -s -X GET http://localhost:8080/api/auth/session)",
-      "Bash(curl -s -X POST http://localhost:8080/api/auth/signin -H 'Content-Type: application/json' -d '{\"email\":\"test@example.com\",\"password\":\"password123\"}')",
-      "Bash(pkill -f \"npm run dev\")",
-      "Bash(cd *)",
-      "Bash(curl -s -X POST http://localhost:8080/api/auth/signin -H 'Content-Type: application/json' -d '{\"email\":\"nonexistent@example.com\",\"password\":\"password123}')",
-      "Bash(curl -s -X POST http://localhost:8080/api/auth/signin -H 'Content-Type: application/json' -d '{\"email\":\"nonexistent@example.com\",\"password\":\"password123\"}')",
-      "Bash(curl -s -o /dev/null -w '%{http_code}\\\\n' -X POST http://localhost:8080/api/auth/signin -H 'Content-Type: application/json' -d '{\"email\":\"test@example.com\",\"password\":\"pass\"}')",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X GET http://localhost:8080/api/auth/session)",
-      "Read(//private/tmp/**)",
-      "Bash(grep -n \"db.execute.*sql\\\\`\" /Users/fabienplart/Projects/local/replit/server/routes.ts)",
-      "Bash(grep -n \"sql\\\\`\" /Users/fabienplart/Projects/local/replit/server/routes.ts)",
-      "Bash(npx tsc *)",
-      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes\" npm run db:migrate:reset)",
-      "Bash(git push *)"
-    ]
+      "Read"
+    ],
+    "deny": [
+      "Bash(rm *)"
+      ]
   }
 }
