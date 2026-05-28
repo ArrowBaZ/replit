@@ -4,14 +4,13 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { validateEmail, validatePassword, validatePasswordConfirmation } from "@/lib/auth-validation";
 import { OAuthButtons } from "@/components/oauth-buttons";
 import { ProfileTypeSelector, type ProfileType } from "@/components/profile-type-selector";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 
 export function SignupPage() {
   const [profileType, setProfileType] = useState<ProfileType | null>(null);
@@ -48,11 +47,7 @@ export function SignupPage() {
     },
     onError: (error: any) => {
       const message = error?.response?.data?.message || t("authError");
-      toast({
-        title: t("authError"),
-        description: message,
-        variant: "destructive",
-      });
+      toast({ title: t("authError"), description: message, variant: "destructive" });
     },
   });
 
@@ -60,41 +55,25 @@ export function SignupPage() {
     e.preventDefault();
 
     if (!profileType) {
-      toast({
-        title: t("authError"),
-        description: "Please select a profile type",
-        variant: "destructive",
-      });
+      toast({ title: t("authError"), description: "Please select a profile type", variant: "destructive" });
       return;
     }
 
     let error = validateEmail(email);
     if (error) {
-      toast({
-        title: t("authError"),
-        description: t(error.message as any),
-        variant: "destructive",
-      });
+      toast({ title: t("authError"), description: t(error.message as any), variant: "destructive" });
       return;
     }
 
     error = validatePassword(password);
     if (error) {
-      toast({
-        title: t("authError"),
-        description: t(error.message as any),
-        variant: "destructive",
-      });
+      toast({ title: t("authError"), description: t(error.message as any), variant: "destructive" });
       return;
     }
 
     error = validatePasswordConfirmation(password, confirmPassword);
     if (error) {
-      toast({
-        title: t("authError"),
-        description: t(error.message as any),
-        variant: "destructive",
-      });
+      toast({ title: t("authError"), description: t(error.message as any), variant: "destructive" });
       return;
     }
 
@@ -102,59 +81,117 @@ export function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>{t("signUp")}</CardTitle>
-          <CardDescription>{t("createAccount")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+    <div className="min-h-screen flex">
+      {/* Left brand panel */}
+      <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between bg-[hsl(210,29%,18%)] text-white relative overflow-hidden p-12">
+        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-[hsl(145,63%,42%)] opacity-10" />
+        <div className="absolute -bottom-32 -left-16 w-80 h-80 rounded-full bg-[hsl(145,63%,42%)] opacity-10" />
+        <div className="absolute top-1/2 right-8 w-40 h-40 rounded-full bg-[hsl(145,63%,42%)] opacity-5" />
+
+        <div className="relative z-10">
+          <a href="/" className="inline-flex items-center gap-2">
+            <span className="font-serif text-2xl font-bold text-white">Sellzy</span>
+          </a>
+        </div>
+
+        <div className="relative z-10 space-y-6">
+          <p className="text-xs font-medium tracking-widest uppercase text-[hsl(145,63%,52%)]">
+            {t("joinSellzy")}
+          </p>
+          <h1 className="font-serif text-4xl xl:text-5xl font-bold leading-tight">
+            {t("heroTitle")}
+          </h1>
+          <p className="text-white/60 text-base leading-relaxed max-w-sm">
+            {t("heroSubtitle")}
+          </p>
+
+          <div className="space-y-3 pt-4">
+            {[
+              { step: "01", label: t("stepCreateAccount") },
+              { step: "02", label: t("stepSubmitItems") },
+              { step: "03", label: t("stepGetPaid") },
+            ].map(({ step, label }) => (
+              <div key={step} className="flex items-center gap-4">
+                <span className="font-serif text-lg font-bold text-[hsl(145,63%,52%)] w-8 shrink-0">{step}</span>
+                <span className="text-sm text-white/70">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="relative z-10 border-t border-white/10 pt-6">
+          <p className="text-sm text-white/40 italic">
+            "La marketplace de revente entre particuliers"
+          </p>
+        </div>
+      </div>
+
+      {/* Right form panel */}
+      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 bg-background overflow-y-auto">
+        {/* Mobile logo */}
+        <div className="lg:hidden mb-8 text-center">
+          <a href="/" className="font-serif text-2xl font-bold text-foreground">Sellzy</a>
+        </div>
+
+        <div className="w-full max-w-lg py-8">
+          {/* Header */}
+          <div className="mb-8">
+            <h2 className="font-serif text-3xl font-bold text-foreground">{t("signUp")}</h2>
+            <p className="text-muted-foreground mt-1.5 text-sm">{t("createAccount")}</p>
+          </div>
+
           {/* Profile Type Selector */}
           <ProfileTypeSelector onSelect={setProfileType} selected={profileType} />
 
-          {/* Form - shown when profile type is selected */}
+          {/* Form — shown after profile type selected */}
           {profileType && (
-            <form onSubmit={handleSubmit} className="space-y-4 border-t pt-6">
-              <div className="space-y-2">
-                <Label htmlFor="email">{t("emailLabel")}</Label>
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5 border-t border-border pt-8">
+              {/* Email */}
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-sm font-medium">{t("emailLabel")}</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder="vous@exemple.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={signUpMutation.isPending}
+                  className="h-11"
                   data-testid="signup-email"
                 />
               </div>
 
+              {/* Name row */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">{t("firstName")}</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="firstName" className="text-sm font-medium">{t("firstName")}</Label>
                   <Input
                     id="firstName"
-                    placeholder="John"
+                    placeholder="Jean"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     disabled={signUpMutation.isPending}
+                    className="h-11"
                     data-testid="signup-firstName"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">{t("lastName")}</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="lastName" className="text-sm font-medium">{t("lastName")}</Label>
                   <Input
                     id="lastName"
-                    placeholder="Doe"
+                    placeholder="Dupont"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     disabled={signUpMutation.isPending}
+                    className="h-11"
                     data-testid="signup-lastName"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">{t("passwordLabel")}</Label>
+              {/* Password */}
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-sm font-medium">{t("passwordLabel")}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -162,12 +199,14 @@ export function SignupPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={signUpMutation.isPending}
+                  className="h-11"
                   data-testid="signup-password"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">{t("confirmPasswordLabel")}</Label>
+              {/* Confirm password */}
+              <div className="space-y-1.5">
+                <Label htmlFor="confirmPassword" className="text-sm font-medium">{t("confirmPasswordLabel")}</Label>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -175,93 +214,110 @@ export function SignupPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={signUpMutation.isPending}
+                  className="h-11"
                   data-testid="signup-confirmPassword"
                 />
               </div>
 
-              {/* Marchand Legal Fields */}
+              {/* Marchand business info */}
               {profileType === "marchand" && (
-                <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <div className="rounded-xl border border-border bg-muted/30 overflow-hidden">
                   <button
                     type="button"
                     onClick={() => setShowLegalFields(!showLegalFields)}
-                    className="flex items-center justify-between w-full hover:opacity-80 transition-opacity"
+                    className="flex items-center justify-between w-full px-4 py-3 hover:bg-muted/50 transition-colors text-left"
                   >
-                    <span className="text-sm font-medium">Optional: Business Information</span>
-                    {showLegalFields ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
+                    <span className="text-sm font-medium">Informations légales (optionnel)</span>
+                    {showLegalFields
+                      ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      : <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    }
                   </button>
 
                   {showLegalFields && (
-                    <div className="space-y-3 pt-2 border-t border-slate-200">
-                      <div className="space-y-2">
-                        <Label htmlFor="siretNumber">SIRET Number</Label>
+                    <div className="px-4 pb-4 space-y-3 border-t border-border pt-4">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="siretNumber" className="text-sm font-medium">Numéro SIRET</Label>
                         <Input
                           id="siretNumber"
-                          placeholder="(Optional)"
+                          placeholder="(Optionnel)"
                           value={siretNumber}
                           onChange={(e) => setSiretNumber(e.target.value)}
                           disabled={signUpMutation.isPending}
+                          className="h-11"
                           data-testid="signup-siretNumber"
                         />
                       </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="vatNumber">VAT Number</Label>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="vatNumber" className="text-sm font-medium">Numéro TVA</Label>
                         <Input
                           id="vatNumber"
-                          placeholder="(Optional)"
+                          placeholder="(Optionnel)"
                           value={vatNumber}
                           onChange={(e) => setVatNumber(e.target.value)}
                           disabled={signUpMutation.isPending}
+                          className="h-11"
                           data-testid="signup-vatNumber"
                         />
                       </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="dviNumber">DVI Number</Label>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="dviNumber" className="text-sm font-medium">Numéro DVI</Label>
                         <Input
                           id="dviNumber"
-                          placeholder="(Optional)"
+                          placeholder="(Optionnel)"
                           value={dviNumber}
                           onChange={(e) => setDviNumber(e.target.value)}
                           disabled={signUpMutation.isPending}
+                          className="h-11"
                           data-testid="signup-dviNumber"
                         />
                       </div>
-
-                      <p className="text-xs text-muted-foreground pt-2">
-                        You can provide these details now or upload documents later to complete your profile verification.
+                      <p className="text-xs text-muted-foreground">
+                        Vous pouvez fournir ces informations maintenant ou uploader des documents plus tard.
                       </p>
                     </div>
                   )}
                 </div>
               )}
 
+              {/* Submit */}
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full h-11 text-sm font-medium bg-[hsl(var(--success))] hover:bg-[hsl(145,63%,36%)] text-white border-0"
                 disabled={signUpMutation.isPending}
                 data-testid="signup-submit"
               >
-                {signUpMutation.isPending ? "..." : t("createAccount")}
+                {signUpMutation.isPending ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Création...
+                  </span>
+                ) : t("createAccount")}
               </Button>
 
-              <div className="text-center text-sm">
-                <span className="text-muted-foreground">{t("alreadyHaveAccount")} </span>
-                <a href="/login" className="text-primary hover:underline font-medium">
+              {/* Sign in link */}
+              <p className="text-center text-sm text-muted-foreground">
+                {t("alreadyHaveAccount")}{" "}
+                <a href="/login" className="text-[hsl(145,63%,32%)] hover:text-[hsl(145,65%,28%)] font-medium transition-colors">
                   {t("signIn")}
                 </a>
+              </p>
+
+              {/* Divider */}
+              <div className="relative my-1">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-background px-3 text-xs text-muted-foreground">{t("orContinueWith")}</span>
+                </div>
               </div>
 
               <OAuthButtons disabled={true} />
             </form>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
