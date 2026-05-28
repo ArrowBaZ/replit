@@ -1,4 +1,4 @@
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
@@ -19,7 +19,8 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 }
 
 export default function FaqPage() {
-  const { t, lang } = useI18n();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
 
   const faqs = lang === "fr" ? [
     { q: "Comment fonctionne Sellzy ?", a: "Sellzy met en relation des vendeurs de vetements avec des revendeurs experts. Vous soumettez une demande, un revendeur local est assigne, recupere vos articles, les evalue, les met en vente et vous recevez vos gains une fois vendus." },

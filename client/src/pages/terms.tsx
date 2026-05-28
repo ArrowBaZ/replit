@@ -1,8 +1,8 @@
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function TermsPage() {
-  const { t } = useI18n();
+  const { t } = useTranslation();
 
   const sections = [
     { title: t("termsSection1Title"), content: t("termsSection1Content") },

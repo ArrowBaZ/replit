@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { ITEM_CONDITIONS as CONDITIONS, ITEM_CATEGORIES as CATEGORIES } from "@s
 
 export default function CreateRequestPage() {
   const { toast } = useToast();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1);
   const [selectedType, setSelectedType] = useState("");

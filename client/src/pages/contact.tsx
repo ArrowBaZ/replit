@@ -1,4 +1,4 @@
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { useState } from "react";
 import { Mail, MapPin, Phone } from "lucide-react";
 
 export default function ContactPage() {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [sending, setSending] = useState(false);

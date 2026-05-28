@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { apiRequest } from "@/lib/queryClient";
 import { validateEmail, validatePassword } from "@/lib/auth-validation";
 import { OAuthButtons } from "@/components/oauth-buttons";
@@ -16,7 +16,7 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const signInMutation = useMutation({

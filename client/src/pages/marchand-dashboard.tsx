@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { useI18n, getServiceTypeLabels } from "@/lib/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ const statusColors: Record<string, string> = {
 
 export default function MarchendDashboard() {
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t } = useTranslation();
 
   const { data: profile } = useQuery<Profile>({
     queryKey: ["/api/profile"],
@@ -56,7 +56,12 @@ export default function MarchendDashboard() {
     total: Number(row.total || 0),
   }));
 
-  const serviceTypeLabels = getServiceTypeLabels(t);
+  const serviceTypeLabels = {
+    classic: t("classicShort"),
+    sos_dressing: t("sosDressingShort"),
+    wardrobe_exchange: t("wardrobeExchangeShort"),
+    luxury_buy_sell: t("luxuryBuySellShort"),
+  };
 
   const translateStatus = (status: string) => {
     const statusMap: Record<string, string> = {

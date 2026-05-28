@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ function getInitials(firstName?: string | null, lastName?: string | null) {
 }
 
 export default function MarchangsPage() {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("rating");
 

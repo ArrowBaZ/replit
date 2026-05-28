@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,7 +14,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function SchedulePage() {
-  const { t } = useI18n();
+  const { t } = useTranslation();
 
   const { data: meetings, isLoading } = useQuery<Meeting[]>({
     queryKey: ["/api/meetings"],

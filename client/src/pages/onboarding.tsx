@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ const departments = [
 export default function OnboardingPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [step, setStep] = useState(1);
   const [role, setRole] = useState<Role | null>(null);
   const [formData, setFormData] = useState({

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSearch, Link } from "wouter";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,7 +26,7 @@ function ResellerGroupHeader({
 }: {
   group: { marchantId: string; requestId: number | null; items: Item[]; totalMin: number; totalMax: number };
 }) {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const { data: contact } = useQuery<{ firstName?: string; lastName?: string } | null>({
     queryKey: ["/api/requests", String(group.requestId), "contact"],
     enabled: group.requestId !== null,
@@ -68,7 +68,7 @@ function ResellerGroupHeader({
 }
 
 function ItemCard({ item, categoryLabels }: { item: Item; categoryLabels: Record<string, string> }) {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   return (
     <Card data-testid={`card-item-${item.id}`}>
       <CardContent className="p-4">
@@ -129,7 +129,7 @@ function ItemCard({ item, categoryLabels }: { item: Item; categoryLabels: Record
 }
 
 export default function ItemsListPage() {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const searchParams = useSearch();
   const initialSearch = new URLSearchParams(searchParams).get("search") ?? "";
   const [search, setSearch] = useState(initialSearch);

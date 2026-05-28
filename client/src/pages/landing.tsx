@@ -5,12 +5,13 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Package, HandshakeIcon, TrendingUp, ArrowRight, Star, Shield, Zap } from "lucide-react";
 import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
+import i18n from "i18next";
 
 const heroImage = "/images/hero-resale.png";
 
 export default function LandingPage() {
-  const { t, lang, setLang } = useI18n();
+  const { t } = useTranslation();
 
   const features = [
     { icon: Package, title: t("featureExpertTitle"), description: t("featureExpertDesc") },
@@ -53,8 +54,8 @@ export default function LandingPage() {
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1 mr-1">
                 <button
-                  onClick={() => setLang("en")}
-                  className={`rounded-md overflow-hidden transition-all ${lang === "en" ? "ring-2 ring-[hsl(var(--success))] scale-110" : "opacity-60 hover:opacity-100"}`}
+                  onClick={() => i18n.changeLanguage("en")}
+                  className={`rounded-md overflow-hidden transition-all ${i18n.language === "en" ? "ring-2 ring-[hsl(var(--success))] scale-110" : "opacity-60 hover:opacity-100"}`}
                   data-testid="button-lang-en"
                   title="English"
                 >
@@ -71,8 +72,8 @@ export default function LandingPage() {
                   </svg>
                 </button>
                 <button
-                  onClick={() => setLang("fr")}
-                  className={`rounded-md overflow-hidden transition-all ${lang === "fr" ? "ring-2 ring-[hsl(var(--success))] scale-110" : "opacity-60 hover:opacity-100"}`}
+                  onClick={() => i18n.changeLanguage("fr")}
+                  className={`rounded-md overflow-hidden transition-all ${i18n.language === "fr" ? "ring-2 ring-[hsl(var(--success))] scale-110" : "opacity-60 hover:opacity-100"}`}
                   data-testid="button-lang-fr"
                   title="Francais"
                 >
@@ -105,7 +106,7 @@ export default function LandingPage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32 lg:py-40">
           <div className="max-w-2xl">
             <p className="text-sm font-medium tracking-wider uppercase text-[hsl(145,65%,52%)] mb-4">
-              {lang === "fr" ? "La marketplace de revente entre particuliers" : "The Peer Resale Marketplace"}
+              {i18n.language === "fr" ? "La marketplace de revente entre particuliers" : "The Peer Resale Marketplace"}
             </p>
             <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
               {t("heroTitle")}
@@ -127,9 +128,9 @@ export default function LandingPage() {
               </a>
             </div>
             <div className="flex flex-wrap items-center gap-4 text-sm text-white/60">
-              <span className="flex items-center gap-1"><Shield className="h-3.5 w-3.5" /> {lang === "fr" ? "Inscription gratuite" : "Free to join"}</span>
-              <span className="flex items-center gap-1"><Zap className="h-3.5 w-3.5" /> {lang === "fr" ? "Aucun frais initial" : "No upfront costs"}</span>
-              <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5" /> {lang === "fr" ? "Experts verifies" : "Verified experts"}</span>
+              <span className="flex items-center gap-1"><Shield className="h-3.5 w-3.5" /> {i18n.language === "fr" ? "Inscription gratuite" : "Free to join"}</span>
+              <span className="flex items-center gap-1"><Zap className="h-3.5 w-3.5" /> {i18n.language === "fr" ? "Aucun frais initial" : "No upfront costs"}</span>
+              <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5" /> {i18n.language === "fr" ? "Experts verifies" : "Verified experts"}</span>
             </div>
           </div>
         </div>
@@ -258,12 +259,12 @@ export default function LandingPage() {
           <div className="flex flex-wrap justify-center gap-3">
             <a href="/signup">
               <Button size="lg" className="bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" data-testid="button-cta-sell">
-                {lang === "fr" ? "Je veux vendre" : "I Want to Sell"}
+                {i18n.language === "fr" ? "Je veux vendre" : "I Want to Sell"}
               </Button>
             </a>
             <a href="/signup">
               <Button size="lg" variant="outline" className="text-primary-foreground border-primary-foreground/30 bg-primary-foreground/10">
-                {lang === "fr" ? "Je suis revendeur" : "I'm a Reseller"}
+                {i18n.language === "fr" ? "Je suis revendeur" : "I'm a Reseller"}
               </Button>
             </a>
           </div>

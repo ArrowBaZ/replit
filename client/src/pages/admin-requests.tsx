@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useI18n, getServiceTypeLabels } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ function timeAgo(dateStr: string | Date | null): string {
 
 export default function AdminRequestsPage() {
   const { toast } = useToast();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -91,7 +91,12 @@ export default function AdminRequestsPage() {
     return map[status] || status.replace(/_/g, " ");
   };
 
-  const serviceTypeLabels = getServiceTypeLabels(t);
+  const serviceTypeLabels = {
+    classic: t("classicShort"),
+    sos_dressing: t("sosDressingShort"),
+    wardrobe_exchange: t("wardrobeExchangeShort"),
+    luxury_buy_sell: t("luxuryBuySellShort"),
+  };
 
   const flagRequest = useMutation({
     mutationFn: async ({ id, reason }: { id: number; reason: string }) => {

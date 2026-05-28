@@ -1,9 +1,9 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { useI18n, getServiceTypeLabels } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -237,7 +237,7 @@ export default function SellerReviewPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t } = useTranslation();
 
   const { data: profile } = useQuery<Profile>({ queryKey: ["/api/profile"] });
 
@@ -373,7 +373,12 @@ export default function SellerReviewPage() {
     );
   }
 
-  const serviceTypeLabels = getServiceTypeLabels(t);
+  const serviceTypeLabels = {
+    classic: t("classicShort"),
+    sos_dressing: t("sosDressingShort"),
+    wardrobe_exchange: t("wardrobeExchangeShort"),
+    luxury_buy_sell: t("luxuryBuySellShort"),
+  };
 
   const dialogItem = showCounterOffer
     ? requestItems?.find((i) => i.id === showCounterOffer.itemId) ?? null

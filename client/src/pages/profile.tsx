@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ function getPref(prefs: Record<string, boolean> | null | undefined, key: PrefKey
 export default function ProfilePage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
 
   const { data: profile, isLoading } = useQuery<Profile>({

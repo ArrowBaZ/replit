@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { useI18n, getServiceTypeLabels } from "@/lib/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ const statusColors: Record<string, string> = {
 export default function RequestsListPage() {
   const [location] = useLocation();
   const isAvailable = location === "/available";
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -38,7 +38,12 @@ export default function RequestsListPage() {
   const isSeller = profile?.role === "seller";
   const title = isAvailable ? t("availableRequests") : isSeller ? t("myRequests") : t("myAssignments");
 
-  const serviceTypeLabels = getServiceTypeLabels(t);
+  const serviceTypeLabels = {
+    classic: t("classicShort"),
+    sos_dressing: t("sosDressingShort"),
+    wardrobe_exchange: t("wardrobeExchangeShort"),
+    luxury_buy_sell: t("luxuryBuySellShort"),
+  };
 
   const translateStatus = (status: string) => {
     const statusMap: Record<string, string> = {

@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import type { Profile, Notification, ItemDocument } from "@shared/schema";
 import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
 import { useEffect, useRef } from "react";
@@ -72,7 +72,7 @@ function toastAllowed(prefs: Record<string, boolean> | null | undefined, key: st
 }
 
 function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?: Record<string, boolean> | null }) {
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [, navigate] = useLocation();
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
@@ -327,7 +327,7 @@ function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?:
 export function AppSidebar() {
   const { user, logout } = useAuth();
   const [location] = useLocation();
-  const { t } = useI18n();
+  const { t } = useTranslation();
 
   const { data: profile } = useQuery<Profile>({
     queryKey: ["/api/profile"],

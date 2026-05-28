@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +53,7 @@ const agreementStatusLabels: Record<string, string> = {
 
 export default function AdminDashboard() {
   const { toast } = useToast();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
 
   const { data: allUsers, isLoading: usersLoading } = useQuery<UserWithProfile[]>({

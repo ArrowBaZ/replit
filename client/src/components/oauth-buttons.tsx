@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 
 interface OAuthButtonsProps {
   disabled?: boolean;
@@ -8,7 +8,7 @@ interface OAuthButtonsProps {
 }
 
 export function OAuthButtons({ disabled = true, onGoogleClick, onMicrosoftClick }: OAuthButtonsProps) {
-  const { t } = useI18n();
+  const { t } = useTranslation();
 
   return (
     <div className="pt-4 space-y-2 border-t">

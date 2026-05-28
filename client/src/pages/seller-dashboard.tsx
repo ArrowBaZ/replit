@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { useI18n, useTranslateStatus, getServiceTypeLabels } from "@/lib/i18n";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ const statusColors: Record<string, string> = {
 
 export default function SellerDashboard() {
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t } = useTranslation();
 
   const { data: requests, isLoading: requestsLoading } = useQuery<Request[]>({
     queryKey: ["/api/requests"],
@@ -52,7 +52,12 @@ export default function SellerDashboard() {
   const soldItems = items?.filter((i) => i.status === "sold") || [];
   const totalEarnings = soldItems.reduce((sum, i) => sum + (parseFloat(i.salePrice || "0") * 0.8), 0);
 
-  const serviceTypeLabels = getServiceTypeLabels(t);
+  const serviceTypeLabels = {
+    classic: t("classicShort"),
+    sos_dressing: t("sosDressingShort"),
+    wardrobe_exchange: t("wardrobeExchangeShort"),
+    luxury_buy_sell: t("luxuryBuySellShort"),
+  };
 
   const translateStatus = (status: string) => {
     const statusMap: Record<string, string> = {

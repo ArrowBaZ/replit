@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Store, Handshake } from "lucide-react";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 
 export type ProfileType = "seller" | "marchand";
 
@@ -10,7 +10,7 @@ interface ProfileTypeSelectorProps {
 }
 
 export function ProfileTypeSelector({ onSelect, selected }: ProfileTypeSelectorProps) {
-  const { t } = useI18n();
+  const { t } = useTranslation();
 
   return (
     <div className="space-y-4">

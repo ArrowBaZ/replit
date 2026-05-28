@@ -1,8 +1,9 @@
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function PrivacyPage() {
-  const { t, lang } = useI18n();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
 
   const sections = lang === "fr" ? [
     { title: "1. Collecte des donnees", content: "Nous collectons les donnees personnelles que vous fournissez lors de votre inscription (nom, email, telephone, adresse) ainsi que les informations relatives aux articles que vous soumettez pour la revente." },

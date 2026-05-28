@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useI18n, getServiceTypeLabels } from "@/lib/i18n";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -155,7 +155,7 @@ export default function RequestDetailPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const [showAddItem, setShowAddItem] = useState(false);
   const [showScheduleMeeting, setShowScheduleMeeting] = useState(false);
 
@@ -718,7 +718,12 @@ export default function RequestDetailPage() {
     };
   }, [user?.id]);
 
-  const serviceTypeLabels = getServiceTypeLabels(t);
+  const serviceTypeLabels = {
+    classic: t("classicShort"),
+    sos_dressing: t("sosDressingShort"),
+    wardrobe_exchange: t("wardrobeExchangeShort"),
+    luxury_buy_sell: t("luxuryBuySellShort"),
+  };
 
   const translateStatus = (status: string) => {
     const statusMap: Record<string, string> = {

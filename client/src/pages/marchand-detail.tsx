@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { useI18n } from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -65,7 +65,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 export default function MarchendDetailPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
 
