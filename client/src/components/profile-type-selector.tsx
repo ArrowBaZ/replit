@@ -1,5 +1,4 @@
-import { Card } from "@/components/ui/card";
-import { Store, Handshake } from "lucide-react";
+import { Store, Handshake, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export type ProfileType = "seller" | "marchand";
@@ -9,58 +8,68 @@ interface ProfileTypeSelectorProps {
   selected?: ProfileType;
 }
 
+const options = [
+  {
+    type: "seller" as ProfileType,
+    icon: Store,
+    labelKey: "sellerOption",
+    descKey: "sellerOptionDesc",
+    badge: "🛍️",
+  },
+  {
+    type: "marchand" as ProfileType,
+    icon: Handshake,
+    labelKey: "marchandOption",
+    descKey: "marchandOptionDesc",
+    badge: "🤝",
+  },
+];
+
 export function ProfileTypeSelector({ onSelect, selected }: ProfileTypeSelectorProps) {
   const { t } = useTranslation();
 
   return (
     <div className="space-y-4">
-      <div className="text-center">
-        <h2 className="text-xl font-semibold">{t("profileTypeQuestion")}</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          {t("profileTypeHint")}
-        </p>
-      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {options.map(({ type, icon: Icon, labelKey, descKey }) => {
+          const isSelected = selected === type;
+          return (
+            <button
+              key={type}
+              type="button"
+              onClick={() => onSelect(type)}
+              data-testid={`profile-type-${type}`}
+              className={`relative text-left rounded-xl border-2 p-5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(145,63%,42%)] ${
+                isSelected
+                  ? "border-[hsl(145,63%,42%)] bg-[hsl(145,63%,42%)]/[0.06]"
+                  : "border-border bg-card hover:border-[hsl(145,63%,42%)]/50 hover:bg-muted/40"
+              }`}
+            >
+              {/* Selected checkmark */}
+              {isSelected && (
+                <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[hsl(145,63%,42%)] flex items-center justify-center">
+                  <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                </span>
+              )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Seller Option */}
-        <Card
-          onClick={() => onSelect("seller")}
-          className={`p-6 cursor-pointer transition-all border-2 ${
-            selected === "seller"
-              ? "border-primary bg-primary/5"
-              : "border-border hover:border-primary/50"
-          }`}
-        >
-          <div className="flex flex-col items-center text-center space-y-3">
-            <Store className="w-10 h-10 text-primary" />
-            <div>
-              <h3 className="font-semibold">{t("sellerOption")}</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {t("sellerOptionDesc")}
-              </p>
-            </div>
-          </div>
-        </Card>
+              {/* Icon */}
+              <div
+                className={`w-11 h-11 rounded-lg flex items-center justify-center mb-3 transition-colors ${
+                  isSelected
+                    ? "bg-[hsl(145,63%,42%)]/15 text-[hsl(145,63%,32%)]"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+              </div>
 
-        {/* Marchand Option */}
-        <Card
-          onClick={() => onSelect("marchand")}
-          className={`p-6 cursor-pointer transition-all border-2 ${
-            selected === "marchand"
-              ? "border-primary bg-primary/5"
-              : "border-border hover:border-primary/50"
-          }`}
-        >
-          <div className="flex flex-col items-center text-center space-y-3">
-            <Handshake className="w-10 h-10 text-primary" />
-            <div>
-              <h3 className="font-semibold">{t("marchandOption")}</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {t("marchandOptionDesc")}
+              <p className={`text-sm font-semibold mb-0.5 ${isSelected ? "text-foreground" : "text-foreground"}`}>
+                {t(labelKey)}
               </p>
-            </div>
-          </div>
-        </Card>
+              <p className="text-xs text-muted-foreground leading-snug">{t(descKey)}</p>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
