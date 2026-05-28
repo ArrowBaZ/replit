@@ -555,6 +555,31 @@ const translations = {
     oauthComingSoon: "Social login coming soon",
     emailVerificationRequired: "Please verify your email before signing in",
     networkError: "Network error. Please check your connection and try again",
+
+    // Profile Type Selector
+    profileTypeQuestion: "What best describes you?",
+    profileTypeHint: "Choose your profile type to get started",
+    sellerOption: "I want to Sell",
+    sellerOptionDesc: "I have items to sell",
+    marchandOption: "I want to Help Sell",
+    marchandOptionDesc: "I want to fulfill requests from sellers",
+
+    // Terms & Conditions
+    termsTitle: "Terms of Service",
+    termsSection1Title: "1. Acceptance of Terms",
+    termsSection1Content: "By using Sellzy, you agree to these terms of service. If you do not agree with any of these terms, please do not use our service.",
+    termsSection2Title: "2. Service Description",
+    termsSection2Content: "Sellzy is a platform connecting clothing sellers with expert resellers. We facilitate the resale process by providing management, tracking, and communication tools.",
+    termsSection3Title: "3. Registration and Accounts",
+    termsSection3Content: "To use Sellzy, you must create an account. You are responsible for the confidentiality of your login information and all activities performed under your account.",
+    termsSection4Title: "4. Commission and Payments",
+    termsSection4Content: "The standard commission is 80% for the seller and 20% for the reseller on each sale. Payments are processed after both parties confirm the sale.",
+    termsSection5Title: "5. User Responsibilities",
+    termsSection5Content: "Sellers must provide accurate descriptions of their items. Resellers must handle items with care and list them at fair prices. Any fraudulent behavior will result in account suspension.",
+    termsSection6Title: "6. Limitation of Liability",
+    termsSection6Content: "Sellzy acts as an intermediary and is not responsible for direct transactions between sellers and resellers. We do not guarantee the sale of items.",
+    termsSection7Title: "7. Modification of Terms",
+    termsSection7Content: "We reserve the right to modify these terms at any time. Users will be informed of important changes by email or notification in the application.",
   },
   fr: {
     // Nav
@@ -1108,6 +1133,31 @@ const translations = {
     oauthComingSoon: "Connexion sociale à venir",
     emailVerificationRequired: "Veuillez vérifier votre email avant de vous connecter",
     networkError: "Erreur réseau. Veuillez vérifier votre connexion et réessayer",
+
+    // Profile Type Selector
+    profileTypeQuestion: "Qui êtes-vous ?",
+    profileTypeHint: "Choisissez votre type de profil pour commencer",
+    sellerOption: "Je veux vendre",
+    sellerOptionDesc: "J'ai des articles à vendre",
+    marchandOption: "Je veux aider à vendre",
+    marchandOptionDesc: "Je veux répondre aux demandes des vendeurs",
+
+    // Terms & Conditions
+    termsTitle: "Conditions de service",
+    termsSection1Title: "1. Acceptation des conditions",
+    termsSection1Content: "En utilisant Sellzy, vous acceptez ces conditions d'utilisation. Si vous n'êtes pas d'accord avec l'une de ces conditions, veuillez ne pas utiliser notre service.",
+    termsSection2Title: "2. Description du service",
+    termsSection2Content: "Sellzy est une plateforme de mise en relation entre vendeurs de vêtements et revendeurs experts. Nous facilitons le processus de revente en proposant des outils de gestion, de suivi et de communication.",
+    termsSection3Title: "3. Inscription et comptes",
+    termsSection3Content: "Pour utiliser Sellzy, vous devez créer un compte. Vous êtes responsable de la confidentialité de vos informations de connexion et de toutes les activités effectuées sous votre compte.",
+    termsSection4Title: "4. Commission et paiements",
+    termsSection4Content: "La commission standard est de 80% pour le vendeur et 20% pour le revendeur sur chaque vente. Les paiements sont traités après confirmation de la vente par les deux parties.",
+    termsSection5Title: "5. Responsabilités des utilisateurs",
+    termsSection5Content: "Les vendeurs doivent fournir des descriptions exactes de leurs articles. Les revendeurs doivent traiter les articles avec soin et les lister à des prix justes. Tout comportement frauduleux entraînera la suspension du compte.",
+    termsSection6Title: "6. Limitation de responsabilité",
+    termsSection6Content: "Sellzy agit comme intermédiaire et n'est pas responsable des transactions directes entre vendeurs et revendeurs. Nous ne garantissons pas la vente des articles.",
+    termsSection7Title: "7. Modification des conditions",
+    termsSection7Content: "Nous nous réservons le droit de modifier ces conditions à tout moment. Les utilisateurs seront informés des changements importants par email ou notification dans l'application.",
   },
 } as const;
 

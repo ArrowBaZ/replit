@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Store, Handshake } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export type ProfileType = "seller" | "marchand";
 
@@ -9,12 +10,14 @@ interface ProfileTypeSelectorProps {
 }
 
 export function ProfileTypeSelector({ onSelect, selected }: ProfileTypeSelectorProps) {
+  const { t } = useI18n();
+
   return (
     <div className="space-y-4">
       <div className="text-center">
-        <h2 className="text-xl font-semibold">What best describes you?</h2>
+        <h2 className="text-xl font-semibold">{t("profileTypeQuestion")}</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Choose your profile type to get started
+          {t("profileTypeHint")}
         </p>
       </div>
 
@@ -31,9 +34,9 @@ export function ProfileTypeSelector({ onSelect, selected }: ProfileTypeSelectorP
           <div className="flex flex-col items-center text-center space-y-3">
             <Store className="w-10 h-10 text-primary" />
             <div>
-              <h3 className="font-semibold">I want to Sell</h3>
+              <h3 className="font-semibold">{t("sellerOption")}</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                I have items to sell
+                {t("sellerOptionDesc")}
               </p>
             </div>
           </div>
@@ -51,9 +54,9 @@ export function ProfileTypeSelector({ onSelect, selected }: ProfileTypeSelectorP
           <div className="flex flex-col items-center text-center space-y-3">
             <Handshake className="w-10 h-10 text-primary" />
             <div>
-              <h3 className="font-semibold">I want to Help Sell</h3>
+              <h3 className="font-semibold">{t("marchandOption")}</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                I want to fulfill requests from sellers
+                {t("marchandOptionDesc")}
               </p>
             </div>
           </div>
