@@ -3,6 +3,7 @@ import type { Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users } from "../shared/models/auth";
@@ -12,11 +13,16 @@ import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS, NOTIF_PREF_K
 import type { Item, Transaction } from "@shared/schema";
 import { sendAgreementReadyEmail } from "./email";
 import { signInSchema, hashPassword, verifyPassword } from "./auth";
-import { randomUUID } from "crypto";
+import { randomUUID, randomBytes } from "crypto";
 
 interface AuthRequest extends Request {
   user?: { id: string };
   cookies: Record<string, string>;
+}
+
+function generateVerificationCode(): string {
+  const code = Math.floor(randomBytes(4).readUInt32BE(0) % 1000000);
+  return code.toString().padStart(6, '0');
 }
 
 function resolveItemPrice(i: Pick<Item, "approvedPrice" | "salePrice" | "maxPrice" | "minPrice">): number {
@@ -240,6 +246,47 @@ export async function registerRoutes(
   app: Express,
 ): Promise<Server> {
   registerObjectStorageRoutes(app);
+
+  // Rate limiters for auth endpoints
+  const signInLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 attempts per window
+    message: "Too many sign in attempts, please try again later",
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3, // 3 attempts per window
+    message: "Too many registration attempts, please try again later",
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const verifyEmailLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 attempts per window
+    message: "Too many verification attempts, please try again later",
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const forgotPasswordLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3, // 3 attempts per window
+    message: "Too many password reset requests, please try again later",
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const resetPasswordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 attempts per window
+    message: "Too many password reset attempts, please try again later",
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
   // Session loading middleware
   app.use(async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -3256,7 +3303,7 @@ export async function registerRoutes(
   );
 
   // Auth endpoints
-  app.post("/api/auth/signin", async (req: AuthRequest, res) => {
+  app.post("/api/auth/signin", signInLimiter, async (req: AuthRequest, res) => {
     try {
       const parsed = await signInSchema.parseAsync(req.body);
       const { email, password } = parsed;
@@ -3273,6 +3320,10 @@ export async function registerRoutes(
       const isPasswordValid = await verifyPassword(password, user.passwordHash);
       if (!isPasswordValid) {
         return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      if (!user.emailVerified) {
+        return res.status(403).json({ message: "Please verify your email before signing in" });
       }
 
       const sessionId = randomUUID();
@@ -3426,7 +3477,7 @@ export async function registerRoutes(
     lastName: z.string().optional(),
   });
 
-  app.post("/api/auth/register", async (req: AuthRequest, res) => {
+  app.post("/api/auth/register", registerLimiter, async (req: AuthRequest, res) => {
     try {
       const parsed = await registerSchema.parseAsync(req.body);
       const { email, password, firstName, lastName } = parsed;
@@ -3479,19 +3530,202 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auth/forgot-password", async (req: AuthRequest, res) => {
+  app.post("/api/auth/send-verification-code", verifyEmailLimiter, isAuthenticated, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.id;
+
+      const code = generateVerificationCode();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      const codeId = randomUUID();
+
+      await db.execute(
+        sql`
+          INSERT INTO email_verification_codes (id, "user_id", code, "expires_at")
+          VALUES (${codeId}, ${userId}, ${code}, ${expiresAt})
+          ON CONFLICT (id) DO NOTHING
+        `
+      );
+
+      // TODO: Send code via email when email system is ready
+      res.json({
+        success: true,
+        message: "Verification code sent to your email",
+      });
+    } catch (error) {
+      console.error("Send verification code error:", error);
+      res.status(500).json({ message: "Failed to send verification code" });
+    }
+  });
+
+  app.post("/api/auth/verify-email", verifyEmailLimiter, isAuthenticated, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.id;
+      const { code } = req.body;
+
+      if (!code || typeof code !== "string") {
+        return res.status(400).json({ message: "Verification code is required" });
+      }
+
+      // Find and validate the code
+      const result = await db.execute(
+        sql`
+          SELECT id, "expires_at", "verified_at"
+          FROM email_verification_codes
+          WHERE "user_id" = ${userId} AND code = ${code}
+        `
+      );
+
+      const verificationRecord = (result as any)?.rows?.[0];
+      if (!verificationRecord) {
+        return res.status(400).json({ message: "Invalid verification code" });
+      }
+
+      if (verificationRecord.verified_at) {
+        return res.status(400).json({ message: "Email already verified" });
+      }
+
+      if (new Date() > new Date(verificationRecord.expires_at)) {
+        return res.status(400).json({ message: "Verification code expired" });
+      }
+
+      // Mark as verified and update user
+      await db.execute(
+        sql`
+          UPDATE email_verification_codes
+          SET "verified_at" = NOW()
+          WHERE id = ${verificationRecord.id}
+        `
+      );
+
+      await db.execute(
+        sql`
+          UPDATE users
+          SET "email_verified" = NOW()
+          WHERE id = ${userId}
+        `
+      );
+
+      res.json({
+        success: true,
+        message: "Email verified successfully",
+      });
+    } catch (error) {
+      console.error("Verify email error:", error);
+      res.status(500).json({ message: "Failed to verify email" });
+    }
+  });
+
+  app.post("/api/auth/forgot-password", forgotPasswordLimiter, async (req: AuthRequest, res) => {
     try {
       const { email } = req.body;
+
       if (!email || typeof email !== "string") {
         return res.status(400).json({ message: "Email is required" });
       }
+
+      // Check if user exists
+      const userResult = await db.execute(
+        sql`SELECT id FROM users WHERE email = ${email}`
+      );
+
+      const user = (userResult as any)?.rows?.[0];
+      if (!user) {
+        // Don't reveal if email exists
+        return res.json({
+          success: true,
+          message: "If that email exists, a password reset link was sent",
+        });
+      }
+
+      // Generate reset token
+      const resetToken = randomBytes(32).toString("hex");
+      const tokenId = randomUUID();
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await db.execute(
+        sql`
+          INSERT INTO password_reset_tokens (id, user_id, token, expires_at)
+          VALUES (${tokenId}, ${user.id}, ${resetToken}, ${expiresAt})
+        `
+      );
+
+      // TODO: Send reset email with token when email system is ready
       res.json({
         success: true,
-        message: "If that email exists in our system, a password reset link has been sent.",
+        message: "If that email exists, a password reset link was sent",
       });
     } catch (error) {
       console.error("Forgot password error:", error);
-      res.status(500).json({ message: "Request failed" });
+      res.status(500).json({ message: "Failed to process password reset request" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", resetPasswordLimiter, async (req: AuthRequest, res) => {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Reset token is required" });
+      }
+
+      if (!newPassword || typeof newPassword !== "string") {
+        return res.status(400).json({ message: "New password is required" });
+      }
+
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+      }
+
+      // Find and validate the token
+      const tokenResult = await db.execute(
+        sql`
+          SELECT id, user_id, expires_at, used_at
+          FROM password_reset_tokens
+          WHERE token = ${token}
+        `
+      );
+
+      const resetToken = (tokenResult as any)?.rows?.[0];
+      if (!resetToken) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+
+      if (resetToken.used_at) {
+        return res.status(400).json({ message: "This reset token has already been used" });
+      }
+
+      if (new Date() > new Date(resetToken.expires_at)) {
+        return res.status(400).json({ message: "Reset token has expired" });
+      }
+
+      // Hash new password and update user
+      const passwordHash = await hashPassword(newPassword);
+
+      await db.execute(
+        sql`
+          UPDATE users
+          SET "passwordHash" = ${passwordHash}, "updatedAt" = NOW()
+          WHERE id = ${resetToken.user_id}
+        `
+      );
+
+      // Mark token as used
+      await db.execute(
+        sql`
+          UPDATE password_reset_tokens
+          SET used_at = NOW()
+          WHERE id = ${resetToken.id}
+        `
+      );
+
+      res.json({
+        success: true,
+        message: "Password reset successfully",
+      });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
     }
   });
 

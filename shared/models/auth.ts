@@ -26,5 +26,41 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const emailVerificationCodes = pgTable(
+  "email_verification_codes",
+  {
+    id: varchar("id").primaryKey(),
+    userId: varchar("user_id").notNull().references(() => users.id),
+    code: varchar("code", { length: 6 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    verifiedAt: timestamp("verified_at"),
+  },
+  (table) => [
+    index("idx_verification_user_id").on(table.userId),
+    index("idx_verification_code").on(table.code),
+    index("idx_verification_expires_at").on(table.expiresAt),
+  ]
+);
+
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: varchar("id").primaryKey(),
+    userId: varchar("user_id").notNull().references(() => users.id),
+    token: varchar("token", { length: 64 }).notNull().unique(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+  },
+  (table) => [
+    index("idx_reset_userId").on(table.userId),
+    index("idx_reset_token").on(table.token),
+    index("idx_reset_expiresAt").on(table.expiresAt),
+  ]
+);
+
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type EmailVerificationCode = typeof emailVerificationCodes.$inferSelect;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
