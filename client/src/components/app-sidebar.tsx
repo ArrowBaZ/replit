@@ -366,11 +366,6 @@ export function AppSidebar() {
 
   const adminItems = [
     { title: t("dashboard"), url: "/dashboard", icon: LayoutDashboard },
-    { title: t("users"), url: "/admin/users", icon: Users },
-    { title: t("applications"), url: "/admin/applications", icon: Shield },
-    { title: t("adminRequests"), url: "/admin/requests", icon: ClipboardList },
-    { title: "Fee Tiers", url: "/admin/fee-tiers", icon: Percent },
-    { title: t("messages"), url: "/messages", icon: MessageSquare },
   ];
 
   const menuItems = role === "admin" ? adminItems : role === "marchand" ? marchandItems : sellerItems;
