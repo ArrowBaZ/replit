@@ -1,351 +1,272 @@
-import pg from 'pg'
-import { randomInt } from 'crypto'
-import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient } from '@prisma/client'
-import { Decimal } from '@prisma/client/runtime/library'
-import {
-  generateName,
-  generateAddress,
-  generatePhoneNumber,
-  generateEmail,
-  generateNotificationPrefs,
-  pickRandom,
-} from './generators'
-import 'dotenv/config'
+/**
+ * Sellzy database seed — uses raw SQL to match the actual DB schema.
+ * Run: npm run db:seed
+ */
+import dotenv from "dotenv";
+dotenv.config();
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
-const adapter = new PrismaPg(pool)
-const prisma = new PrismaClient({ adapter })
+import pg from "pg";
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+function generatePhone(): string {
+  return `0${pickRandom(["6", "7"])}${randomInt(10000000, 99999999)}`;
+}
+function generateAddress() {
+  const streets = [
+    "12 Rue de Rivoli", "45 Boulevard Haussmann", "8 Avenue des Champs-Élysées",
+    "3 Rue du Faubourg Saint-Antoine", "27 Rue de la Paix", "15 Cours Mirabeau",
+  ];
+  const cities = [
+    { city: "Paris",      postal_code: "75001", department: "Île-de-France" },
+    { city: "Marseille",  postal_code: "13001", department: "Provence-Alpes-Côte d'Azur" },
+    { city: "Lyon",       postal_code: "69001", department: "Auvergne-Rhône-Alpes" },
+    { city: "Bordeaux",   postal_code: "33000", department: "Nouvelle-Aquitaine" },
+    { city: "Toulouse",   postal_code: "31000", department: "Occitanie" },
+    { city: "Nantes",     postal_code: "44000", department: "Pays de la Loire" },
+  ];
+  return { address: pickRandom(streets), ...pickRandom(cities) };
+}
+function generateNotifPrefs(): string {
+  return JSON.stringify({
+    newRequest: Math.random() > 0.3,
+    itemApproved: true,
+    itemRejected: Math.random() > 0.2,
+    counterOffer: Math.random() > 0.3,
+    agreementReady: true,
+    messages: Math.random() > 0.4,
+    meetings: true,
+  });
+}
+
+// Convenience wrapper
+async function q(sql: string, params: any[] = []) {
+  return pool.query(sql, params);
+}
+
+// ─── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('🌱 Starting French dataset seed...')
+  console.log("🌱 Starting Sellzy seed...");
 
-  await prisma.$transaction(async (tx) => {
-    // Deletion order (respects FK constraints - delete from leaf tables first)
-    console.log('Deleting existing data...')
-    await tx.moderation_actions.deleteMany()
-    await tx.fee_tier_changelog.deleteMany()
-    await tx.agreement_signatures.deleteMany()
-    await tx.agreements.deleteMany()
-    await tx.item_price_offers.deleteMany()
-    await tx.item_document_requests.deleteMany()
-    await tx.item_documents.deleteMany()
-    await tx.reviews.deleteMany()
-    await tx.transactions.deleteMany()
-    await tx.meetings.deleteMany()
-    await tx.messages.deleteMany()
-    await tx.notifications.deleteMany()
-    await tx.items.deleteMany()
-    await tx.requests.deleteMany()
-    await tx.profiles.deleteMany()
-    await tx.sessions.deleteMany()
-    await tx.users.deleteMany()
+  // ── 1. Clear existing data (leaf → root) ─────────────────────────────────
+  console.log("🗑️  Clearing existing data...");
+  const deletes = [
+    "moderation_actions", "fee_tier_changelog", "agreement_signatures",
+    "agreements", "item_price_offers", "item_document_requests",
+    "item_documents", "reviews", "transactions", "meetings",
+    "messages", "notifications", "items", "requests", "profiles",
+    "sessions", "users", "fee_tiers",
+  ];
+  for (const table of deletes) {
+    await q(`DELETE FROM ${table}`);
+  }
 
-    // Create fee tiers (Tier 1, 2, 3 with Sellzy commission splits)
-    console.log('Creating fee_tiers (3)...')
-    const tiers = await tx.fee_tiers.createMany({
-      data: [
-        {
-          label: 'Tier 1: €0-150',
-          min_price: new Decimal('0'),
-          max_price: new Decimal('150'),
-          seller_percent: new Decimal('50'),
-          reseller_percent: new Decimal('40'),
-          platform_percent: new Decimal('10'),
-          currency_note: 'EUR/CHF',
-          is_active: true,
-        },
-        {
-          label: 'Tier 2: €151-500',
-          min_price: new Decimal('151'),
-          max_price: new Decimal('500'),
-          seller_percent: new Decimal('55'),
-          reseller_percent: new Decimal('35'),
-          platform_percent: new Decimal('10'),
-          currency_note: 'EUR/CHF',
-          is_active: true,
-        },
-        {
-          label: 'Tier 3: €501+',
-          min_price: new Decimal('501'),
-          max_price: null,
-          seller_percent: new Decimal('60'),
-          reseller_percent: new Decimal('30'),
-          platform_percent: new Decimal('10'),
-          currency_note: 'EUR/CHF',
-          is_active: true,
-        },
-      ],
-    })
+  // ── 2. Fee tiers ──────────────────────────────────────────────────────────
+  console.log("💶 Creating fee tiers...");
+  const { rows: tiers } = await q(`
+    INSERT INTO fee_tiers
+      (label, min_price, max_price, seller_percent, reseller_percent, platform_percent, currency_note, is_active)
+    VALUES
+      ('Tier 1 : 0 – 150 €',   0,   150, 50, 40, 10, 'EUR/CHF', true),
+      ('Tier 2 : 151 – 500 €', 151, 500, 55, 35, 10, 'EUR/CHF', true),
+      ('Tier 3 : 501 € +',     501, NULL, 60, 30, 10, 'EUR/CHF', true)
+    RETURNING id
+  `);
+  const [tier1Id, tier2Id, tier3Id] = tiers.map((r: any) => r.id);
 
-    // Create admin users (3)
-    console.log('Creating admin users (3)...')
-    const adminUsers = await Promise.all([
-      tx.users.create({
-        data: {
-          email: 'admin.moreau@example.fr',
-          first_name: 'André',
-          last_name: 'Moreau',
-          profile_image_url: 'https://example.com/avatars/admin-1.jpg',
-        },
-      }),
-      tx.users.create({
-        data: {
-          email: 'admin.lefevre@example.fr',
-          first_name: 'Isabelle',
-          last_name: 'Lefebvre',
-          profile_image_url: 'https://example.com/avatars/admin-2.jpg',
-        },
-      }),
-      tx.users.create({
-        data: {
-          email: 'admin.renard@example.fr',
-          first_name: 'Claude',
-          last_name: 'Renard',
-          profile_image_url: 'https://example.com/avatars/admin-3.jpg',
-        },
-      }),
-    ])
+  // ── 3. Admin users ────────────────────────────────────────────────────────
+  console.log("👑 Creating admin users (3)...");
+  const { rows: adminUsers } = await q(`
+    INSERT INTO users (email, first_name, last_name, profile_image_url)
+    VALUES
+      ('admin.moreau@example.fr',   'André',    'Moreau',   'https://i.pravatar.cc/150?u=admin1'),
+      ('admin.lefevre@example.fr',  'Isabelle', 'Lefebvre', 'https://i.pravatar.cc/150?u=admin2'),
+      ('admin.renard@example.fr',   'Claude',   'Renard',   'https://i.pravatar.cc/150?u=admin3')
+    RETURNING id
+  `);
+  for (const u of adminUsers) {
+    await q(`
+      INSERT INTO profiles (user_id, role, status, phone, notification_prefs)
+      VALUES ($1, 'admin', 'approved', $2, $3)
+    `, [u.id, generatePhone(), generateNotifPrefs()]);
+  }
 
-    // Create admin profiles
-    await tx.profiles.createMany({
-      data: adminUsers.map((user) => ({
-        user_id: user.id,
-        role: 'admin',
-        status: 'approved',
-        phone: generatePhoneNumber(),
-        notification_prefs: generateNotificationPrefs(),
-      })),
-    })
+  // ── 4. Seller users ───────────────────────────────────────────────────────
+  console.log("🛍️  Creating seller users (5)...");
+  const sellerData = [
+    { email: "seller.dupont@example.fr",   first: "Pierre", last: "Dupont",  img: "seller1", bio: "Vend des articles de mode haut de gamme." },
+    { email: "seller.martin@example.fr",   first: "Marie",  last: "Martin",  img: "seller2", bio: "Spécialisée en électronique et high-tech." },
+    { email: "seller.bernard@example.fr",  first: "Jean",   last: "Bernard", img: "seller3", bio: "Vendeur généraliste, articles variés." },
+    { email: "seller.laurent@example.fr",  first: "Sophie", last: "Laurent", img: "seller4", bio: "Vêtements enfants et jouets de qualité." },
+    { email: "seller.leclerc@example.fr",  first: "Marc",   last: "Leclerc", img: "seller5", bio: "Mobilier et décoration intérieure." },
+  ];
+  const sellerUsers: string[] = [];
+  for (const s of sellerData) {
+    const { rows } = await q(`
+      INSERT INTO users (email, first_name, last_name, profile_image_url)
+      VALUES ($1, $2, $3, $4) RETURNING id
+    `, [s.email, s.first, s.last, `https://i.pravatar.cc/150?u=${s.img}`]);
+    const uid = rows[0].id;
+    sellerUsers.push(uid);
+    const addr = generateAddress();
+    await q(`
+      INSERT INTO profiles
+        (user_id, role, status, phone, address, city, postal_code, department, bio, notification_prefs)
+      VALUES ($1, 'seller', 'approved', $2, $3, $4, $5, $6, $7, $8)
+    `, [uid, generatePhone(), addr.address, addr.city, addr.postal_code, addr.department, s.bio, generateNotifPrefs()]);
+  }
 
-    // Create seller users (5)
-    console.log('Creating seller users (5)...')
-    const sellerData = [
-      { email: 'seller.dupont@example.fr', first: 'Pierre', last: 'Dupont' },
-      { email: 'seller.martin@example.fr', first: 'Marie', last: 'Martin' },
-      { email: 'seller.bernard@example.fr', first: 'Jean', last: 'Bernard' },
-      { email: 'seller.laurent@example.fr', first: 'Sophie', last: 'Laurent' },
-      { email: 'seller.leclerc@example.fr', first: 'Marc', last: 'Leclerc' },
-    ]
+  // ── 5. Reusse (reseller) users ─────────────────────────────────────────────
+  console.log("🤝 Creating reusse users (3)...");
+  const reusseData = [
+    { email: "reusse.bernard@example.fr",  first: "Thomas",  last: "Bernard",  status: "approved", bio: "Revendeur expérimenté, 8 ans sur le marché. Service irréprochable.", img: "reusse1", exp: `${randomInt(5,12)} ans de revente` },
+    { email: "reusse.simon@example.fr",    first: "Émilie",  last: "Simon",    status: "approved", bio: "Revendeuse secondaire, activité occasionnelle.", img: "reusse2", exp: `${randomInt(2,5)} ans de revente` },
+    { email: "reusse.rousseau@example.fr", first: "Nicolas", last: "Rousseau", status: "pending",  bio: "Nouveau revendeur en attente de validation.", img: "reusse3", exp: null },
+  ];
+  const reusseUsers: string[] = [];
+  for (const r of reusseData) {
+    const { rows } = await q(`
+      INSERT INTO users (email, first_name, last_name, profile_image_url)
+      VALUES ($1, $2, $3, $4) RETURNING id
+    `, [r.email, r.first, r.last, `https://i.pravatar.cc/150?u=${r.img}`]);
+    const uid = rows[0].id;
+    reusseUsers.push(uid);
+    const addr = generateAddress();
+    const siret = r.status === "pending" ? null : `${addr.postal_code.slice(0,2)}123${randomInt(10000000,99999999)}`;
+    await q(`
+      INSERT INTO profiles
+        (user_id, role, status, phone, address, city, postal_code, department, bio, experience, siret_number, notification_prefs)
+      VALUES ($1, 'marchand', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `, [uid, r.status, generatePhone(), addr.address, addr.city, addr.postal_code, addr.department, r.bio, r.exp, siret, generateNotifPrefs()]);
+  }
 
-    const sellerUsers = await Promise.all(
-      sellerData.map((data) =>
-        tx.users.create({
-          data: {
-            email: data.email,
-            first_name: data.first,
-            last_name: data.last,
-            profile_image_url: `https://example.com/avatars/seller-${data.last.toLowerCase()}.jpg`,
-          },
-        }),
-      ),
-    )
+  const [reusse1, reusse2] = reusseUsers;
 
-    // Create seller profiles
-    await tx.profiles.createMany({
-      data: sellerUsers.map((user, index) => {
-        const addr = generateAddress()
-        return {
-          user_id: user.id,
-          role: 'seller',
-          status: 'approved',
-          phone: generatePhoneNumber(),
-          address: addr.address,
-          city: addr.city,
-          postal_code: addr.postalCode,
-          department: addr.department,
-          bio: `Professional seller specializing in quality items. ${index === 0 ? 'Sells high-end fashion.' : index === 1 ? 'Specializes in electronics.' : 'General merchandise seller.'}`,
-          experience: `${randomInt(2, 10)} years of selling experience`,
-          notification_prefs: generateNotificationPrefs(),
-        }
-      }),
-    })
+  // ── 6. Requests & items ───────────────────────────────────────────────────
+  console.log("📦 Creating requests & items...");
 
-    // Create marchand users (3: 1 approved+active, 1 approved+inactive, 1 pending)
-    console.log('Creating marchand users (3)...')
-    const marchands = [
-      {
-        email: 'marchand.bernard@example.fr',
-        first: 'Thomas',
-        last: 'Bernard',
-        status: 'approved',
-        bio: 'Experienced reseller with 8 years in the market. Focus on quality items and customer service.',
-      },
-      {
-        email: 'marchand.simon@example.fr',
-        first: 'Émilie',
-        last: 'Simon',
-        status: 'approved',
-        bio: 'Secondary reseller (minimal activity)',
-      },
-      {
-        email: 'marchand.rousseau@example.fr',
-        first: 'Nicolas',
-        last: 'Rousseau',
-        status: 'pending',
-        bio: 'New reseller applying to the platform. Under review.',
-      },
-    ]
+  // Request 1 — Pending (no reusse assigned), Seller 0
+  const { rows: [req1] } = await q(`
+    INSERT INTO requests
+      (seller_id, service_type, status, item_count, categories, item_condition, meeting_location, notes)
+    VALUES ($1, 'resale', 'pending', 3, ARRAY['mode','accessoires'], 'excellent', 'Paris, 75001',
+            'Articles de créateur, manipuler avec soin.')
+    RETURNING id
+  `, [sellerUsers[0]]);
 
-    const marchantUsers = await Promise.all(
-      marchands.map((data) =>
-        tx.users.create({
-          data: {
-            email: data.email,
-            first_name: data.first,
-            last_name: data.last,
-            profile_image_url: `https://example.com/avatars/marchand-${data.last.toLowerCase()}.jpg`,
-          },
-        }),
-      ),
-    )
+  await q(`
+    INSERT INTO items
+      (request_id, seller_id, title, description, brand, category, subcategory, condition, status, min_price, max_price, photos)
+    VALUES
+      ($1, $2, 'Sac à main vintage en cuir',   'Sac de créateur authentique, état excellent', 'Hermès', 'maroquinerie', 'sacs',         'excellent',  'pending_approval', 150, 200, ARRAY['https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400']),
+      ($1, $2, 'Foulard en soie',              'Foulard classique d''une marque de luxe',     'Hermès', 'accessoires',  NULL,           'excellent',  'pending_approval', 50,  80,  ARRAY['https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=400']),
+      ($1, $2, 'Lunettes de soleil',           'Lunettes de créateur avec étui d''origine',   'Chanel', 'accessoires',  NULL,           'comme_neuf', 'pending_approval', 120, 150, ARRAY['https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400'])
+  `, [req1.id, sellerUsers[0]]);
 
-    // Create marchand profiles
-    await tx.profiles.createMany({
-      data: marchantUsers.map((user, index) => {
-        const addr = generateAddress()
-        const marchData = marchands[index]
-        return {
-          user_id: user.id,
-          role: 'marchand',
-          status: marchData.status as 'approved' | 'pending',
-          phone: generatePhoneNumber(),
-          address: addr.address,
-          city: addr.city,
-          postal_code: addr.postalCode,
-          department: addr.department,
-          bio: marchData.bio,
-          experience: index === 2 ? null : `${randomInt(5, 15)} years of reselling experience`,
-          siret_number: `${addr.postalCode.substring(0, 2)}123${randomInt(10000000, 99999999)}`,
-          notification_prefs: generateNotificationPrefs(),
-        }
-      }),
-    })
+  // Request 2 — In progress, assigned to reusse1, Seller 1
+  const { rows: [req2] } = await q(`
+    INSERT INTO requests
+      (seller_id, reusse_id, service_type, status, item_count, categories, meeting_location)
+    VALUES ($1, $2, 'resale', 'in_progress', 2, ARRAY['electronique'], 'Marseille, 13001')
+    RETURNING id
+  `, [sellerUsers[1], reusse1]);
 
-    // Create requests & items (basic version for MVP seed)
-    console.log('Creating requests & items...')
+  await q(`
+    INSERT INTO items
+      (request_id, seller_id, reusse_id, title, description, brand, category, subcategory, condition, status, min_price, max_price, approved_price, price_approved_by_seller, model, photos)
+    VALUES
+      ($1, $2, $3, 'Apple AirPods Pro', 'Écouteurs sans fil, boîte d''origine', 'Apple', 'electronique', 'audio', 'excellent', 'approved', 180, 220, 200, true, 'AirPods Pro 2', ARRAY['https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=400']),
+      ($1, $2, $3, 'Câble USB-C',       'Câble de charge haute qualité',        'Apple', 'electronique', NULL,    'neuf',      'approved', 15,  25,  20,  true, NULL,           ARRAY['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400'])
+  `, [req2.id, sellerUsers[1], reusse1]);
 
-    // Request 1: Pending (no marchand assigned yet)
-    const request1 = await tx.requests.create({
-      data: {
-        seller_id: sellerUsers[0].id,
-        service_type: 'resale',
-        status: 'pending',
-        item_count: 3,
-        categories: ['fashion', 'accessories'],
-        item_condition: 'excellent',
-        meeting_location: 'Paris, France',
-        notes: 'High-end designer items, must be handled carefully',
-      },
-    })
+  // Request 3 — Completed, Seller 2 + reusse2
+  const { rows: [req3] } = await q(`
+    INSERT INTO requests
+      (seller_id, reusse_id, service_type, status, item_count, categories, meeting_location, completed_at)
+    VALUES ($1, $2, 'resale', 'completed', 1, ARRAY['mode'], 'Lyon, 69001', '2026-04-15')
+    RETURNING id
+  `, [sellerUsers[2], reusse2]);
 
-    // Add items to request 1
-    await tx.items.createMany({
-      data: [
-        {
-          request_id: request1.id,
-          seller_id: sellerUsers[0].id,
-          title: 'Vintage Leather Handbag',
-          description: 'Authentic designer handbag, excellent condition',
-          brand: 'Hermès',
-          category: 'fashion',
-          subcategory: 'handbags',
-          condition: 'excellent',
-          status: 'pending_approval',
-          min_price: new Decimal('150'),
-          max_price: new Decimal('200'),
-          photos: [
-            'https://example.com/marketplace/item-1-photo-1.jpg',
-            'https://example.com/marketplace/item-1-photo-2.jpg',
-          ],
-        },
-        {
-          request_id: request1.id,
-          seller_id: sellerUsers[0].id,
-          title: 'Silk Scarf',
-          description: 'Classic silk scarf from luxury brand',
-          brand: 'Hermès',
-          category: 'accessories',
-          condition: 'excellent',
-          status: 'pending_approval',
-          min_price: new Decimal('50'),
-          max_price: new Decimal('80'),
-          photos: ['https://example.com/marketplace/item-2-photo-1.jpg'],
-        },
-        {
-          request_id: request1.id,
-          seller_id: sellerUsers[0].id,
-          title: 'Sunglasses',
-          description: 'Designer sunglasses with original case',
-          brand: 'Chanel',
-          category: 'accessories',
-          condition: 'like-new',
-          status: 'pending_approval',
-          min_price: new Decimal('120'),
-          max_price: new Decimal('150'),
-          photos: ['https://example.com/marketplace/item-3-photo-1.jpg'],
-        },
-      ],
-    })
+  const { rows: [soldItem] } = await q(`
+    INSERT INTO items
+      (request_id, seller_id, reusse_id, title, description, brand, category, condition, status,
+       min_price, max_price, approved_price, price_approved_by_seller, sale_price, sold_at, photos)
+    VALUES ($1, $2, $3,
+      'Veste en cuir noir', 'Veste en cuir véritable, taille M', 'Sandro', 'mode', 'tres_bon', 'sold',
+      80, 120, 110, true, 110, '2026-04-10', ARRAY['https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400'])
+    RETURNING id
+  `, [req3.id, sellerUsers[2], reusse2]);
 
-    // Request 2: In progress with some approved items
-    const request2 = await tx.requests.create({
-      data: {
-        seller_id: sellerUsers[1].id,
-        service_type: 'resale',
-        status: 'in_progress',
-        item_count: 2,
-        categories: ['electronics'],
-        meeting_location: 'Marseille, France',
-      },
-    })
+  // Transaction for the sold item (Tier 1: 50/40/10)
+  await q(`
+    INSERT INTO transactions
+      (item_id, request_id, seller_id, reusse_id, sale_price,
+       seller_earning, reusse_earning, platform_earning,
+       fee_tier_id, seller_percent, reseller_percent, platform_percent, status)
+    VALUES ($1, $2, $3, $4, 110, 55, 44, 11, $5, 50, 40, 10, 'completed')
+  `, [soldItem.id, req3.id, sellerUsers[2], reusse2, tier1Id]);
 
-    await tx.items.createMany({
-      data: [
-        {
-          request_id: request2.id,
-          seller_id: sellerUsers[1].id,
-          title: 'Apple AirPods Pro',
-          description: 'Wireless earbuds, original packaging',
-          brand: 'Apple',
-          category: 'electronics',
-          subcategory: 'audio',
-          condition: 'excellent',
-          status: 'approved',
-          min_price: new Decimal('180'),
-          max_price: new Decimal('220'),
-          approved_price: new Decimal('200'),
-          photos: ['https://example.com/marketplace/item-4-photo-1.jpg'],
-          model: 'AirPods Pro 2',
-        },
-        {
-          request_id: request2.id,
-          seller_id: sellerUsers[1].id,
-          title: 'USB-C Cable',
-          description: 'High-quality charging cable',
-          brand: 'Apple',
-          category: 'electronics',
-          condition: 'new',
-          status: 'approved',
-          min_price: new Decimal('15'),
-          max_price: new Decimal('25'),
-          approved_price: new Decimal('20'),
-          photos: ['https://example.com/marketplace/item-5-photo-1.jpg'],
-        },
-      ],
-    })
+  // Review for request 3
+  await q(`
+    INSERT INTO reviews
+      (request_id, seller_id, reusse_id, rating, comment, communication_rating, reliability_rating, handling_rating)
+    VALUES ($1, $2, $3, 5,
+      'Service impeccable, vente rapide et transparente. Très satisfait !', 5, 5, 4)
+  `, [req3.id, sellerUsers[2], reusse2]);
 
-    console.log('✅ Seed complete.')
-    console.log('Database ready for testing.')
-  })
+  // ── 7. Meeting for request 2 ──────────────────────────────────────────────
+  console.log("📅 Creating meeting...");
+  await q(`
+    INSERT INTO meetings (request_id, scheduled_date, location, duration, status, notes)
+    VALUES ($1, '2026-06-10 14:00:00', '13 Rue de la République, Marseille 13001', 60, 'scheduled',
+            'Apporter les articles dans leur emballage d''origine.')
+  `, [req2.id]);
+
+  // ── 8. Messages for request 2 ─────────────────────────────────────────────
+  console.log("💬 Creating messages...");
+  await q(`
+    INSERT INTO messages (sender_id, receiver_id, request_id, content, is_read)
+    VALUES
+      ($1, $2, $3, 'Bonjour, j''ai bien reçu votre confirmation. À quelle heure vous convient-il de nous rencontrer ?', true),
+      ($2, $1, $3, 'Bonjour Marie ! 14h me conviendrait parfaitement. Je serai ponctuel.', false)
+  `, [sellerUsers[1], reusse1, req2.id]);
+
+  // ── 9. Notifications ──────────────────────────────────────────────────────
+  console.log("🔔 Creating notifications...");
+  await q(`
+    INSERT INTO notifications (user_id, type, title, message, link, is_read)
+    VALUES
+      ($1, 'message',     'Nouveau message',  'Thomas Bernard vous a répondu concernant votre demande.', $3, false),
+      ($2, 'new_request', 'Nouvelle demande', 'Une nouvelle demande de revente est disponible.', $4, false)
+  `, [sellerUsers[1], reusse1, `/requests/${req2.id}`, `/requests/${req1.id}`]);
+
+  // ── Summary ───────────────────────────────────────────────────────────────
+  console.log("\n✅ Seed terminé avec succès !");
+  console.log("──────────────────────────────────────────────");
+  console.log(`  Admins    : ${adminUsers.length}`);
+  console.log(`  Sellers   : ${sellerUsers.length}`);
+  console.log(`  Reusses   : ${reusseUsers.length}`);
+  console.log("  Requests  : 3  (pending / in_progress / completed)");
+  console.log("  Fee tiers : 3  (Tier 1/2/3)");
+  console.log("──────────────────────────────────────────────");
+  console.log("\n📋 Comptes de test :");
+  console.log("  admin.moreau@example.fr");
+  console.log("  seller.dupont@example.fr");
+  console.log("  reusse.bernard@example.fr");
 }
 
 main()
   .catch((e) => {
-    console.error('Seed failed:', e)
-    process.exit(1)
+    console.error("❌ Seed failed:", e.message ?? e);
+    process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect()
-    await pool.end()
-  })
+  .finally(() => pool.end());
