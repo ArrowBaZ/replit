@@ -3322,10 +3322,6 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
-      if (!user.emailVerified) {
-        return res.status(403).json({ message: "Please verify your email before signing in" });
-      }
-
       const sessionId = randomUUID();
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
