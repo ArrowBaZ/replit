@@ -3491,7 +3491,7 @@ export async function registerRoutes(
       const userId = randomUUID();
 
       await db.execute(
-        sql`INSERT INTO users (id, email, "passwordHash", "firstName", "lastName") VALUES (${userId}, ${email}, ${passwordHash}, ${firstName || null}, ${lastName || null})`
+        sql`INSERT INTO users (id, email, "passwordHash", "firstName", "lastName", "emailVerified") VALUES (${userId}, ${email}, ${passwordHash}, ${firstName || null}, ${lastName || null}, NOW())`
       );
 
       // Create profile during registration
