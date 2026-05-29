@@ -46,6 +46,7 @@ Your app will be available at `http://localhost:5000`
 | `npm run start` | Start production server |
 | `npm run check` | Type checking |
 | `npm run db:push` | Push Drizzle schema to database |
+| `npm run db:seed` | Seed database with French test dataset (Drizzle ORM) |
 | `npm run db:seed-sql` | Seed database from dump.sql |
 | `npm run docker:up` | Start Docker containers |
 | `npm run docker:down` | Stop Docker containers |
@@ -57,13 +58,24 @@ See [README-docker.md](README-docker.md) for detailed Docker documentation.
 
 ## 🗃️ Database
 
-- **ORM:** Drizzle ORM with PostgreSQL
-- **Schema:** Defined in `shared/schema.ts`
+- **ORM:** Drizzle ORM with PostgreSQL (exclusive ORM, no Prisma)
+- **Schema:** Defined in `shared/schema.ts` (single source of truth)
 - **Tables:** 9 tables (users, sessions, profiles, requests, items, meetings, messages, notifications, transactions)
+- **Seeding:** `npm run db:seed` uses Drizzle ORM for test data creation
 
 ### Database Schema
 
 All tables are created automatically when you run `npm run db:push`.
+
+### Database Seeding
+
+The project uses Drizzle ORM exclusively for both runtime queries and seeding. To seed with test data (3 admin users, 5 sellers, 3 marchands, sample requests and items with French data):
+
+```bash
+npm run db:seed
+```
+
+**Note:** The seed script is idempotent — running it multiple times will delete and recreate the test data.
 
 ## 🔐 Authentication
 
