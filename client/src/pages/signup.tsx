@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +13,17 @@ import { ProfileTypeSelector, type ProfileType } from "@/components/profile-type
 import { ChevronDown, ChevronUp, Loader2, ArrowLeft } from "lucide-react";
 
 export function SignupPage() {
+  const search = useSearch();
   const [step, setStep] = useState<1 | 2>(1);
   const [profileType, setProfileType] = useState<ProfileType | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const type = params.get("type");
+    if (type === "seller" || type === "marchand") {
+      setProfileType(type);
+    }
+  }, [search]);
   const [showLegalFields, setShowLegalFields] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

@@ -257,12 +257,12 @@ export default function LandingPage() {
             {t("ctaSubtitle")}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <a href="/signup">
+            <a href="/signup?type=seller">
               <Button size="lg" className="bg-[hsl(var(--success))] border-[hsl(var(--success))] text-white" data-testid="button-cta-sell">
                 {i18n.language === "fr" ? "Je veux vendre" : "I Want to Sell"}
               </Button>
             </a>
-            <a href="/signup">
+            <a href="/signup?type=marchand">
               <Button size="lg" variant="outline" className="text-primary-foreground border-primary-foreground/30 bg-primary-foreground/10">
                 {i18n.language === "fr" ? "Je suis revendeur" : "I'm a Reseller"}
               </Button>
