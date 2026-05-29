@@ -11,6 +11,7 @@ import {
   pickRandom,
   generateSIRET,
 } from './generators'
+import { hashPassword } from '../server/auth'
 import 'dotenv/config'
 
 /**
@@ -35,6 +36,10 @@ import 'dotenv/config'
 
 async function main() {
   console.log('🌱 Starting French dataset seed with Drizzle ORM...')
+
+  const testPassword = 'TestPassword123'
+  const passwordHash = await hashPassword(testPassword)
+  console.log(`📝 Using test password: ${testPassword}`)
 
   await db.transaction(async (tx) => {
     // Deletion order (respects FK constraints - delete from leaf tables first)
@@ -102,6 +107,7 @@ async function main() {
           firstName: 'André',
           lastName: 'Moreau',
           profileImageUrl: 'https://example.com/avatars/admin-1.jpg',
+          passwordHash,
         })
         .returning(),
       tx
@@ -111,6 +117,7 @@ async function main() {
           firstName: 'Isabelle',
           lastName: 'Lefebvre',
           profileImageUrl: 'https://example.com/avatars/admin-2.jpg',
+          passwordHash,
         })
         .returning(),
       tx
@@ -120,6 +127,7 @@ async function main() {
           firstName: 'Claude',
           lastName: 'Renard',
           profileImageUrl: 'https://example.com/avatars/admin-3.jpg',
+          passwordHash,
         })
         .returning(),
     ])
@@ -157,6 +165,7 @@ async function main() {
             firstName: data.first,
             lastName: data.last,
             profileImageUrl: `https://example.com/avatars/seller-${data.last.toLowerCase()}.jpg`,
+            passwordHash,
           })
           .returning(),
       ),
@@ -224,6 +233,7 @@ async function main() {
             firstName: data.first,
             lastName: data.last,
             profileImageUrl: `https://example.com/avatars/marchand-${data.last.toLowerCase()}.jpg`,
+            passwordHash,
           })
           .returning(),
       ),
