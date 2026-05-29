@@ -83,16 +83,19 @@ async function main() {
   `);
   const [tier1Id] = tiers.map((r: any) => r.id);
 
+  // All test accounts share this password: Sellzy2026!
+  const PW = '$2b$10$yF8xTCmhErWHKqHFDgX0yODmuhpCAzcRgFCL5DCMKOWqQTSQcymvW';
+
   // ── 3. Admin users ────────────────────────────────────────────────────────
   console.log("👑 Creating admin users (3)...");
   const { rows: adminUsers } = await q(`
-    INSERT INTO users (email, first_name, last_name, profile_image_url)
+    INSERT INTO users (email, password_hash, first_name, last_name, profile_image_url)
     VALUES
-      ('admin.moreau@example.fr',   'André',    'Moreau',   'https://i.pravatar.cc/150?u=admin1'),
-      ('admin.lefevre@example.fr',  'Isabelle', 'Lefebvre', 'https://i.pravatar.cc/150?u=admin2'),
-      ('admin.renard@example.fr',   'Claude',   'Renard',   'https://i.pravatar.cc/150?u=admin3')
+      ('admin.moreau@example.fr',   $1, 'André',    'Moreau',   'https://i.pravatar.cc/150?u=admin1'),
+      ('admin.lefevre@example.fr',  $1, 'Isabelle', 'Lefebvre', 'https://i.pravatar.cc/150?u=admin2'),
+      ('admin.renard@example.fr',   $1, 'Claude',   'Renard',   'https://i.pravatar.cc/150?u=admin3')
     RETURNING id
-  `);
+  `, [PW]);
   for (const u of adminUsers) {
     await q(`
       INSERT INTO profiles (user_id, role, status, phone, notification_prefs)
@@ -112,9 +115,9 @@ async function main() {
   const sellerUsers: string[] = [];
   for (const s of sellerRows) {
     const { rows } = await q(`
-      INSERT INTO users (email, first_name, last_name, profile_image_url)
-      VALUES ($1, $2, $3, $4) RETURNING id
-    `, [s.email, s.first, s.last, `https://i.pravatar.cc/150?u=${s.img}`]);
+      INSERT INTO users (email, password_hash, first_name, last_name, profile_image_url)
+      VALUES ($1, $2, $3, $4, $5) RETURNING id
+    `, [s.email, PW, s.first, s.last, `https://i.pravatar.cc/150?u=${s.img}`]);
     const uid = rows[0].id;
     sellerUsers.push(uid);
     const addr = generateAddress();
@@ -135,9 +138,9 @@ async function main() {
   const marchUsers: string[] = [];
   for (const m of marchRows) {
     const { rows } = await q(`
-      INSERT INTO users (email, first_name, last_name, profile_image_url)
-      VALUES ($1, $2, $3, $4) RETURNING id
-    `, [m.email, m.first, m.last, `https://i.pravatar.cc/150?u=${m.img}`]);
+      INSERT INTO users (email, password_hash, first_name, last_name, profile_image_url)
+      VALUES ($1, $2, $3, $4, $5) RETURNING id
+    `, [m.email, PW, m.first, m.last, `https://i.pravatar.cc/150?u=${m.img}`]);
     const uid = rows[0].id;
     marchUsers.push(uid);
     const addr = generateAddress();
