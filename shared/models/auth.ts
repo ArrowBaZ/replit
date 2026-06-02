@@ -1,16 +1,18 @@
 import { sql } from "drizzle-orm";
-import { index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
-// Session storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
+// Session storage table — custom auth session format
 export const sessions = pgTable(
   "sessions",
   {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
+    sessionToken: text("sessionToken").primaryKey(),
+    userId: varchar("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    expires: timestamp("expires").notNull(),
   },
-  (table) => [index("IDX_session_expire").on(table.expire)]
+  (table) => [
+    index("idx_sessions_userId").on(table.userId),
+    index("idx_sessions_expires").on(table.expires),
+  ]
 );
 
 // User storage table.
