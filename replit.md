@@ -27,6 +27,24 @@ Sellzy is built with a modern web stack:
     - **Admin Tools**: Admin users have capabilities to manage users, approve reseller applications, view analytics, manage fee tiers, and moderate requests.
     - **Request Workflow**: Multi-step request creation wizard, item photo uploads with guidance, meeting management, and detailed request/item lifecycle tracking.
 
+## Database Setup
+
+To initialise a fresh database or after any schema changes, run the seed script — it automatically applies pending schema migrations before inserting demo data:
+
+```bash
+npx tsx server/seed.ts
+```
+
+The script will:
+1. Run `drizzle-kit push --force` to bring the database schema in line with `shared/schema.ts`.
+2. Insert demo users and sample data if they do not already exist.
+
+**Never run the seed directly without the migration step.** If new columns are added to `shared/schema.ts` and the seed is run against an outdated database, it will fail with "column does not exist" errors. The built-in migration step prevents this.
+
+Demo credentials inserted by the seed:
+- Reseller: `reseller@sellzy.demo` / `password123`
+- Seller: `seller@sellzy.demo` / `password123`
+
 ## External Dependencies
 - **Replit Auth**: For user authentication and authorization.
 - **Replit Object Storage**: For storing item photos, certificates, and other documents.

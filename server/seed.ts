@@ -1,9 +1,19 @@
+import { execSync } from "child_process";
 import { db } from "./db";
 import { users, profiles, requests, items } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword } from "./auth";
 
 async function seed() {
+  console.log("[seed] Applying schema migrations...");
+  try {
+    execSync("npx drizzle-kit push --force", { stdio: "inherit" });
+    console.log("[seed] Schema is up to date.");
+  } catch (err) {
+    console.error("[seed] Schema push failed:", err);
+    process.exit(1);
+  }
+
   console.log("[seed] Starting seed...");
 
   const marchantEmail = "reseller@sellzy.demo";
