@@ -138,7 +138,10 @@ const itemFields = {
   description: z.string().optional(),
   brand: z.string().optional(),
   size: z.string().optional(),
-  condition: z.enum(ITEM_CONDITIONS).optional(),
+  condition: z.preprocess(
+    (val) => (val === "" || val === null ? undefined : val),
+    z.enum(ITEM_CONDITIONS).optional(),
+  ),
   minPrice: z.string().optional(),
   maxPrice: z.string().optional(),
   photos: z.array(z.string()).optional(),

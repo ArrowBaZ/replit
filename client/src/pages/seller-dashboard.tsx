@@ -6,8 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import type { Request, Item, Profile } from "@shared/schema";
+import type { Request, Item, Profile, FeeTier } from "@shared/schema";
 import { Package, Shirt, TrendingUp, Clock, Plus, ArrowRight, ShoppingBag, Bell } from "lucide-react";
+
+function getTierForPrice(price: number, tiers: FeeTier[]): FeeTier | null {
+  if (!tiers || tiers.length === 0) return null;
+  const sorted = [...tiers].sort((a, b) => parseFloat(a.minPrice as string) - parseFloat(b.minPrice as string));
+  for (const tier of sorted) {
+    const min = parseFloat(tier.minPrice as string);
+    const max = tier.maxPrice ? parseFloat(tier.maxPrice as string) : Infinity;
+    if (price >= min && price <= max) return tier;
+  }
+  return null;
+}
 
 function StatCard({ icon: Icon, label, value, trend, color }: { icon: any; label: string; value: string; trend?: string; color: string }) {
   return (
@@ -51,10 +62,19 @@ export default function SellerDashboard() {
     queryKey: ["/api/requests/pending-action"],
   });
 
+  const { data: feeTiers = [] } = useQuery<FeeTier[]>({
+    queryKey: ["/api/fee-tiers"],
+  });
+
   const activeRequests = requests?.filter((r) => !["completed", "cancelled"].includes(r.status)) || [];
   const totalItems = items?.length || 0;
   const soldItems = items?.filter((i) => i.status === "sold") || [];
-  const totalEarnings = soldItems.reduce((sum, i) => sum + (parseFloat(i.salePrice || "0") * 0.8), 0);
+  const totalEarnings = soldItems.reduce((sum, i) => {
+    const price = parseFloat(i.minPrice || i.salePrice || "0");
+    const tier = getTierForPrice(price, feeTiers);
+    const sellerPct = tier ? parseFloat(tier.sellerPercent as string) / 100 : 0.55;
+    return sum + price * sellerPct;
+  }, 0);
 
   const serviceTypeLabels = {
     classic: t("classicShort"),

@@ -6,9 +6,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
-import type { Request, Item, Profile } from "@shared/schema";
+import type { Request, Item, Profile, FeeTier } from "@shared/schema";
 import { Package, Shirt, TrendingUp, Calendar, ArrowRight, MapPin, Clock, BarChart3, MessageSquare, CheckCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+
+function getTierForPrice(price: number, tiers: FeeTier[]): FeeTier | null {
+  if (!tiers || tiers.length === 0) return null;
+  const sorted = [...tiers].sort((a, b) => parseFloat(a.minPrice as string) - parseFloat(b.minPrice as string));
+  for (const tier of sorted) {
+    const min = parseFloat(tier.minPrice as string);
+    const max = tier.maxPrice ? parseFloat(tier.maxPrice as string) : Infinity;
+    if (price >= min && price <= max) return tier;
+  }
+  return null;
+}
 
 const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
@@ -47,9 +58,18 @@ export default function MarchendDashboard() {
     queryKey: ["/api/stats/activity"],
   });
 
+  const { data: feeTiers = [] } = useQuery<FeeTier[]>({
+    queryKey: ["/api/fee-tiers"],
+  });
+
   const activeAssignments = myRequests?.filter((r) => !["completed", "cancelled"].includes(r.status)) || [];
   const soldItems = items?.filter((i) => i.status === "sold") || [];
-  const totalEarnings = soldItems.reduce((sum, i) => sum + (parseFloat(i.salePrice || "0") * 0.2), 0);
+  const totalEarnings = soldItems.reduce((sum, i) => {
+    const price = parseFloat(i.minPrice || i.salePrice || "0");
+    const tier = getTierForPrice(price, feeTiers);
+    const marchantPct = tier ? parseFloat(tier.marchantPercent as string) / 100 : 0.35;
+    return sum + price * marchantPct;
+  }, 0);
 
   const chartData = (earningsSummary || []).map((row: any) => ({
     month: row.month?.slice(5) || row.month,

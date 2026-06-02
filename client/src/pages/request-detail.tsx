@@ -1256,11 +1256,14 @@ export default function RequestDetailPage() {
                 <DialogHeader><DialogTitle>{t("addItem")}</DialogTitle></DialogHeader>
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  addItem.mutate({
-                    ...itemForm,
-                    photos: itemPhotos.length > 0 ? itemPhotos : undefined,
-                    certificatePhotos: certPhotos.length > 0 ? certPhotos : undefined,
-                  });
+                  const allowedFields = CATEGORY_FIELDS[itemForm.category] || [];
+                  const payload: Record<string, unknown> = { ...itemForm };
+                  if (!allowedFields.includes("condition")) {
+                    delete payload.condition;
+                  }
+                  payload.photos = itemPhotos.length > 0 ? itemPhotos : undefined;
+                  payload.certificatePhotos = certPhotos.length > 0 ? certPhotos : undefined;
+                  addItem.mutate(payload);
                 }} className="space-y-3">
                   <div className="space-y-2">
                     <Label>{t("title")} *</Label>
@@ -1409,8 +1412,8 @@ export default function RequestDetailPage() {
                       <Input type="number" value={itemForm.maxPrice} onChange={(e) => setItemForm({...itemForm, maxPrice: e.target.value})} data-testid="input-item-max-price" />
                     </div>
                   </div>
-                  {itemForm.maxPrice && parseFloat(itemForm.maxPrice) > 0 && (
-                    <ItemFeePreview price={parseFloat(itemForm.maxPrice)} />
+                  {itemForm.minPrice && parseFloat(itemForm.minPrice) > 0 && (
+                    <ItemFeePreview price={parseFloat(itemForm.minPrice)} />
                   )}
                   <div className="space-y-2">
                     <Label>{t("description")}</Label>
@@ -1590,10 +1593,10 @@ export default function RequestDetailPage() {
                           )}
                         </div>
                       </div>
-                      {item.maxPrice && parseFloat(item.maxPrice) > 0 && (
+                      {item.minPrice && parseFloat(item.minPrice) > 0 && (
                         <div data-testid={`fee-preview-counter-${item.id}`}>
-                          <p className="text-xs text-muted-foreground mb-1">Fee breakdown at seller's max price:</p>
-                          <ItemFeePreview price={parseFloat(item.maxPrice)} />
+                          <p className="text-xs text-muted-foreground mb-1">Fee breakdown at seller's min price:</p>
+                          <ItemFeePreview price={parseFloat(item.minPrice)} />
                         </div>
                       )}
                       {showRevisePrice !== item.id && (
@@ -1658,9 +1661,9 @@ export default function RequestDetailPage() {
                     </div>
                   )}
 
-                  {isSeller && item.status === "pending_approval" && request.listReadyAt && item.maxPrice && (
+                  {isSeller && item.status === "pending_approval" && request.listReadyAt && item.minPrice && (
                     <div className="ml-[4.25rem]" data-testid={`fee-preview-pending-${item.id}`}>
-                      <ItemFeePreview price={parseFloat(item.maxPrice)} />
+                      <ItemFeePreview price={parseFloat(item.minPrice)} />
                     </div>
                   )}
 
