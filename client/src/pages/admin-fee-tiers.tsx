@@ -307,7 +307,11 @@ function computeCoverage(tiers: FeeTier[]): CoverageSummary {
 
     const currentMax = aMax === Infinity ? null : aMax;
     const nextMin = parseFloat(activeTiers[i + 1].minPrice ?? "0");
-    if (currentMax !== null && nextMin > currentMax) {
+    // Use integer-coverage check: a real gap exists only if there is at least one
+    // integer price value (whole-euro amount) that falls between the two tiers.
+    // Adjacent integer boundaries (e.g. Tier A max=150, Tier B min=151) leave no
+    // uncovered integer price, so they are treated as contiguous.
+    if (currentMax !== null && Math.floor(currentMax) + 1 < nextMin) {
       gaps.push({ from: currentMax, to: nextMin });
     }
   }

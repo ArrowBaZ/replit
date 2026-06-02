@@ -1175,16 +1175,51 @@ export class DatabaseStorage implements IStorage {
 
   async seedDefaultFeeTiers(): Promise<void> {
     const existing = await db.select({ id: feeTiers.id }).from(feeTiers).limit(1);
-    if (existing.length > 0) return;
-    const defaults = [
-      { label: "Entry (€0–€150)", minPrice: "0", maxPrice: "150", sellerPercent: "50", marchantPercent: "40", platformPercent: "10", isActive: true },
-      { label: "Standard (€150.01–€500)", minPrice: "150.01", maxPrice: "500", sellerPercent: "55", marchantPercent: "35", platformPercent: "10", isActive: true },
-      { label: "Premium (€500.01+)", minPrice: "500.01", maxPrice: null, sellerPercent: "60", marchantPercent: "30", platformPercent: "10", isActive: true },
-    ];
-    for (const tier of defaults) {
-      await db.insert(feeTiers).values(tier);
+    if (existing.length === 0) {
+      const defaults = [
+        { label: "Entry (€0–€150)", minPrice: "0", maxPrice: "150", sellerPercent: "50", marchantPercent: "40", platformPercent: "10", isActive: true },
+        { label: "Standard (€151–€500)", minPrice: "151", maxPrice: "500", sellerPercent: "55", marchantPercent: "35", platformPercent: "10", isActive: true },
+        { label: "Premium (€501+)", minPrice: "501", maxPrice: null, sellerPercent: "60", marchantPercent: "30", platformPercent: "10", isActive: true },
+      ];
+      for (const tier of defaults) {
+        await db.insert(feeTiers).values(tier);
+      }
+      console.log("[fee-tiers] Seeded 3 default fee tiers.");
+      return;
     }
-    console.log("[fee-tiers] Seeded 3 default fee tiers.");
+
+    // One-time migration: ensure the Standard and Premium default tiers use inclusive
+    // integer boundaries (151 and 501) so the inclusive query (min <= price <= max)
+    // assigns €150 to Entry and €151 to Standard, with no uncovered integer prices.
+    // Covers: original wrong decimal values (150.01, 500.01), wrong integer values (150, 500 from
+    // a previous bad migration), and any stale off-by-one values.
+    const fixed151 = await db
+      .update(feeTiers)
+      .set({ minPrice: "151" })
+      .where(
+        and(
+          sql`${feeTiers.minPrice}::numeric IN (150, 150.01)`,
+          sql`${feeTiers.maxPrice}::numeric = 500`,
+        )
+      )
+      .returning({ id: feeTiers.id });
+    if (fixed151.length > 0) {
+      console.log(`[fee-tiers] Boundary migration: updated ${fixed151.length} Standard tier(s) to minPrice 151.`);
+    }
+
+    const fixed501 = await db
+      .update(feeTiers)
+      .set({ minPrice: "501" })
+      .where(
+        and(
+          sql`${feeTiers.minPrice}::numeric IN (500, 500.01)`,
+          isNull(feeTiers.maxPrice),
+        )
+      )
+      .returning({ id: feeTiers.id });
+    if (fixed501.length > 0) {
+      console.log(`[fee-tiers] Boundary migration: updated ${fixed501.length} Premium tier(s) to minPrice 501.`);
+    }
   }
 
   async createPriceOffer(data: InsertItemPriceOffer): Promise<ItemPriceOffer> {
