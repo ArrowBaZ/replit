@@ -1,0 +1,27 @@
+
+**I. Admin Functionality & Validation:**
+
+1. **Merchant Verification:** As an admin, implement functionality to approve or reject merchant applications.
+2. **Code Verification:** Integrate verification checks for crucial merchant codes (DVI, SIRET, TVA) and other identifiers. If no code is provided, automatically send a reminder message requesting the necessary information.
+3. Marchand can provide the profile of his platform profile, Leboncoin, Vinted, Ricardo
+
+**II. Fee Tier Management:**
+
+1. **Fee Tier Review:** Investigate and address gaps in coverage within the “Partial Coverage – €0–∞” fee tier: specifically, prices between €150-€151 and €500-€501 are currently not covered by any tiers. (Refer to link: [https://112a149b-acf7-4bbd-9ba7-b1c9826b43f6-00-27aowflco0fla.riker.replit.dev/admin/fee-tiers](https://112a149b-acf7-4bbd-9ba7-b1c9826b43f6-00-27aowflco0fla.riker.replit.dev/admin/fee-tiers))
+
+**III. Communication & Workflow:**
+
+1. **Messaging Integration:** Allow merchants to contact sellers through the platform's messaging system (e.g., to discuss date changes or other questions).
+2. **Request Item Clarification:** Within a seller’s request view, clearly identify any documents requested by the merchant in a list format.
+3. **Click to Action Dashboard - Vendor Side:** Develop a dashboard for vendors that allows them to take action on requests containing items provided by merchants.
+
+**IV. Bug Fixes & Improvements:**
+
+1. **Wine Category Validation Error:** Address the "Validation error" bug related to the “Wine” category selection, specifically regarding invalid enum values (new_with_tags, like_new, good, fair). The current error message is: “Invalid enum value… received ''”.
+2. **Projected Earnings Accuracy:** Change projected earnings calculations to base them on the _minimum_ price when calculating projections, as currently this can be misleading given the data.
+
+**V. Vendor Functionality & UX:**
+
+1. **Vendor Offer Acceptance:** As a seller, allow merchants to accept offer and items
+2. **Insurance Option:** Ensure sellers have the ability to check "I want insurance" – don't remove that option from their view.
+3. Marchand use a checkbox to tell the seller the goods is only on the different platform that he definded in his profile, update the seed database to provide data
