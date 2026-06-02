@@ -131,9 +131,25 @@ async function main() {
   // ── 5. Marchand (reseller) users ──────────────────────────────────────────
   console.log("🤝 Creating marchand users (3)...");
   const marchRows = [
-    { email: "marchand.bernard@example.fr",  first: "Thomas",  last: "Bernard",  status: "approved", bio: "Revendeur expérimenté, 8 ans sur le marché. Service irréprochable.", img: "march1" },
-    { email: "marchand.simon@example.fr",    first: "Émilie",  last: "Simon",    status: "approved", bio: "Revendeuse secondaire, activité occasionnelle.", img: "march2" },
-    { email: "marchand.rousseau@example.fr", first: "Nicolas", last: "Rousseau", status: "pending",  bio: "Nouveau revendeur en attente de validation.", img: "march3" },
+    {
+      email: "marchand.bernard@example.fr",  first: "Thomas",  last: "Bernard",  status: "approved",
+      bio: "Revendeur expérimenté, 8 ans sur le marché. Service irréprochable.", img: "march1",
+      leboncoin: "https://www.leboncoin.fr/profil/thomas-bernard-revente",
+      vinted: "https://www.vinted.fr/member/thomas-bernard",
+      ricardo: "https://www.ricardo.ch/thomas-bernard-fashion",
+    },
+    {
+      email: "marchand.simon@example.fr",    first: "Émilie",  last: "Simon",    status: "approved",
+      bio: "Revendeuse secondaire, activité occasionnelle.", img: "march2",
+      leboncoin: "https://www.leboncoin.fr/profil/emilie-simon",
+      vinted: "https://www.vinted.fr/member/emilie-simon",
+      ricardo: null,
+    },
+    {
+      email: "marchand.rousseau@example.fr", first: "Nicolas", last: "Rousseau", status: "pending",
+      bio: "Nouveau revendeur en attente de validation.", img: "march3",
+      leboncoin: null, vinted: null, ricardo: null,
+    },
   ];
   const marchUsers: string[] = [];
   for (const m of marchRows) {
@@ -148,9 +164,11 @@ async function main() {
     const exp = m.status === "pending" ? null : `${randomInt(5, 15)} ans de revente`;
     await q(`
       INSERT INTO profiles
-        (user_id, role, status, phone, address, city, postal_code, department, bio, experience, siret_number, notification_prefs)
-      VALUES ($1, 'marchand', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-    `, [uid, m.status, generatePhone(), addr.address, addr.city, addr.postal_code, addr.department, m.bio, exp, siret, generateNotifPrefs()]);
+        (user_id, role, status, phone, address, city, postal_code, department, bio, experience,
+         siret_number, leboncoin_url, vinted_url, ricardo_url, notification_prefs)
+      VALUES ($1, 'marchand', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    `, [uid, m.status, generatePhone(), addr.address, addr.city, addr.postal_code, addr.department,
+        m.bio, exp, siret, m.leboncoin, m.vinted, m.ricardo, generateNotifPrefs()]);
   }
 
   const [march1, march2] = marchUsers;
@@ -170,11 +188,11 @@ async function main() {
   await q(`
     INSERT INTO items
       (request_id, seller_id, title, description, brand, category, subcategory,
-       condition, status, min_price, max_price, photos)
+       condition, status, min_price, max_price, platform_only, photos)
     VALUES
-      ($1, $2, 'Sac à main vintage en cuir',   'Sac de créateur authentique',         'Hermès', 'maroquinerie', 'sacs', 'excellent',  'pending_approval', 150, 200, ARRAY['https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400']),
-      ($1, $2, 'Foulard en soie',              'Foulard classique d''une marque de luxe', 'Hermès', 'accessoires', NULL,   'excellent',  'pending_approval', 50,  80,  ARRAY['https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=400']),
-      ($1, $2, 'Lunettes de soleil',           'Lunettes de créateur avec étui',      'Chanel', 'accessoires', NULL,   'comme_neuf', 'pending_approval', 120, 150, ARRAY['https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400'])
+      ($1, $2, 'Sac à main vintage en cuir',   'Sac de créateur authentique',              'Hermès', 'maroquinerie', 'sacs', 'excellent',  'pending_approval', 150, 200, true,  ARRAY['https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400']),
+      ($1, $2, 'Foulard en soie',              'Foulard classique d''une marque de luxe',  'Hermès', 'accessoires',  NULL,   'excellent',  'pending_approval', 50,  80,  false, ARRAY['https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=400']),
+      ($1, $2, 'Lunettes de soleil',           'Lunettes de créateur avec étui',           'Chanel', 'accessoires',  NULL,   'comme_neuf', 'pending_approval', 120, 150, true,  ARRAY['https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400'])
   `, [req1.id, sellerUsers[0]]);
 
   // Request 2 — In progress, assigned to march1, Seller 1

@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTranslation } from "react-i18next";
+import { useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,10 @@ interface Conversation {
 export default function MessagesPage() {
   const { user } = useAuth();
   const { t } = useTranslation();
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const recipientParam = searchParams.get("recipient");
+  const [selectedConversation, setSelectedConversation] = useState<string | null>(recipientParam);
   const [messageText, setMessageText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -34,6 +38,13 @@ export default function MessagesPage() {
   const { data: chatMessages, isLoading: msgsLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages", selectedConversation],
     enabled: !!selectedConversation,
+  });
+
+  const selectedUser = conversations?.find((c) => c.userId === selectedConversation)?.user;
+
+  const { data: recipientInfo } = useQuery<{ id: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null }>({
+    queryKey: ["/api/users", selectedConversation, "info"],
+    enabled: !!selectedConversation && !selectedUser && !!conversations,
   });
 
   useEffect(() => {
@@ -100,7 +111,7 @@ export default function MessagesPage() {
     sendMessage.mutate({ receiverId: selectedConversation, content: messageText.trim() });
   };
 
-  const selectedUser = conversations?.find((c) => c.userId === selectedConversation)?.user;
+  const activeUser = selectedUser ?? recipientInfo ?? null;
 
   return (
     <div className="flex h-[calc(100vh-65px)]">
@@ -158,7 +169,7 @@ export default function MessagesPage() {
       </div>
 
       <div className={`${selectedConversation ? "flex" : "hidden md:flex"} flex-1 flex-col`}>
-        {selectedConversation && selectedUser ? (
+        {selectedConversation && activeUser ? (
           <>
             <div className="p-4 border-b flex items-center gap-3">
               <Button
@@ -171,12 +182,12 @@ export default function MessagesPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
               </Button>
               <Avatar className="h-8 w-8">
-                <AvatarImage src={selectedUser.profileImageUrl || undefined} />
+                <AvatarImage src={activeUser.profileImageUrl || undefined} />
                 <AvatarFallback className="text-xs bg-muted">
-                  {(selectedUser.firstName?.[0] || "") + (selectedUser.lastName?.[0] || "")}
+                  {(activeUser.firstName?.[0] || "") + (activeUser.lastName?.[0] || "")}
                 </AvatarFallback>
               </Avatar>
-              <p className="text-sm font-medium">{selectedUser.firstName} {selectedUser.lastName}</p>
+              <p className="text-sm font-medium">{activeUser.firstName} {activeUser.lastName}</p>
             </div>
 
             <ScrollArea className="flex-1 p-4">

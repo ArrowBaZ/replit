@@ -60,6 +60,7 @@ export interface IStorage {
   getRequests(userId: string, role: string): Promise<Request[]>;
   getAvailableRequests(): Promise<Request[]>;
   getRequest(id: number): Promise<Request | undefined>;
+  getRequestsPendingSellerAction(sellerId: string): Promise<Request[]>;
   createRequest(data: InsertRequest): Promise<Request>;
   updateRequest(
     id: number,
@@ -133,6 +134,7 @@ export interface IStorage {
   getDocumentsByUser(userId: string): Promise<any[]>;
   getDocumentRequestStatus(itemId: number, marchantId: string): Promise<ItemDocumentRequest | undefined>;
   createDocumentRequest(itemId: number, marchantId: string): Promise<ItemDocumentRequest>;
+  getDocumentRequestsByRequest(requestId: number): Promise<any[]>;
 
   createAgreement(data: InsertAgreement): Promise<Agreement>;
   getAgreement(id: number): Promise<Agreement | undefined>;
@@ -955,6 +957,76 @@ export class DatabaseStorage implements IStorage {
   async createDocumentRequest(itemId: number, marchantId: string): Promise<ItemDocumentRequest> {
     const [req] = await db.insert(itemDocumentRequests).values({ itemId, marchantId }).returning();
     return req;
+  }
+
+  async getDocumentRequestsByRequest(requestId: number): Promise<any[]> {
+    const requestItems = await db
+      .select({ id: items.id, title: items.title })
+      .from(items)
+      .where(and(eq(items.requestId, requestId), isNull(items.deletedAt)));
+    if (requestItems.length === 0) return [];
+    const itemIds = requestItems.map((i) => i.id);
+    const docReqs = await db
+      .select({ req: itemDocumentRequests, marchant: users })
+      .from(itemDocumentRequests)
+      .leftJoin(users, eq(users.id, itemDocumentRequests.marchantId))
+      .where(inArray(itemDocumentRequests.itemId, itemIds));
+    const itemMap = new Map(requestItems.map((i) => [i.id, i]));
+    return docReqs.map((r) => ({
+      ...r.req,
+      itemTitle: itemMap.get(r.req.itemId)?.title || "Unknown Item",
+      marchantName: r.marchant
+        ? `${r.marchant.firstName || ""} ${r.marchant.lastName || ""}`.trim() || r.marchant.email
+        : "Reseller",
+    }));
+  }
+
+  async getRequestsPendingSellerAction(sellerId: string): Promise<Request[]> {
+    // All requests where seller is involved and a marchant is assigned
+    const sellerRequests = await db
+      .select()
+      .from(requests)
+      .where(
+        and(
+          eq(requests.sellerId, sellerId),
+          isNotNull(requests.marchantId),
+        )
+      );
+    if (sellerRequests.length === 0) return [];
+
+    const pending: Request[] = [];
+    for (const req of sellerRequests) {
+      // Case 1: list finalized — check for items awaiting seller price approval
+      if (req.listReadyAt) {
+        const pendingItems = await db
+          .select({ id: items.id })
+          .from(items)
+          .where(
+            and(
+              eq(items.requestId, req.id),
+              eq(items.status, "pending_approval"),
+              isNull(items.deletedAt),
+            )
+          )
+          .limit(1);
+        if (pendingItems.length > 0) {
+          pending.push(req);
+          continue;
+        }
+      }
+
+      // Case 2: document requests — applies regardless of list finalization
+      const docReqs = await db
+        .select({ id: itemDocumentRequests.id })
+        .from(itemDocumentRequests)
+        .innerJoin(items, and(eq(items.id, itemDocumentRequests.itemId), isNull(items.deletedAt)))
+        .where(eq(items.requestId, req.id))
+        .limit(1);
+      if (docReqs.length > 0) {
+        pending.push(req);
+      }
+    }
+    return pending;
   }
 
   async createAgreement(data: InsertAgreement): Promise<Agreement> {

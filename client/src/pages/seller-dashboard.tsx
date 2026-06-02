@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import type { Request, Item, Profile } from "@shared/schema";
-import { Package, Shirt, TrendingUp, Clock, Plus, ArrowRight, ShoppingBag } from "lucide-react";
+import { Package, Shirt, TrendingUp, Clock, Plus, ArrowRight, ShoppingBag, Bell } from "lucide-react";
 
 function StatCard({ icon: Icon, label, value, trend, color }: { icon: any; label: string; value: string; trend?: string; color: string }) {
   return (
@@ -45,6 +45,10 @@ export default function SellerDashboard() {
 
   const { data: items, isLoading: itemsLoading } = useQuery<Item[]>({
     queryKey: ["/api/items"],
+  });
+
+  const { data: pendingActionRequests } = useQuery<Request[]>({
+    queryKey: ["/api/requests/pending-action"],
   });
 
   const activeRequests = requests?.filter((r) => !["completed", "cancelled"].includes(r.status)) || [];
@@ -107,6 +111,40 @@ export default function SellerDashboard() {
         )}
       </div>
 
+      {pendingActionRequests && pendingActionRequests.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-amber-500" />
+            <h2 className="font-semibold text-lg">Pending Your Action</h2>
+            <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold" data-testid="badge-pending-action-count">{pendingActionRequests.length}</span>
+          </div>
+          <div className="space-y-2">
+            {pendingActionRequests.map((req) => (
+              <Link key={req.id} href={`/requests/${req.id}`}>
+                <Card className="hover-elevate cursor-pointer border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-900/10">
+                  <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-md bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                        <Bell className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate" data-testid={`text-pending-request-${req.id}`}>
+                          {serviceTypeLabels[req.serviceType as keyof typeof serviceTypeLabels] || req.serviceType} #{req.id}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Review items or upload requested documents</p>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" data-testid={`badge-pending-action-${req.id}`}>
+                      Action needed
+                    </Badge>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between gap-4">
@@ -136,7 +174,7 @@ export default function SellerDashboard() {
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate" data-testid={`text-request-title-${req.id}`}>
-                            {serviceTypeLabels[req.serviceType] || req.serviceType} - {req.itemCount} {t("items")}
+                            {serviceTypeLabels[req.serviceType as keyof typeof serviceTypeLabels] || req.serviceType} - {req.itemCount} {t("items")}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {req.createdAt ? new Date(req.createdAt).toLocaleDateString("fr-FR") : ""}

@@ -15,7 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Request, Item, Meeting, Profile } from "@shared/schema";
-import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag, FileText, FileSignature, Lock, History, ChevronDown, ChevronUp, Users } from "lucide-react";
+import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, DollarSign, ThumbsUp, ThumbsDown, ShoppingBag, XCircle, Tag, Camera, X, Loader2, Phone, Copy, AlertCircle, Award, Flag, FileText, FileSignature, Lock, History, ChevronDown, ChevronUp, Users, MessageSquare, Shield, Monitor } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ItemDocumentsSection } from "@/components/item-documents-section";
 import { ItemStatusBadge } from "@/components/item-status-badge";
 import { ITEM_CATEGORIES, type ItemCategory } from "@shared/schema";
@@ -213,7 +214,7 @@ export default function RequestDetailPage() {
     title: "", description: "", brand: "", size: "", category: "clothing" as ItemCategory, condition: "good",
     minPrice: "", maxPrice: "", material: "", dimensions: "", author: "", genre: "", language: "",
     vintage: "", ageRange: "", model: "", deviceStorage: "", ram: "", volume: "", frameSize: "",
-    instrumentType: "", applianceType: "", decorStyle: "", subcategory: "",
+    instrumentType: "", applianceType: "", decorStyle: "", subcategory: "", platformOnly: false,
   };
   const [itemForm, setItemForm] = useState(emptyItemForm);
   const [itemPhotos, setItemPhotos] = useState<string[]>([]);
@@ -329,6 +330,7 @@ export default function RequestDetailPage() {
       applianceType: item.applianceType || "",
       decorStyle: item.decorStyle || "",
       subcategory: item.subcategory || "",
+      platformOnly: item.platformOnly ?? false,
     });
     setItemPhotos(item.photos || []);
     setCertPhotos(item.certificatePhotos || []);
@@ -644,6 +646,11 @@ export default function RequestDetailPage() {
     enabled: !!request?.marchantId,
   });
 
+  const { data: documentRequests } = useQuery<any[]>({
+    queryKey: ["/api/requests", params.id, "document-requests"],
+    enabled: !!request,
+  });
+
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
 
   const finalizeList = useMutation({
@@ -932,7 +939,7 @@ export default function RequestDetailPage() {
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-bold" data-testid="text-request-detail-title">
-              {serviceTypeLabels[request.serviceType]} {t("requestDetail")} #{request.id}
+              {serviceTypeLabels[request.serviceType as keyof typeof serviceTypeLabels]} {t("requestDetail")} #{request.id}
             </h1>
             <Badge variant="secondary" className={statusColors[request.status] || ""}>
               {translateStatus(request.status)}
@@ -1013,11 +1020,23 @@ export default function RequestDetailPage() {
         </Card>
       )}
 
+      {request.hasInsurance && (
+        <Card className="border-blue-200 dark:border-blue-800">
+          <CardContent className="p-4 flex items-center gap-3">
+            <Shield className="h-5 w-5 text-blue-500 shrink-0" />
+            <div>
+              <p className="text-sm font-medium">Insurance Requested</p>
+              <p className="text-xs text-muted-foreground">The seller has requested insurance coverage for this consignment.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {contactInfo && (
         <Card className="border-blue-200 dark:border-blue-800">
           <CardContent className="p-4 flex items-start gap-3">
             <Phone className="h-5 w-5 text-blue-500 mt-0.5" />
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 flex-1">
               <p className="text-xs text-muted-foreground mb-1">
                 {isMarchand ? t("sellerContact") : t("marchandContact")}
               </p>
@@ -1031,6 +1050,18 @@ export default function RequestDetailPage() {
                 <p className="text-xs text-muted-foreground">{contactInfo.address}{contactInfo.city ? `, ${contactInfo.city}` : ""}</p>
               )}
             </div>
+            {isMarchand && isAssigned && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                onClick={() => setLocation(`/messages?recipient=${request.sellerId}`)}
+                data-testid="button-message-seller"
+              >
+                <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                Message Seller
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -1385,6 +1416,18 @@ export default function RequestDetailPage() {
                     <Label>{t("description")}</Label>
                     <Textarea value={itemForm.description} onChange={(e) => setItemForm({...itemForm, description: e.target.value})} className="resize-none" rows={2} data-testid="input-item-description" />
                   </div>
+                  <div className="flex items-start gap-3 p-2.5 rounded-md border bg-muted/30">
+                    <Checkbox
+                      id="item-platform-only"
+                      checked={itemForm.platformOnly}
+                      onCheckedChange={(checked) => setItemForm({...itemForm, platformOnly: !!checked})}
+                      data-testid="checkbox-platform-only"
+                    />
+                    <Label htmlFor="item-platform-only" className="text-sm cursor-pointer flex items-center gap-1.5">
+                      <Monitor className="h-3.5 w-3.5 text-purple-500" />
+                      Platform Only — list exclusively on the platform
+                    </Label>
+                  </div>
                   <ItemPhotoUploadArea />
                   {showCertPhotos && <CertPhotoUploadArea />}
                   <div className="space-y-2">
@@ -1489,6 +1532,11 @@ export default function RequestDetailPage() {
                             {CATEGORY_LABELS[item.category] || item.category}
                           </Badge>
                           {item.condition && <span className="text-xs text-muted-foreground">{conditionLabel(item.condition)}</span>}
+                          {item.platformOnly && (
+                            <Badge className="text-xs px-1.5 py-0 h-auto bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-0" data-testid={`badge-platform-only-${item.id}`}>
+                              <Monitor className="h-3 w-3 mr-0.5" />Platform Only
+                            </Badge>
+                          )}
                         </div>
                         {item.minPrice && item.maxPrice && (
                           <p className="text-xs text-muted-foreground mt-1">{item.minPrice} - {item.maxPrice} EUR</p>
@@ -1783,6 +1831,36 @@ export default function RequestDetailPage() {
                 <p className="text-sm text-muted-foreground">{t("noItemsAdded")}</p>
               </CardContent>
             </Card>
+          )}
+          {isSeller && documentRequests && documentRequests.length > 0 && (
+            <div className="space-y-2 pt-2 border-t mt-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-amber-500" />
+                <h3 className="text-sm font-semibold">Documents Requested by Reseller</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">The reseller has requested documents for the following items. Please upload them in the item's document section below.</p>
+              <div className="space-y-2">
+                {documentRequests.map((dr: any) => (
+                  <Card key={dr.id} className="border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-900/10">
+                    <CardContent className="p-3 flex items-center gap-3">
+                      <FileText className="h-4 w-4 text-amber-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" data-testid={`text-doc-request-item-${dr.itemId}`}>{dr.itemTitle}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {dr.documentType === "authenticity_certificate" ? "Authenticity Certificate"
+                            : dr.documentType === "purchase_invoice" ? "Purchase Invoice"
+                            : dr.documentType === "warranty_card" ? "Warranty Card"
+                            : dr.documentType || "Document"} · Requested by {dr.marchantName} · {dr.createdAt ? new Date(dr.createdAt).toLocaleDateString("fr-FR") : ""}
+                        </p>
+                      </div>
+                      <Badge className="text-xs shrink-0 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-0" data-testid={`badge-doc-request-status-${dr.id}`}>
+                        {dr.status === "fulfilled" ? "Fulfilled" : "Pending"}
+                      </Badge>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
           )}
         </TabsContent>
 

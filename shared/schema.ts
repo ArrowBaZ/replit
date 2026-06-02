@@ -117,6 +117,7 @@ export const items = pgTable("items", {
   soldAt: timestamp("sold_at"),
   salePrice: numeric("sale_price"),
   platformListedOn: varchar("platform_listed_on", { length: 100 }),
+  platformOnly: boolean("platform_only").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
@@ -155,6 +156,8 @@ export const itemDocumentRequests = pgTable("item_document_requests", {
   id: serial("id").primaryKey(),
   itemId: integer("item_id").notNull().references(() => items.id),
   marchantId: varchar("marchand_id").notNull().references(() => users.id),
+  documentType: varchar("document_type", { length: 50 }).default("authenticity_certificate"),
+  status: varchar("status", { length: 20 }).default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_item_doc_requests_item").on(table.itemId),

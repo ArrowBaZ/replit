@@ -188,12 +188,14 @@ function validateCategoryFields(data: { category: string; [key: string]: unknown
 const createItemBody = z.object({
   title: z.string().min(1),
   category: z.enum(ITEM_CATEGORIES),
+  platformOnly: z.boolean().optional(),
   ...itemFields,
 }).superRefine(validateCategoryFields);
 
 const updateItemBody = z.object({
   title: z.string().min(1).optional(),
   category: z.enum(ITEM_CATEGORIES).optional(),
+  platformOnly: z.boolean().optional(),
   ...itemFields,
 }).superRefine((data, ctx) => {
   if (data.category) validateCategoryFields(data as { category: string; [key: string]: unknown }, ctx);
@@ -357,6 +359,27 @@ export async function registerRoutes(
   });
 
   app.get(
+    "/api/users/:userId/info",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { userId } = req.params;
+        const [userRow] = await db.select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+        }).from(users).where(eq(users.id, userId));
+        if (!userRow) return res.status(404).json({ message: "User not found" });
+        res.json(userRow);
+      } catch (error) {
+        console.error("Error fetching user info:", error);
+        res.status(500).json({ message: "Failed to fetch user info" });
+      }
+    }
+  );
+
+  app.get(
     "/api/profile",
     isAuthenticated,
     async (req: any, res) => {
@@ -505,6 +528,25 @@ export async function registerRoutes(
   );
 
   app.get(
+    "/api/requests/pending-action",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const profile = await storage.getProfile(userId);
+        if (!profile || profile.role !== "seller") {
+          return res.status(403).json({ message: "Only sellers can use this endpoint" });
+        }
+        const result = await storage.getRequestsPendingSellerAction(userId);
+        res.json(result);
+      } catch (error) {
+        console.error("Error fetching pending-action requests:", error);
+        res.status(500).json({ message: "Failed to fetch pending requests" });
+      }
+    },
+  );
+
+  app.get(
     "/api/requests/:id",
     isAuthenticated,
     async (req: any, res) => {
@@ -518,6 +560,30 @@ export async function registerRoutes(
       } catch (error) {
         console.error("Error fetching request:", error);
         res.status(500).json({ message: "Failed to fetch request" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/requests/:id/document-requests",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const id = parseInt(req.params.id);
+        const request = await storage.getRequest(id);
+        if (!request) return res.status(404).json({ message: "Request not found" });
+        if (request.sellerId !== userId && request.marchantId !== userId) {
+          const profile = await storage.getProfile(userId);
+          if (!profile || profile.role !== "admin") {
+            return res.status(403).json({ message: "Not authorized" });
+          }
+        }
+        const docRequests = await storage.getDocumentRequestsByRequest(id);
+        res.json(docRequests);
+      } catch (error) {
+        console.error("Error fetching document requests:", error);
+        res.status(500).json({ message: "Failed to fetch document requests" });
       }
     },
   );
@@ -584,6 +650,7 @@ export async function registerRoutes(
           preferredDateStart,
           preferredDateEnd,
           notes,
+          hasInsurance,
         } = req.body;
         const request = await storage.createRequest({
           sellerId: userId,
@@ -602,6 +669,7 @@ export async function registerRoutes(
             ? new Date(preferredDateEnd)
             : null,
           notes: notes || null,
+          hasInsurance: hasInsurance ?? false,
         });
         res.json(request);
       } catch (error) {
@@ -821,6 +889,7 @@ export async function registerRoutes(
           applianceType,
           decorStyle,
           subcategory,
+        platformOnly,
         } = req.body;
         const item = await storage.createItem({
           requestId,
@@ -853,6 +922,7 @@ export async function registerRoutes(
           applianceType: applianceType || null,
           decorStyle: decorStyle || null,
           subcategory: subcategory || null,
+          platformOnly: platformOnly ?? false,
         });
 
         await storage.createNotification({
@@ -1403,6 +1473,7 @@ export async function registerRoutes(
           material, dimensions, author, genre, language, vintage,
           ageRange, model, deviceStorage, ram, volume, frameSize,
           instrumentType, applianceType, decorStyle, subcategory,
+          platformOnly,
         } = req.body;
 
         // Apply category-aware validation using existing item's category when not changing it
@@ -1440,6 +1511,7 @@ export async function registerRoutes(
           ...(applianceType !== undefined && { applianceType: applianceType || null }),
           ...(decorStyle !== undefined && { decorStyle: decorStyle || null }),
           ...(subcategory !== undefined && { subcategory: subcategory || null }),
+          ...(platformOnly !== undefined && { platformOnly: !!platformOnly }),
         });
         if (!updated) return res.status(404).json({ message: "Item not found" });
         res.json(updated);

@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { isUnauthorizedError } from "@/lib/auth-utils";
-import { ArrowLeft, ArrowRight, Package, Zap, Sparkles, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Package, Zap, Sparkles, Check, Shield } from "lucide-react";
 
 import { ITEM_CONDITIONS as CONDITIONS, ITEM_CATEGORIES as CATEGORIES } from "@shared/constants";
 
@@ -23,6 +24,7 @@ export default function CreateRequestPage() {
   const [selectedType, setSelectedType] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedCondition, setSelectedCondition] = useState("");
+  const [hasInsurance, setHasInsurance] = useState(false);
   const [formData, setFormData] = useState({
     itemCount: "",
     estimatedValue: "",
@@ -105,6 +107,7 @@ export default function CreateRequestPage() {
       preferredDateStart: formData.preferredDateStart || null,
       preferredDateEnd: formData.preferredDateEnd || null,
       notes: formData.notes || null,
+      hasInsurance,
     });
   };
 
@@ -296,6 +299,24 @@ export default function CreateRequestPage() {
               data-testid="input-notes"
             />
           </div>
+
+          <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+            <Checkbox
+              id="hasInsurance"
+              checked={hasInsurance}
+              onCheckedChange={(checked) => setHasInsurance(!!checked)}
+              data-testid="checkbox-insurance"
+            />
+            <div>
+              <Label htmlFor="hasInsurance" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                <Shield className="h-3.5 w-3.5 text-blue-500" />
+                {t("requestInsurance") || "Add insurance coverage"}
+              </Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t("insuranceDesc") || "Request insurance for your items during the resale process."}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -362,6 +383,10 @@ export default function CreateRequestPage() {
                   <p className="text-sm">{formData.notes}</p>
                 </div>
               )}
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground flex items-center gap-1"><Shield className="h-3.5 w-3.5 text-blue-500" />{t("requestInsurance") || "Insurance"}</span>
+                <span className="text-sm font-medium">{hasInsurance ? "Yes" : "No"}</span>
+              </div>
             </CardContent>
           </Card>
         </div>

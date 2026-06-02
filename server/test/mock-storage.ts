@@ -111,6 +111,9 @@ export function createMockStorage(
 
     createPriceOffer: vi.fn().mockResolvedValue({ id: 1 }),
     getPriceOffersByItem: vi.fn().mockResolvedValue([]),
+
+    getRequestsPendingSellerAction: vi.fn().mockResolvedValue([]),
+    getDocumentRequestsByRequest: vi.fn().mockResolvedValue([]),
   };
 
   return { ...defaults, ...overrides } as IStorage;
