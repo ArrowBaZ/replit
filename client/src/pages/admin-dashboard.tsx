@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { User, Profile } from "@shared/schema";
-import { Users, Shield, Package, CheckCircle, XCircle, Clock, FileSignature } from "lucide-react";
+import { Users, Shield, Package, CheckCircle, XCircle, Clock, FileSignature, Link as LinkIcon, AlertCircle } from "lucide-react";
 
 interface UserWithProfile {
   id: string;
@@ -196,6 +196,36 @@ export default function AdminDashboard() {
                         )}
                         {u.profile?.experience && (
                           <p className="text-xs text-muted-foreground mt-1 line-clamp-2">Experience: {u.profile.experience}</p>
+                        )}
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                          {u.profile?.siretNumber ? (
+                            <span className="text-xs font-mono text-muted-foreground" data-testid={`text-siret-${u.id}`}>SIRET: <span className="text-foreground font-medium">{u.profile.siretNumber}</span></span>
+                          ) : (
+                            <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-0.5" data-testid={`text-siret-missing-${u.id}`}><AlertCircle className="h-3 w-3" /> SIRET manquant</span>
+                          )}
+                          {u.profile?.vatNumber ? (
+                            <span className="text-xs font-mono text-muted-foreground" data-testid={`text-vat-${u.id}`}>TVA: <span className="text-foreground font-medium">{u.profile.vatNumber}</span></span>
+                          ) : (
+                            <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-0.5" data-testid={`text-vat-missing-${u.id}`}><AlertCircle className="h-3 w-3" /> TVA manquant</span>
+                          )}
+                          {u.profile?.dviNumber ? (
+                            <span className="text-xs font-mono text-muted-foreground" data-testid={`text-dvi-${u.id}`}>DVI: <span className="text-foreground font-medium">{u.profile.dviNumber}</span></span>
+                          ) : (
+                            <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-0.5" data-testid={`text-dvi-missing-${u.id}`}><AlertCircle className="h-3 w-3" /> DVI manquant</span>
+                          )}
+                        </div>
+                        {(u.profile?.leboncoinUrl || u.profile?.vintedUrl || u.profile?.ricardoUrl) && (
+                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                            {u.profile?.leboncoinUrl && (
+                              <a href={u.profile.leboncoinUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-0.5" data-testid={`link-leboncoin-${u.id}`}><LinkIcon className="h-3 w-3" /> Leboncoin</a>
+                            )}
+                            {u.profile?.vintedUrl && (
+                              <a href={u.profile.vintedUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-0.5" data-testid={`link-vinted-${u.id}`}><LinkIcon className="h-3 w-3" /> Vinted</a>
+                            )}
+                            {u.profile?.ricardoUrl && (
+                              <a href={u.profile.ricardoUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-0.5" data-testid={`link-ricardo-${u.id}`}><LinkIcon className="h-3 w-3" /> Ricardo</a>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

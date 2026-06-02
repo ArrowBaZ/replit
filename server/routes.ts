@@ -427,6 +427,22 @@ export async function registerRoutes(
         const userId = req.user.id;
         const body = req.body as Record<string, unknown>;
 
+        // Validate platform URLs — only http/https allowed to prevent javascript: XSS
+        const urlFields = ["leboncoinUrl", "vintedUrl", "ricardoUrl"] as const;
+        for (const field of urlFields) {
+          const val = body[field];
+          if (val !== undefined && val !== null && val !== "") {
+            try {
+              const parsed = new URL(val as string);
+              if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+                return res.status(400).json({ message: `Invalid URL for ${field}: only http/https allowed` });
+              }
+            } catch {
+              return res.status(400).json({ message: `Invalid URL for ${field}` });
+            }
+          }
+        }
+
         if (body.notificationPrefs !== undefined) {
           const notifPrefs = body.notificationPrefs;
           if (typeof notifPrefs !== "object" || notifPrefs === null || Array.isArray(notifPrefs)) {
@@ -1195,6 +1211,25 @@ export async function registerRoutes(
     async (req: any, res) => {
       try {
         const result = await storage.getPendingReusses();
+
+        // Auto-send reminder notifications to merchants missing all three codes
+        for (const reuss of result) {
+          const profile = reuss.profile as import("@shared/schema").Profile | null;
+          if (profile && !profile.siretNumber && !profile.vatNumber && !profile.dviNumber) {
+            const existing = await storage.getNotifications(reuss.id);
+            const alreadyReminded = existing.some((n) => n.type === "codes_reminder");
+            if (!alreadyReminded) {
+              await storage.createNotification({
+                userId: reuss.id,
+                type: "codes_reminder",
+                title: "Codes de vérification requis",
+                message: "Pour finaliser votre candidature, veuillez renseigner vos numéros SIRET, TVA et DVI dans les paramètres de votre profil.",
+                link: "/profile",
+              });
+            }
+          }
+        }
+
         res.json(result);
       } catch (error) {
         console.error("Error fetching applications:", error);
@@ -1211,6 +1246,7 @@ export async function registerRoutes(
       try {
         const { userId } = req.params;
         const { status } = req.body;
+        const profileBefore = await storage.getProfile(userId);
         const profile = await storage.updateProfileStatus(userId, status);
         if (!profile) {
           return res.status(404).json({ message: "Profile not found" });
@@ -1228,6 +1264,21 @@ export async function registerRoutes(
               ? "Your reseller application has been approved! You can now accept seller requests."
               : "Your reseller application status has been updated.",
         });
+
+        // If merchant is missing all three codes, send a codes reminder (with deduplication)
+        if (profileBefore && !profileBefore.siretNumber && !profileBefore.vatNumber && !profileBefore.dviNumber) {
+          const existingNotifs = await storage.getNotifications(userId);
+          const alreadyReminded = existingNotifs.some((n) => n.type === "codes_reminder");
+          if (!alreadyReminded) {
+            await storage.createNotification({
+              userId,
+              type: "codes_reminder",
+              title: "Codes de vérification requis",
+              message: "Pour finaliser votre candidature, veuillez renseigner vos numéros SIRET, TVA et DVI dans les paramètres de votre profil.",
+              link: "/profile",
+            });
+          }
+        }
 
         res.json(profile);
       } catch (error) {

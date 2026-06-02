@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Star, MapPin, CheckCircle, Package, MessageSquare } from "lucide-react";
+import { ArrowLeft, Star, MapPin, CheckCircle, Package, MessageSquare, Link as LinkIcon } from "lucide-react";
 import type { Profile } from "@shared/schema";
 
 function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
@@ -200,6 +200,25 @@ export default function MarchendDetailPage() {
                   <span className="font-medium not-italic text-foreground">{t("resaleExperience")}: </span>
                   {marchand.experience}
                 </p>
+              )}
+              {(marchand.leboncoinUrl || marchand.vintedUrl || marchand.ricardoUrl) && (
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {marchand.leboncoinUrl && (
+                    <a href={marchand.leboncoinUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-1" data-testid="link-marchand-leboncoin">
+                      <LinkIcon className="h-3 w-3" /> Leboncoin
+                    </a>
+                  )}
+                  {marchand.vintedUrl && (
+                    <a href={marchand.vintedUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-1" data-testid="link-marchand-vinted">
+                      <LinkIcon className="h-3 w-3" /> Vinted
+                    </a>
+                  )}
+                  {marchand.ricardoUrl && (
+                    <a href={marchand.ricardoUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline flex items-center gap-1" data-testid="link-marchand-ricardo">
+                      <LinkIcon className="h-3 w-3" /> Ricardo
+                    </a>
+                  )}
+                </div>
               )}
             </div>
           </div>

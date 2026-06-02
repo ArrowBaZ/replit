@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Profile } from "@shared/schema";
-import { User, MapPin, Phone, Mail, Pencil, Save, Bell } from "lucide-react";
+import { User, MapPin, Phone, Mail, Pencil, Save, Bell, Link as LinkIcon } from "lucide-react";
 
 const PREF_KEYS = ["toast_agreement_ready", "toast_document_request", "toast_counter_offer", "toast_price_revised", "toast_meeting_update", "toast_item_pricing"] as const;
 type PrefKey = typeof PREF_KEYS[number];
@@ -47,6 +47,11 @@ export default function ProfilePage() {
         bio: profile.bio || "",
         experience: profile.experience || "",
         siretNumber: profile.siretNumber || "",
+        vatNumber: profile.vatNumber || "",
+        dviNumber: profile.dviNumber || "",
+        leboncoinUrl: profile.leboncoinUrl || "",
+        vintedUrl: profile.vintedUrl || "",
+        ricardoUrl: profile.ricardoUrl || "",
       });
     }
     setEditing(true);
@@ -212,6 +217,31 @@ export default function ProfilePage() {
                     <Label>{t("siretNumber")}</Label>
                     <Input value={formData.siretNumber || ""} onChange={(e) => updateField("siretNumber", e.target.value)} data-testid="input-edit-siret" />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Numéro TVA</Label>
+                    <Input value={formData.vatNumber || ""} onChange={(e) => updateField("vatNumber", e.target.value)} data-testid="input-edit-vat" placeholder="FR00000000000" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Numéro DVI</Label>
+                    <Input value={formData.dviNumber || ""} onChange={(e) => updateField("dviNumber", e.target.value)} data-testid="input-edit-dvi" placeholder="DVI-XXXXX" />
+                  </div>
+                  <div className="border-t pt-4">
+                    <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">Profils Plateforme</p>
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label>URL Leboncoin</Label>
+                        <Input value={formData.leboncoinUrl || ""} onChange={(e) => updateField("leboncoinUrl", e.target.value)} data-testid="input-edit-leboncoin" placeholder="https://www.leboncoin.fr/boutique/..." />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>URL Vinted</Label>
+                        <Input value={formData.vintedUrl || ""} onChange={(e) => updateField("vintedUrl", e.target.value)} data-testid="input-edit-vinted" placeholder="https://www.vinted.fr/member/..." />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>URL Ricardo</Label>
+                        <Input value={formData.ricardoUrl || ""} onChange={(e) => updateField("ricardoUrl", e.target.value)} data-testid="input-edit-ricardo" placeholder="https://www.ricardo.ch/..." />
+                      </div>
+                    </div>
+                  </div>
                 </>
               )}
               <div className="flex items-center gap-2">
@@ -249,10 +279,50 @@ export default function ProfilePage() {
                   <p className="text-sm" data-testid="text-profile-experience">{profile.experience}</p>
                 </div>
               )}
-              {profile?.siretNumber && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">{t("siretNumber")}</p>
-                  <p className="text-sm" data-testid="text-profile-siret">{profile.siretNumber}</p>
+              {(profile?.siretNumber || profile?.vatNumber || profile?.dviNumber) && (
+                <div className="border rounded-md p-3 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Codes de vérification</p>
+                  {profile?.siretNumber && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">SIRET</p>
+                      <p className="text-sm font-mono" data-testid="text-profile-siret">{profile.siretNumber}</p>
+                    </div>
+                  )}
+                  {profile?.vatNumber && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">TVA</p>
+                      <p className="text-sm font-mono" data-testid="text-profile-vat">{profile.vatNumber}</p>
+                    </div>
+                  )}
+                  {profile?.dviNumber && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">DVI</p>
+                      <p className="text-sm font-mono" data-testid="text-profile-dvi">{profile.dviNumber}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {(profile?.leboncoinUrl || profile?.vintedUrl || profile?.ricardoUrl) && (
+                <div className="border rounded-md p-3 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Profils Plateforme</p>
+                  {profile?.leboncoinUrl && (
+                    <div className="flex items-center gap-2">
+                      <LinkIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <a href={profile.leboncoinUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline truncate" data-testid="link-leboncoin">Leboncoin</a>
+                    </div>
+                  )}
+                  {profile?.vintedUrl && (
+                    <div className="flex items-center gap-2">
+                      <LinkIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <a href={profile.vintedUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline truncate" data-testid="link-vinted">Vinted</a>
+                    </div>
+                  )}
+                  {profile?.ricardoUrl && (
+                    <div className="flex items-center gap-2">
+                      <LinkIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <a href={profile.ricardoUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline truncate" data-testid="link-ricardo">Ricardo</a>
+                    </div>
+                  )}
                 </div>
               )}
               {!profile?.phone && !profile?.address && !profile?.bio && (
