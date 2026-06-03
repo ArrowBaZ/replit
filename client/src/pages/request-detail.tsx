@@ -414,6 +414,13 @@ export default function RequestDetailPage() {
   const [reportReason, setReportReason] = useState("");
   const [declineReason, setDeclineReason] = useState("");
 
+  const [insuranceChecked, setInsuranceChecked] = useState<Set<number>>(new Set());
+  const toggleInsurance = (itemId: number) => setInsuranceChecked((prev) => {
+    const next = new Set(prev);
+    if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
+    return next;
+  });
+
   const acceptAllItems = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/requests/${params.id}/items/accept-all`, {});
@@ -1597,6 +1604,30 @@ export default function RequestDetailPage() {
                         <div data-testid={`fee-preview-counter-${item.id}`}>
                           <p className="text-xs text-muted-foreground mb-1">Fee breakdown at seller's min price:</p>
                           <ItemFeePreview price={parseFloat(item.minPrice)} />
+                        </div>
+                      )}
+                      {showRevisePrice !== item.id && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2" data-testid={`insurance-row-${item.id}`}>
+                            <Checkbox
+                              id={`insurance-${item.id}`}
+                              checked={insuranceChecked.has(item.id)}
+                              onCheckedChange={() => toggleInsurance(item.id)}
+                              data-testid={`checkbox-insurance-${item.id}`}
+                            />
+                            <label
+                              htmlFor={`insurance-${item.id}`}
+                              className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1"
+                            >
+                              <Shield className="h-3 w-3 text-blue-500" />
+                              Add insurance <span className="font-medium text-foreground">(+5% of item price)</span>
+                            </label>
+                          </div>
+                          {insuranceChecked.has(item.id) && item.minPrice && parseFloat(item.minPrice) > 0 && (
+                            <p className="text-xs text-blue-600 dark:text-blue-400 pl-6" data-testid={`text-insurance-amount-${item.id}`}>
+                              Insurance: +€{(parseFloat(item.minPrice) * 0.05).toFixed(2)} — charged to the customer
+                            </p>
+                          )}
                         </div>
                       )}
                       {showRevisePrice !== item.id && (
