@@ -14,6 +14,7 @@ import type { Item, Transaction } from "@shared/schema";
 import { sendAgreementReadyEmail } from "./email";
 import { signInSchema, registerSchema, hashPassword, verifyPassword } from "./auth";
 import { randomUUID, randomBytes } from "crypto";
+import { validateApprovedItemsForAgreement } from "./domain/agreement";
 
 interface AuthRequest extends Request {
   user?: { id: string };
@@ -2954,14 +2955,11 @@ export async function registerRoutes(
         const existing = await storage.getAgreementByRequest(requestId);
         if (existing) return res.json(existing);
         const items = await storage.getItemsByRequest(requestId);
-        if (items.length === 0) {
-          return res.status(400).json({ message: "No items found for this request" });
+        const validation = await validateApprovedItemsForAgreement(items);
+        if (!validation.valid) {
+          return res.status(400).json({ message: validation.error });
         }
-        const allApproved = items.every((i) => i.status === "approved");
-        if (!allApproved) {
-          return res.status(400).json({ message: "Not all items are approved yet" });
-        }
-        const { itemsSnapshot, feeBreakdown, totalValue } = await buildAgreementSnapshot(items);
+        const { itemsSnapshot, feeBreakdown, totalValue } = await buildAgreementSnapshot(validation.approvedItems!);
         const agreement = await storage.createAgreement({
           requestId,
           sellerId: request.sellerId,
