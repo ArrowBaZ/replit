@@ -1,12 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calculator } from "lucide-react";
+import { Calculator, Shield } from "lucide-react";
 import type { FeeTier } from "@shared/schema";
 
 function formatMoney(v: number) {
   return v.toLocaleString("fr-CH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function FeeBreakdownCard({ price, tier }: { price: number; tier: FeeTier | null | undefined }) {
+export function FeeBreakdownCard({ price, tier, insurance }: { price: number; tier: FeeTier | null | undefined; insurance?: boolean }) {
   if (!tier || price <= 0) return null;
 
   const sellerPct = parseFloat(tier.sellerPercent as string);
@@ -15,6 +15,7 @@ export function FeeBreakdownCard({ price, tier }: { price: number; tier: FeeTier
   const sellerAmt = (price * sellerPct) / 100;
   const marchantAmt = (price * marchantPct) / 100;
   const platformAmt = price - sellerAmt - marchantAmt;
+  const insuranceAmt = insurance ? price * 0.05 : 0;
 
   return (
     <Card className="border-2 border-[hsl(var(--success))]/30 bg-[hsl(var(--success))]/5">
@@ -28,7 +29,7 @@ export function FeeBreakdownCard({ price, tier }: { price: number; tier: FeeTier
           {tier.currencyNote && <span className="ml-1">({tier.currencyNote})</span>}
         </p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20" data-testid="breakdown-seller">
             <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-1">Seller</p>
@@ -46,6 +47,14 @@ export function FeeBreakdownCard({ price, tier }: { price: number; tier: FeeTier
             <p className="text-xs text-muted-foreground">{platformPct.toFixed(1)}%</p>
           </div>
         </div>
+        {insurance && (
+          <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800" data-testid="breakdown-insurance">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-400">
+              <Shield className="h-3.5 w-3.5" /> Insurance (+5%)
+            </span>
+            <span className="text-sm font-bold text-blue-700 dark:text-blue-400">+€{formatMoney(insuranceAmt)}</span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

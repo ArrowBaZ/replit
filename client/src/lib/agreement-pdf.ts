@@ -63,6 +63,8 @@ export function downloadAgreementPdf(agreement: AgreementDetail): void {
     id: number;
     title: string;
     approvedPrice: number;
+    hasInsurance?: boolean;
+    insuranceCost?: number;
     fees: SnapshotFees;
   }>;
 
@@ -122,7 +124,7 @@ export function downloadAgreementPdf(agreement: AgreementDetail): void {
   const pctStr = (v: number | undefined) => (v != null ? ` (${v}%)` : "");
 
   const tableBody = items.map((item) => [
-    item.title,
+    item.hasInsurance ? `${item.title} 🛡 (+5% ins.)` : item.title,
     fmt(item.approvedPrice),
     `${fmt(item.fees.sellerAmount)}${pctStr(item.fees.sellerPct)}`,
     `${fmt(item.fees.marchantAmount)}${pctStr(item.fees.marchantPct)}`,

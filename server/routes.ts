@@ -54,6 +54,7 @@ async function buildAgreementSnapshot(items: Item[]): Promise<{ itemsSnapshot: s
   const snapItems = await Promise.all(items.map(async (i) => {
     const price = resolveItemPrice(i);
     const feeRes = await resolveFeePercentages(price);
+    const insuranceCost = i.hasInsurance ? parseFloat((price * 0.05).toFixed(2)) : 0;
     const fees = {
       sellerAmount: parseFloat(((price * feeRes.sellerPct) / 100).toFixed(2)),
       marchantAmount: parseFloat(((price * feeRes.marchantPct) / 100).toFixed(2)),
@@ -62,12 +63,12 @@ async function buildAgreementSnapshot(items: Item[]): Promise<{ itemsSnapshot: s
       marchantPct: feeRes.marchantPct,
       platformPct: feeRes.platformPct,
     };
-    return { id: i.id, title: i.title, approvedPrice: price, fees };
+    return { id: i.id, title: i.title, approvedPrice: price, hasInsurance: i.hasInsurance ?? false, insuranceCost, fees };
   }));
   const totalValue = snapItems.reduce((sum, it) => sum + it.approvedPrice, 0);
   return {
     itemsSnapshot: JSON.stringify(snapItems),
-    feeBreakdown: JSON.stringify(snapItems.map((it) => ({ itemId: it.id, title: it.title, salePrice: it.approvedPrice, fees: it.fees }))),
+    feeBreakdown: JSON.stringify(snapItems.map((it) => ({ itemId: it.id, title: it.title, salePrice: it.approvedPrice, hasInsurance: it.hasInsurance, insuranceCost: it.insuranceCost, fees: it.fees }))),
     totalValue: totalValue.toFixed(2),
   };
 }
@@ -1859,11 +1860,16 @@ export async function registerRoutes(
           return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
         }
 
+        const insuranceFlag = req.body?.insurance === true;
+        const insuranceCostVal = insuranceFlag && approvedPrice ? parseFloat((parseFloat(approvedPrice) * 0.05).toFixed(2)) : null;
+
         const acceptNewData = {
           status: "approved" as const,
           priceApprovedBySeller: true,
           sellerCounterOffer: false,
           approvedPrice,
+          hasInsurance: insuranceFlag,
+          insuranceCost: insuranceCostVal !== null ? String(insuranceCostVal) : null,
           version: (existingItem.version ?? 1) + 1,
           updatedAt: new Date(),
         };
@@ -1888,6 +1894,16 @@ export async function registerRoutes(
             link: `/requests/${existingItem.requestId}`,
           });
           broadcastToUser(existingItem.sellerId, { type: "item_approved", itemId: id, itemTitle: existingItem.title, requestId: existingItem.requestId });
+
+          if (insuranceFlag) {
+            await storage.createNotification({
+              userId: existingItem.sellerId,
+              type: "insurance_added",
+              title: "Insurance Added",
+              message: `Insurance (+5%) has been added to "${existingItem.title}"${insuranceCostVal !== null ? ` (€${insuranceCostVal.toFixed(2)})` : ""}.`,
+              link: `/requests/${existingItem.requestId}`,
+            });
+          }
         }
 
         // Trigger agreement generation if all items are now approved

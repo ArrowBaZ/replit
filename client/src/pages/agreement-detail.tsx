@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, FileSignature, CheckCircle, Clock, User, Package, Printer, Download, Mail } from "lucide-react";
+import { ArrowLeft, FileSignature, CheckCircle, Clock, User, Package, Printer, Download, Mail, Shield } from "lucide-react";
 import { useState } from "react";
 import { type AgreementDetail, type SnapshotFees, statusLabels, userName, downloadAgreementPdf } from "@/lib/agreement-pdf";
 
@@ -81,6 +81,8 @@ export default function AgreementDetailPage() {
     id: number;
     title: string;
     approvedPrice: number;
+    hasInsurance?: boolean;
+    insuranceCost?: number;
     fees: SnapshotFees;
   }>;
 
@@ -186,8 +188,20 @@ export default function AgreementDetailPage() {
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id} className="border-b last:border-0" data-testid={`row-agreement-item-${item.id}`}>
-                    <td className="py-2 pr-4">{item.title}</td>
-                    <td className="text-right py-2 px-2">€{item.approvedPrice.toFixed(2)}</td>
+                    <td className="py-2 pr-4">
+                      <span>{item.title}</span>
+                      {item.hasInsurance && (
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 text-xs text-blue-600 dark:text-blue-400" data-testid={`badge-insurance-${item.id}`}>
+                          <Shield className="h-3 w-3" /> Insured
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-right py-2 px-2">
+                      <span>€{item.approvedPrice.toFixed(2)}</span>
+                      {item.hasInsurance && item.insuranceCost != null && item.insuranceCost > 0 && (
+                        <span className="block text-xs text-blue-600 dark:text-blue-400" data-testid={`text-insurance-cost-${item.id}`}>+€{(item.insuranceCost as number).toFixed(2)} ins.</span>
+                      )}
+                    </td>
                     <td className="text-right py-2 px-2 text-emerald-700 dark:text-emerald-400">
                       €{item.fees.sellerAmount.toFixed(2)}
                       <span className="text-xs text-muted-foreground ml-1">({item.fees.sellerPct}%)</span>

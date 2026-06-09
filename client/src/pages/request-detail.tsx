@@ -483,8 +483,8 @@ export default function RequestDetailPage() {
   });
 
   const acceptCounterOffer = useMutation({
-    mutationFn: async ({ itemId, version }: { itemId: number; version: number }) => {
-      const res = await apiRequest("POST", `/api/items/${itemId}/accept-counter-offer`, { version });
+    mutationFn: async ({ itemId, version, insurance }: { itemId: number; version: number; insurance: boolean }) => {
+      const res = await apiRequest("POST", `/api/items/${itemId}/accept-counter-offer`, { version, insurance });
       return res.json();
     },
     onSuccess: (_data, { itemId }) => {
@@ -1635,7 +1635,7 @@ export default function RequestDetailPage() {
                           <Button
                             size="sm"
                             className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={() => acceptCounterOffer.mutate({ itemId: item.id, version: item.version ?? 1 })}
+                            onClick={() => acceptCounterOffer.mutate({ itemId: item.id, version: item.version ?? 1, insurance: insuranceChecked.has(item.id) })}
                             disabled={acceptCounterOffer.isPending}
                             data-testid={`button-accept-counter-${item.id}`}
                           >
