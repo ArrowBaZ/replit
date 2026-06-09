@@ -200,6 +200,7 @@ const updateItemBody = z.object({
   title: z.string().min(1).optional(),
   category: z.enum(ITEM_CATEGORIES).optional(),
   platformOnly: z.boolean().optional(),
+  hasInsurance: z.boolean().optional(),
   ...itemFields,
 }).superRefine((data, ctx) => {
   if (data.category) validateCategoryFields(data as { category: string; [key: string]: unknown }, ctx);
@@ -1477,7 +1478,7 @@ export async function registerRoutes(
           material, dimensions, author, genre, language, vintage,
           ageRange, model, deviceStorage, ram, volume, frameSize,
           instrumentType, applianceType, decorStyle, subcategory,
-          platformOnly,
+          platformOnly, hasInsurance,
         } = req.body;
 
         // Apply category-aware validation using existing item's category when not changing it
@@ -1488,6 +1489,14 @@ export async function registerRoutes(
         if (categoryIssues.length > 0) {
           return res.status(400).json({ message: "Validation error", errors: categoryIssues });
         }
+
+        // Compute insurance cost preview from current price range when toggling insurance
+        const effectiveInsurance = hasInsurance !== undefined ? hasInsurance : existingItem.hasInsurance ?? false;
+        const priceForInsurance = maxPrice ?? minPrice ?? existingItem.maxPrice ?? existingItem.minPrice;
+        const insuranceCostPreview = effectiveInsurance && priceForInsurance
+          ? String(parseFloat((parseFloat(priceForInsurance) * 0.05).toFixed(2)))
+          : null;
+
         const updated = await storage.updateItem(id, {
           ...(title !== undefined && { title }),
           ...(description !== undefined && { description: description || null }),
@@ -1516,6 +1525,7 @@ export async function registerRoutes(
           ...(decorStyle !== undefined && { decorStyle: decorStyle || null }),
           ...(subcategory !== undefined && { subcategory: subcategory || null }),
           ...(platformOnly !== undefined && { platformOnly: !!platformOnly }),
+          ...(hasInsurance !== undefined && { hasInsurance: !!hasInsurance, insuranceCost: insuranceCostPreview }),
         });
         if (!updated) return res.status(404).json({ message: "Item not found" });
         res.json(updated);

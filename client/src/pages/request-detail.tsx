@@ -421,6 +421,19 @@ export default function RequestDetailPage() {
     return next;
   });
 
+  const setItemInsurance = useMutation({
+    mutationFn: async ({ itemId, hasInsurance }: { itemId: number; hasInsurance: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/items/${itemId}`, { hasInsurance });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to update insurance", variant: "destructive" });
+    },
+  });
+
   const acceptAllItems = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/requests/${params.id}/items/accept-all`, {});
@@ -1586,6 +1599,32 @@ export default function RequestDetailPage() {
                       testId={`badge-item-status-${item.id}`}
                     />
                   </div>
+
+                  {isMarchand && isAssigned && !request.listReadyAt && item.status === "pending_approval" && !item.sellerCounterOffer && (
+                    <div className="ml-[4.25rem] space-y-1.5">
+                      <div className="flex items-center gap-2" data-testid={`insurance-row-initial-${item.id}`}>
+                        <Checkbox
+                          id={`insurance-initial-${item.id}`}
+                          checked={item.hasInsurance ?? false}
+                          onCheckedChange={(checked) => setItemInsurance.mutate({ itemId: item.id, hasInsurance: !!checked })}
+                          disabled={setItemInsurance.isPending}
+                          data-testid={`checkbox-insurance-initial-${item.id}`}
+                        />
+                        <label
+                          htmlFor={`insurance-initial-${item.id}`}
+                          className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1"
+                        >
+                          <Shield className="h-3 w-3 text-blue-500" />
+                          Add insurance <span className="font-medium text-foreground">(+5% of item price)</span>
+                        </label>
+                      </div>
+                      {(item.hasInsurance) && (item.maxPrice || item.minPrice) && parseFloat(item.maxPrice || item.minPrice || "0") > 0 && (
+                        <p className="text-xs text-blue-600 dark:text-blue-400 pl-6" data-testid={`text-insurance-amount-initial-${item.id}`}>
+                          Insurance: +€{(parseFloat(item.maxPrice || item.minPrice || "0") * 0.05).toFixed(2)} — charged to the customer
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {item.sellerCounterOffer && item.status === "pending_approval" && isMarchand && (
                     <div className="ml-[4.25rem] space-y-2">
