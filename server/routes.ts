@@ -2965,7 +2965,7 @@ export async function registerRoutes(
           sellerId: request.sellerId,
           marchantId: request.marchantId,
           status: "pending",
-          itemCount: items.length,
+          itemCount: validation.approvedItems!.length,
           totalValue,
           itemsSnapshot,
           feeBreakdown,
