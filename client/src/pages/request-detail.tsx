@@ -19,6 +19,7 @@ import { ArrowLeft, Package, Shirt, Calendar, Plus, MapPin, Clock, CheckCircle, 
 import { Checkbox } from "@/components/ui/checkbox";
 import { ItemDocumentsSection } from "@/components/item-documents-section";
 import { ItemStatusBadge } from "@/components/item-status-badge";
+import { PlatformSelector } from "@/components/platform-selector";
 import { ITEM_CATEGORIES, type ItemCategory } from "@shared/schema";
 import type { FeeTier } from "@shared/schema";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
@@ -406,7 +407,7 @@ export default function RequestDetailPage() {
   const [reviseMin, setReviseMin] = useState("");
   const [reviseMax, setReviseMax] = useState("");
   const [showListItem, setShowListItem] = useState<number | null>(null);
-  const [listPlatform, setListPlatform] = useState("");
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [showReschedule, setShowReschedule] = useState<number | null>(null);
   const [rescheduleForm, setRescheduleForm] = useState({ date: "", time: "", location: "" });
   const [showDeclineReason, setShowDeclineReason] = useState<number | null>(null);
@@ -589,17 +590,26 @@ export default function RequestDetailPage() {
   });
 
   const listItem = useMutation({
-    mutationFn: async ({ itemId, platformListedOn }: { itemId: number; platformListedOn: string }) => {
+    mutationFn: async ({ itemId, platformListedOn }: { itemId: number; platformListedOn: string[] }) => {
       const res = await apiRequest("POST", `/api/items/${itemId}/list`, { platformListedOn });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
       setShowListItem(null);
-      setListPlatform("");
-      toast({ title: t("itemListed") });
+      const platformMessage = selectedPlatforms.length > 0
+        ? `Item listed on ${selectedPlatforms.join(", ")}`
+        : t("itemListed");
+      toast({ title: platformMessage });
+      setSelectedPlatforms([]);
     },
   });
+
+  useEffect(() => {
+    if (showListItem === null) {
+      setSelectedPlatforms([]);
+    }
+  }, [showListItem]);
 
   const markSold = useMutation({
     mutationFn: async ({ itemId, salePrice }: { itemId: number; salePrice: string }) => {
@@ -1647,6 +1657,21 @@ export default function RequestDetailPage() {
                     />
                   </div>
 
+                  {item.status === "listed" && item.platformListedOn && (
+                    <div className="ml-[4.25rem] text-xs text-muted-foreground pt-1" data-testid={`platforms-display-${item.id}`}>
+                      <span className="font-medium text-foreground">Listed on:</span>{" "}
+                      {Array.isArray(item.platformListedOn)
+                        ? item.platformListedOn.join(", ")
+                        : item.platformListedOn}
+                    </div>
+                  )}
+
+                  {item.status === "listed" && !item.platformListedOn && (
+                    <div className="ml-[4.25rem] text-xs text-muted-foreground pt-1" data-testid={`platforms-empty-${item.id}`}>
+                      <span className="font-medium text-foreground">Status:</span> Listed (no platform specified)
+                    </div>
+                  )}
+
                   {isMarchand && isAssigned && !request.listReadyAt && item.status === "pending_approval" && !item.sellerCounterOffer && (
                     <div className="ml-[4.25rem] space-y-1.5">
                       <div className="flex items-center gap-2" data-testid={`insurance-row-initial-${item.id}`}>
@@ -1857,12 +1882,17 @@ export default function RequestDetailPage() {
 
                   {showListItem === item.id && (
                     <div className="ml-[4.25rem] p-3 bg-muted rounded-lg space-y-2">
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         <Label className="text-xs">{t("platformListed")}</Label>
-                        <Input value={listPlatform} onChange={(e) => setListPlatform(e.target.value)} placeholder="Vinted, Vestiaire Collective..." data-testid="input-platform" />
+                        <PlatformSelector
+                          selectedPlatforms={selectedPlatforms}
+                          onChange={setSelectedPlatforms}
+                          disabled={listItem.isPending}
+                          testId="platform-selector-list-item"
+                        />
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={() => listItem.mutate({ itemId: item.id, platformListedOn: listPlatform })} disabled={listItem.isPending} data-testid="button-submit-list">
+                        <Button size="sm" onClick={() => listItem.mutate({ itemId: item.id, platformListedOn: selectedPlatforms })} disabled={listItem.isPending} data-testid="button-submit-list">
                           {t("markAsListed")}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setShowListItem(null)}>{t("back")}</Button>
