@@ -449,6 +449,20 @@ export default function RequestDetailPage() {
     },
   });
 
+  const generateAgreement = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/requests/${params.id}/generate-agreement`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "agreement"] });
+      toast({ title: "Agreement Generated", description: "The agreement is ready for signature." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to generate agreement", variant: "destructive" });
+    },
+  });
+
   const approveItem = useMutation({
     mutationFn: async ({ itemId, version }: { itemId: number; version: number }) => {
       const res = await apiRequest("POST", `/api/items/${itemId}/approve`, { version });
@@ -1191,7 +1205,7 @@ export default function RequestDetailPage() {
                     <Lock className="h-4 w-4 text-amber-600" /> Finalize Item List
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    This will lock the item list and notify the seller to review and approve all items. You will no longer be able to add, edit, or remove items after this action. An agreement will be automatically generated once all items are approved.
+                    This will lock the item list and notify the seller to review and approve or decline items. You will no longer be able to add, edit, or remove items after this action. An agreement will be automatically generated once some items are approved, or you can generate it manually after the seller responds.
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -1223,12 +1237,45 @@ export default function RequestDetailPage() {
           )}
 
           {isMarchand && isAssigned && request.listReadyAt && !requestAgreement && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400" data-testid="status-list-finalized">
-              <Lock className="h-3.5 w-3.5 shrink-0" />
-              {requestItems?.some((i) => i.sellerCounterOffer && i.status === "pending_approval")
-                ? "Seller has counter-offered on some items — review and respond below"
-                : "List finalized — awaiting seller approval of all items"}
-            </div>
+            <Card className="border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
+              <CardContent className="p-4 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="h-9 w-9 rounded-md bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+                    <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      {requestItems?.some((i) => i.sellerCounterOffer && i.status === "pending_approval")
+                        ? "Seller Counter-offered on Items"
+                        : "Item List Finalized"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {requestItems?.some((i) => i.sellerCounterOffer && i.status === "pending_approval")
+                        ? "The seller has counter-offered on some items. Review and respond below."
+                        : `${requestItems?.filter((i) => i.status === "approved").length || 0} of ${requestItems?.length || 0} items approved. Once approved items are ready, generate the agreement.`}
+                    </p>
+                  </div>
+                </div>
+                {!requestItems?.some((i) => i.sellerCounterOffer && i.status === "pending_approval") && (requestItems?.some((i) => i.status === "approved")) && (
+                  <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-blue-300 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      onClick={() => generateAgreement.mutate()}
+                      disabled={generateAgreement.isPending}
+                      data-testid="button-generate-agreement"
+                    >
+                      {generateAgreement.isPending ? (
+                        <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />Generating...</>
+                      ) : (
+                        <><FileSignature className="h-3.5 w-3.5 mr-1" />Generate Agreement</>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )}
 
           {isSeller && request.listReadyAt && !requestAgreement && requestItems && requestItems.some((i) => i.status === "pending_approval") && (

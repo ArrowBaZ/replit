@@ -801,15 +801,15 @@ export async function registerRoutes(
           const existingAgreement = await storage.getAgreementByRequest(requestId);
           if (!existingAgreement) {
             const allItems = await storage.getItemsByRequest(requestId);
-            const allApproved = allItems.length > 0 && allItems.every((i) => i.status === "approved");
-            if (allApproved) {
-              const { itemsSnapshot, feeBreakdown, totalValue } = await buildAgreementSnapshot(allItems);
+            const approvedItems = allItems.filter((i) => i.status === "approved");
+            if (approvedItems.length > 0) {
+              const { itemsSnapshot, feeBreakdown, totalValue } = await buildAgreementSnapshot(approvedItems);
               const agreement = await storage.createAgreement({
                 requestId,
                 sellerId: request.sellerId,
                 marchantId: request.marchantId,
                 status: "pending",
-                itemCount: allItems.length,
+                itemCount: approvedItems.length,
                 totalValue,
                 itemsSnapshot,
                 feeBreakdown,
