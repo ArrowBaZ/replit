@@ -1,4 +1,5 @@
 import { Check, Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface ProfileStatusBadgeProps {
   status: "approved" | "pending";
@@ -6,6 +7,7 @@ interface ProfileStatusBadgeProps {
 }
 
 export function ProfileStatusBadge({ status, size = "md" }: ProfileStatusBadgeProps) {
+  const { t } = useTranslation();
   const isApproved = status === "approved";
   const sizeClasses = size === "sm" ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm";
 
@@ -22,7 +24,7 @@ export function ProfileStatusBadge({ status, size = "md" }: ProfileStatusBadgePr
       ) : (
         <Clock className={size === "sm" ? "w-3 h-3" : "w-4 h-4"} />
       )}
-      <span>{isApproved ? "Approved" : "Pending Validation"}</span>
+      <span>{isApproved ? t("profileStatusApproved") : t("profileStatusPendingValidation")}</span>
     </div>
   );
 }

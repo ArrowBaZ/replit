@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Loader2, FileText, Upload, FileImage, Download, MessageSquare, ChevronDown, ChevronUp, X, ExternalLink, ZoomIn, ChevronLeft, ChevronRight } from "lucide-react";
@@ -366,6 +367,7 @@ const MAX_PHOTO_SIZE = 10 * 1024 * 1024;
 const MAX_CERT_SIZE = 5 * 1024 * 1024;
 
 export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSectionProps) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [showDocs, setShowDocs] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -514,7 +516,7 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
           data-testid={`button-toggle-docs-${item.id}`}
         >
           <FileText className="h-3.5 w-3.5 mr-1" />
-          Documents
+          {t("documentsTitle")}
           {showDocs ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
         </Button>
 
@@ -528,16 +530,16 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
                 data-testid={`button-add-docs-${item.id}`}
               >
                 <Upload className="h-3.5 w-3.5 mr-1" />
-                Add Photos / Documents
+                {t("addPhotosDocuments")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Upload Photos / Documents</DialogTitle>
+                <DialogTitle>{t("uploadPhotosDocuments")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium mb-2">What are you uploading?</p>
+                  <p className="text-sm font-medium mb-2">{t("whatAreYouUploading")}</p>
                   <div className="flex gap-2" data-testid={`upload-type-selector-${item.id}`}>
                     <Button
                       size="sm"
@@ -548,7 +550,7 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
                       data-testid={`upload-type-photo-${item.id}`}
                     >
                       <FileImage className="h-3.5 w-3.5 mr-1.5" />
-                      Photo (max 10MB)
+                      {t("photoMaxSize")}
                     </Button>
                     <Button
                       size="sm"
@@ -559,13 +561,13 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
                       data-testid={`upload-type-cert-${item.id}`}
                     >
                       <FileText className="h-3.5 w-3.5 mr-1.5" />
-                      Certificate (max 5MB)
+                      {t("certificateMaxSize")}
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1.5">
                     {uploadType === "photo"
-                      ? "Item photos — JPEG, PNG, WebP, GIF, max 10MB each"
-                      : "Authenticity certificates or receipts — images or PDF, max 5MB each"}
+                      ? t("photoGuideImages")
+                      : t("certificateGuideImages")}
                   </p>
                 </div>
                 <label
@@ -575,14 +577,14 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
                   {isUploading ? (
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">Uploading...</p>
+                      <p className="text-sm text-muted-foreground">{t("uploading")}</p>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
                       <Upload className="h-8 w-8 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">Click to select files</p>
+                      <p className="text-sm text-muted-foreground">{t("clickSelectFiles")}</p>
                       <p className="text-xs text-muted-foreground">
-                        {uploadType === "photo" ? "Images (max 10MB)" : "Images or PDF (max 5MB)"}
+                        {uploadType === "photo" ? t("imagesMaxSize") : t("imagesOrPdfMaxSize")}
                       </p>
                     </div>
                   )}
@@ -612,7 +614,7 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
             data-testid={`button-request-docs-${item.id}`}
           >
             <MessageSquare className="h-3.5 w-3.5 mr-1" />
-            {docAlreadyRequested ? "Request Sent" : "Request Documents"}
+            {docAlreadyRequested ? t("requestSent") : t("requestDocuments")}
           </Button>
         )}
       </div>
@@ -622,7 +624,7 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
           {docsLoading ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Loading documents...
+              {t("loadingDocuments")}
             </div>
           ) : documents && documents.length > 0 ? (
             <div className="space-y-3">

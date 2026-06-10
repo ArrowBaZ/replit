@@ -347,10 +347,10 @@ export function AppSidebar() {
     { title: t("dashboard"), url: "/dashboard", icon: LayoutDashboard },
     { title: t("myRequests"), url: "/requests", icon: ClipboardList },
     { title: t("myItems"), url: "/items", icon: Shirt },
-    { title: "My Documents", url: "/documents", icon: FolderOpen, badge: documentCount > 0 ? documentCount : null },
+    { title: t("myDocuments"), url: "/documents", icon: FolderOpen, badge: documentCount > 0 ? documentCount : null },
     { title: t("discoverMarchands"), url: "/marchands", icon: Star },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
-    { title: "Fee Structure", url: "/fee-structure", icon: Percent },
+    { title: t("feeStructure"), url: "/fee-structure", icon: Percent },
     { title: t("profile"), url: "/profile", icon: User },
   ];
 
@@ -360,14 +360,14 @@ export function AppSidebar() {
     { title: t("myAssignments"), url: "/requests", icon: ClipboardList },
     { title: t("schedule"), url: "/schedule", icon: Calendar },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
-    { title: "Fee Structure", url: "/fee-structure", icon: Percent },
+    { title: t("feeStructure"), url: "/fee-structure", icon: Percent },
     { title: t("profile"), url: "/profile", icon: User },
   ];
 
   const adminItems = [
     { title: t("dashboard"), url: "/dashboard", icon: LayoutDashboard },
     { title: t("adminRequests"), url: "/admin/requests", icon: ClipboardList },
-    { title: "Fee Tiers", url: "/admin/fee-tiers", icon: Percent },
+    { title: t("feeTiers"), url: "/admin/fee-tiers", icon: Percent },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
   ];
 
