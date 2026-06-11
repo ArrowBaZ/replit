@@ -6,7 +6,7 @@ import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { db } from "./db";
-import { users } from "../shared/models/auth";
+import { users, emailVerificationCodes, sessions } from "../shared/models/auth";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS, NOTIF_PREF_KEYS } from "@shared/constants";
@@ -3488,9 +3488,11 @@ export async function registerRoutes(
       const sessionId = randomUUID();
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
-      await db.execute(
-        sql`INSERT INTO sessions ("sessionToken", "userId", expires) VALUES (${sessionId}, ${user.id}, ${expiresAt})`
-      );
+      await db.insert(sessions).values({
+        sessionToken: sessionId,
+        userId: user.id,
+        expires: expiresAt,
+      });
 
       res.cookie("next-auth.session-token", sessionId, {
         httpOnly: true,
@@ -3623,19 +3625,6 @@ export async function registerRoutes(
     }
   });
 
-  const registerSchema = z.object({
-    email: z
-      .string({ required_error: "Email is required" })
-      .min(1, "Email is required")
-      .email("Invalid email"),
-    password: z
-      .string({ required_error: "Password is required" })
-      .min(8, "Password must be at least 8 characters")
-      .max(32, "Password must be at most 32 characters"),
-    firstName: z.string().optional(),
-    lastName: z.string().optional(),
-  });
-
   app.post("/api/auth/register", registerLimiter, async (req: AuthRequest, res) => {
     try {
       const parsed = await registerSchema.parseAsync(req.body);
@@ -3678,9 +3667,12 @@ export async function registerRoutes(
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
       const codeId = randomUUID();
 
-      await db.execute(
-        sql`INSERT INTO email_verification_codes (id, "userId", code, "expiresAt") VALUES (${codeId}, ${userId}, ${verificationCode}, ${expiresAt})`
-      );
+      await db.insert(emailVerificationCodes).values({
+        id: codeId,
+        userId,
+        code: verificationCode,
+        expiresAt,
+      });
 
       // TODO: Send verification email with code
       console.log(`Verification code for ${email}: ${verificationCode}`);
@@ -3688,9 +3680,11 @@ export async function registerRoutes(
       const sessionId = randomUUID();
       const expiresAtSession = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-      await db.execute(
-        sql`INSERT INTO sessions ("sessionToken", "userId", expires) VALUES (${sessionId}, ${userId}, ${expiresAtSession})`
-      );
+      await db.insert(sessions).values({
+        sessionToken: sessionId,
+        userId,
+        expires: expiresAtSession,
+      });
 
       res.cookie("next-auth.session-token", sessionId, {
         httpOnly: true,
