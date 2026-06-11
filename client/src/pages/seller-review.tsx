@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { Request, Item, Profile } from "@shared/schema";
 import { ArrowLeft, Package, Shirt, CheckCircle, XCircle, Tag, Loader2, ChevronDown, ChevronUp, CheckCheck, AlertCircle } from "lucide-react";
 import { ItemStatusBadge } from "@/components/item-status-badge";
@@ -253,6 +254,8 @@ export default function SellerReviewPage() {
   const [showCounterOffer, setShowCounterOffer] = useState<{ itemId: number; version: number } | null>(null);
   const [counterOfferError, setCounterOfferError] = useState<string | null>(null);
   const [showDeclineDialog, setShowDeclineDialog] = useState<{ itemId: number; version: number } | null>(null);
+  const [showApproveConfirm, setShowApproveConfirm] = useState<{ itemId: number; version: number } | null>(null);
+  const [approveInsurance, setApproveInsurance] = useState(false);
   const [counterMin, setCounterMin] = useState("");
   const [counterMax, setCounterMax] = useState("");
   const [declineReason, setDeclineReason] = useState("");
@@ -262,10 +265,12 @@ export default function SellerReviewPage() {
   const otherItems = requestItems?.filter((i) => !["pending_approval", "approved"].includes(i.status)) ?? [];
 
   const approveItem = useMutation({
-    mutationFn: async ({ itemId, version }: { itemId: number; version: number }) =>
-      (await apiRequest("POST", `/api/items/${itemId}/approve`, { version })).json(),
+    mutationFn: async ({ itemId, version, insurance }: { itemId: number; version: number; insurance: boolean }) =>
+      (await apiRequest("POST", `/api/items/${itemId}/approve`, { version, insurance })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      setShowApproveConfirm(null);
+      setApproveInsurance(false);
       toast({ title: "Item accepted" });
     },
     onError: (err: unknown) => {
@@ -452,7 +457,7 @@ export default function SellerReviewPage() {
                     key={item.id}
                     item={item}
                     requestId={params.id}
-                    onApprove={(id, version) => approveItem.mutate({ itemId: id, version })}
+                    onApprove={(id, version) => { setShowApproveConfirm({ itemId: id, version }); setApproveInsurance(false); }}
                     onDecline={(id, version) => { setShowDeclineDialog({ itemId: id, version }); setDeclineReason(""); }}
                     onCounterOffer={(id, version) => { setShowCounterOffer({ itemId: id, version }); setCounterOfferError(null); setCounterMin(""); setCounterMax(""); }}
                     isApproving={approveItem.isPending}
@@ -474,7 +479,7 @@ export default function SellerReviewPage() {
                     key={item.id}
                     item={item}
                     requestId={params.id}
-                    onApprove={(id, version) => approveItem.mutate({ itemId: id, version })}
+                    onApprove={(id, version) => { setShowApproveConfirm({ itemId: id, version }); setApproveInsurance(false); }}
                     onDecline={(id, version) => { setShowDeclineDialog({ itemId: id, version }); setDeclineReason(""); }}
                     onCounterOffer={(id, version) => { setShowCounterOffer({ itemId: id, version }); setCounterOfferError(null); setCounterMin(""); setCounterMax(""); }}
                     isApproving={approveItem.isPending}
@@ -496,7 +501,7 @@ export default function SellerReviewPage() {
                     key={item.id}
                     item={item}
                     requestId={params.id}
-                    onApprove={(id, version) => approveItem.mutate({ itemId: id, version })}
+                    onApprove={(id, version) => { setShowApproveConfirm({ itemId: id, version }); setApproveInsurance(false); }}
                     onDecline={(id, version) => { setShowDeclineDialog({ itemId: id, version }); setDeclineReason(""); }}
                     onCounterOffer={(id, version) => { setShowCounterOffer({ itemId: id, version }); setCounterOfferError(null); setCounterMin(""); setCounterMax(""); }}
                     isApproving={approveItem.isPending}
@@ -661,6 +666,56 @@ export default function SellerReviewPage() {
               >
                 {declineItem.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                 Confirm Rejection
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showApproveConfirm !== null}
+        onOpenChange={(open) => { if (!open) { setShowApproveConfirm(null); setApproveInsurance(false); } }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Accept Item</DialogTitle>
+            {showApproveConfirm && requestItems && (
+              <p className="text-sm text-muted-foreground mt-0.5">{requestItems.find(i => i.id === showApproveConfirm.itemId)?.title}</p>
+            )}
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="approve-insurance"
+                  checked={approveInsurance}
+                  onCheckedChange={(checked) => setApproveInsurance(checked === true)}
+                  data-testid="checkbox-approve-insurance"
+                />
+                <Label htmlFor="approve-insurance" className="cursor-pointer">
+                  Add insurance coverage <span className="text-xs text-muted-foreground">(+5% of item price)</span>
+                </Label>
+              </div>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 pl-6">
+                Insurance protects your item during the resale process.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setShowApproveConfirm(null); setApproveInsurance(false); }} data-testid="button-approve-cancel">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (showApproveConfirm) {
+                    approveItem.mutate({ itemId: showApproveConfirm.itemId, version: showApproveConfirm.version, insurance: approveInsurance });
+                  }
+                }}
+                disabled={approveItem.isPending}
+                className="bg-[hsl(var(--success))] text-white hover:bg-[hsl(var(--success)/0.9)]"
+                data-testid="button-approve-confirm"
+              >
+                {approveItem.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                Accept Item
               </Button>
             </div>
           </div>

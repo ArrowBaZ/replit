@@ -1572,10 +1572,16 @@ export async function registerRoutes(
           }
         }
 
+        const insuranceFlag = req.body?.insurance === true;
+        const approvedPrice = req.body?.approvedPrice || null;
+        const insuranceCostVal = insuranceFlag && approvedPrice ? parseFloat((parseFloat(approvedPrice) * 0.05).toFixed(2)) : null;
+
         const newData = {
           status: "approved" as const,
           priceApprovedBySeller: true,
-          approvedPrice: req.body?.approvedPrice || null,
+          approvedPrice,
+          hasInsurance: insuranceFlag,
+          insuranceCost: insuranceCostVal !== null ? String(insuranceCostVal) : null,
           version: (existingItem.version ?? 1) + 1,
           updatedAt: new Date(),
         };

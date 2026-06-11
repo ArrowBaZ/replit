@@ -1496,18 +1496,6 @@ export default function RequestDetailPage() {
                     <Label>{t("description")}</Label>
                     <Textarea value={itemForm.description} onChange={(e) => setItemForm({...itemForm, description: e.target.value})} className="resize-none" rows={2} data-testid="input-item-description" />
                   </div>
-                  <div className="flex items-start gap-3 p-2.5 rounded-md border bg-muted/30">
-                    <Checkbox
-                      id="item-platform-only"
-                      checked={itemForm.platformOnly}
-                      onCheckedChange={(checked) => setItemForm({...itemForm, platformOnly: !!checked})}
-                      data-testid="checkbox-platform-only"
-                    />
-                    <Label htmlFor="item-platform-only" className="text-sm cursor-pointer flex items-center gap-1.5">
-                      <Monitor className="h-3.5 w-3.5 text-purple-500" />
-                      Platform Only — list exclusively on the platform
-                    </Label>
-                  </div>
                   <ItemPhotoUploadArea />
                   {showCertPhotos && <CertPhotoUploadArea />}
                   <div className="space-y-2">
@@ -1722,16 +1710,18 @@ export default function RequestDetailPage() {
                           <div className="flex items-center gap-2" data-testid={`insurance-row-${item.id}`}>
                             <Checkbox
                               id={`insurance-${item.id}`}
-                              checked={insuranceChecked.has(item.id)}
-                              onCheckedChange={() => toggleInsurance(item.id)}
+                              checked={!!item.hasInsurance || insuranceChecked.has(item.id)}
+                              onCheckedChange={() => !item.hasInsurance && toggleInsurance(item.id)}
+                              disabled={!!item.hasInsurance}
                               data-testid={`checkbox-insurance-${item.id}`}
                             />
                             <label
                               htmlFor={`insurance-${item.id}`}
-                              className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1"
+                              className={`text-xs cursor-pointer select-none flex items-center gap-1 ${!!item.hasInsurance ? "text-muted-foreground opacity-60" : "text-muted-foreground"}`}
                             >
-                              <Shield className="h-3 w-3 text-blue-500" />
+                              <Shield className={`h-3 w-3 ${!!item.hasInsurance ? "text-amber-500" : "text-blue-500"}`} />
                               Add insurance <span className="font-medium text-foreground">(+5% of item price)</span>
+                              {!!item.hasInsurance && <span className="text-xs text-amber-600 dark:text-amber-400 font-medium ml-1">(Seller chose this)</span>}
                             </label>
                           </div>
                           {insuranceChecked.has(item.id) && item.minPrice && parseFloat(item.minPrice) > 0 && (
