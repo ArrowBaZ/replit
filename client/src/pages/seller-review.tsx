@@ -47,6 +47,9 @@ function parseApiError(err: unknown): { status: number | null; message: string }
   return { status: null, message: "An unexpected error occurred" };
 }
 
+// Note: ACTION_LABEL is defined outside the component and cannot use t() directly.
+// The translation keys are defined in locales but this component uses static labels.
+// TODO: Move this inside component to use t() for translation support.
 const ACTION_LABEL: Record<string, string> = {
   initial: "Initial Price",
   counter_offer: "Counter-offer",

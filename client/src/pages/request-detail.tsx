@@ -72,10 +72,10 @@ function NegotiationHistory({ itemId }: { itemId: number }) {
   }
 
   const actionLabel: Record<string, string> = {
-    initial: "Initial Price",
-    counter_offer: "Counter-offer",
-    revision: "Revised Price",
-    accepted: "Accepted",
+    initial: t("priceHistoryInitial"),
+    counter_offer: t("priceHistoryCounterOffer"),
+    revision: t("priceHistoryRevised"),
+    accepted: t("priceHistoryAccepted"),
   };
 
   const actionColors: Record<string, string> = {
@@ -1972,7 +1972,7 @@ export default function RequestDetailPage() {
                 <FileText className="h-4 w-4 text-amber-500" />
                 <h3 className="text-sm font-semibold">{t("documentsRequestedByReseller")}</h3>
               </div>
-              <p className="text-xs text-muted-foreground">The reseller has requested documents for the following items. Please upload them in the item's document section below.</p>
+              <p className="text-xs text-muted-foreground">{t("documentsRequestedDesc")}</p>
               <div className="space-y-2">
                 {documentRequests.map((dr: any) => (
                   <Card key={dr.id} className="border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-900/10">
@@ -1981,14 +1981,14 @@ export default function RequestDetailPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate" data-testid={`text-doc-request-item-${dr.itemId}`}>{dr.itemTitle}</p>
                         <p className="text-xs text-muted-foreground">
-                          {dr.documentType === "authenticity_certificate" ? "Authenticity Certificate"
-                            : dr.documentType === "purchase_invoice" ? "Purchase Invoice"
-                            : dr.documentType === "warranty_card" ? "Warranty Card"
-                            : dr.documentType || "Document"} · Requested by {dr.marchantName} · {dr.createdAt ? new Date(dr.createdAt).toLocaleDateString("fr-FR") : ""}
+                          {dr.documentType === "authenticity_certificate" ? t("authorityCertificate")
+                            : dr.documentType === "purchase_invoice" ? t("purchaseInvoice")
+                            : dr.documentType === "warranty_card" ? t("warrantyCard")
+                            : dr.documentType || t("documentType")} · {t("requestedBy")} {dr.marchantName} · {dr.createdAt ? new Date(dr.createdAt).toLocaleDateString("fr-FR") : ""}
                         </p>
                       </div>
                       <Badge className="text-xs shrink-0 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-0" data-testid={`badge-doc-request-status-${dr.id}`}>
-                        {dr.status === "fulfilled" ? "Fulfilled" : "Pending"}
+                        {dr.status === "fulfilled" ? t("documentFulfilled") : t("documentPending")}
                       </Badge>
                     </CardContent>
                   </Card>
