@@ -2694,6 +2694,11 @@ export async function registerRoutes(
           }
           throw err;
         }
+        // TODO: i18n - Server-side notifications are currently hardcoded in English.
+        // To support multiple languages, we should:
+        // 1. Store user language preference in the users table
+        // 2. Use the preference when creating notifications
+        // 3. Or store notification type + parameters and translate on client side
         const content = `📄 I'd like to request additional documentation for "${item.title}". Please upload authenticity certificates, purchase receipts, or any relevant documents.`;
         const message = await storage.createMessage({
           senderId: userId,
