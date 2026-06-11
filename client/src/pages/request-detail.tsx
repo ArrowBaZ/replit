@@ -215,7 +215,7 @@ export default function RequestDetailPage() {
     title: "", description: "", brand: "", size: "", category: "clothing" as ItemCategory, condition: "good",
     minPrice: "", maxPrice: "", material: "", dimensions: "", author: "", genre: "", language: "",
     vintage: "", ageRange: "", model: "", deviceStorage: "", ram: "", volume: "", frameSize: "",
-    instrumentType: "", applianceType: "", decorStyle: "", subcategory: "", platformOnly: false,
+    instrumentType: "", applianceType: "", decorStyle: "", subcategory: "",
   };
   const [itemForm, setItemForm] = useState(emptyItemForm);
   const [itemPhotos, setItemPhotos] = useState<string[]>([]);
@@ -331,7 +331,6 @@ export default function RequestDetailPage() {
       applianceType: item.applianceType || "",
       decorStyle: item.decorStyle || "",
       subcategory: item.subcategory || "",
-      platformOnly: item.platformOnly ?? false,
     });
     setItemPhotos(item.photos || []);
     setCertPhotos(item.certificatePhotos || []);
@@ -1166,12 +1165,12 @@ export default function RequestDetailPage() {
           (isSeller && requestAgreement.status === "marchand_signed") ||
           (isMarchand && requestAgreement.status === "seller_signed");
         const subtitle = fullyDone
-          ? "Both parties have signed the agreement."
+          ? t("agreementBothSigned")
           : currentUserSigned
-            ? "Waiting for the other party to sign."
+            ? t("agreementWaitingOtherParty")
             : otherPartySigned
-              ? "The other party signed — your signature is needed."
-              : "Please review and sign the agreement to proceed.";
+              ? t("agreementOtherPartySigned")
+              : t("agreementPleaseReviewAndSign");
         return (
           <Card className={`border-2 ${fullyDone ? "border-emerald-300 dark:border-emerald-700" : "border-amber-300 dark:border-amber-700"}`} data-testid="card-agreement-cta">
             <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
@@ -1600,11 +1599,6 @@ export default function RequestDetailPage() {
                             {CATEGORY_LABELS[item.category] || item.category}
                           </Badge>
                           {item.condition && <span className="text-xs text-muted-foreground">{conditionLabel(item.condition)}</span>}
-                          {item.platformOnly && (
-                            <Badge className="text-xs px-1.5 py-0 h-auto bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-0" data-testid={`badge-platform-only-${item.id}`}>
-                              <Monitor className="h-3 w-3 mr-0.5" />Platform Only
-                            </Badge>
-                          )}
                         </div>
                         {item.minPrice && item.maxPrice && (
                           <p className="text-xs text-muted-foreground mt-1">{item.minPrice} - {item.maxPrice} EUR</p>
