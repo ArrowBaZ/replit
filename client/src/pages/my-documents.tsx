@@ -143,16 +143,16 @@ function ReUploadDialog({ doc }: { doc: UserDocument }) {
           data-testid={`button-reupload-${doc.id}`}
         >
           <Upload className="h-3.5 w-3.5 mr-1" />
-          Replace
+          {t("replace")}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Upload Replacement Document</DialogTitle>
+          <DialogTitle>{t("uploadReplacementDocument")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <p className="text-sm font-medium mb-2">What are you uploading?</p>
+            <p className="text-sm font-medium mb-2">{t("whatAreYouUploading")}</p>
             <div className="flex gap-2">
               <Button
                 size="sm"

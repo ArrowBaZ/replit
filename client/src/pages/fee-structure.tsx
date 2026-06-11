@@ -115,21 +115,21 @@ export default function FeeStructurePage() {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground mt-0.5">
-                          {tier.minPrice ? `From €${parseFloat(tier.minPrice as string).toLocaleString("fr-CH")}` : "From €0"}
-                          {tier.maxPrice ? ` to €${parseFloat(tier.maxPrice as string).toLocaleString("fr-CH")}` : " and above"}
+                          {tier.minPrice ? t("feeFrom", { amount: parseFloat(tier.minPrice as string).toLocaleString("fr-CH") }) : t("feeFrom", { amount: "0" })}
+                          {tier.maxPrice ? t("feeTo", { amount: parseFloat(tier.maxPrice as string).toLocaleString("fr-CH") }) : t("feeAndAbove")}
                         </p>
                       </div>
                       <div className="flex items-center gap-4 text-sm">
                         <div className="text-center">
-                          <p className="text-xs text-muted-foreground">Seller</p>
+                          <p className="text-xs text-muted-foreground">{t("feeRoleSeller")}</p>
                           <p className="font-bold text-emerald-600 dark:text-emerald-400" data-testid={`text-tier-seller-${tier.id}`}>{sellerPct.toFixed(1)}%</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-xs text-muted-foreground">Marchand</p>
+                          <p className="text-xs text-muted-foreground">{t("feeRoleMarchand")}</p>
                           <p className="font-bold text-blue-600 dark:text-blue-400" data-testid={`text-tier-marchand-${tier.id}`}>{marchantPct.toFixed(1)}%</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-xs text-muted-foreground">Platform</p>
+                          <p className="text-xs text-muted-foreground">{t("feeRolePlatform")}</p>
                           <p className="font-bold text-purple-600 dark:text-purple-400" data-testid={`text-tier-platform-${tier.id}`}>{platformPct.toFixed(1)}%</p>
                         </div>
                       </div>
