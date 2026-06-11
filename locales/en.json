@@ -595,5 +595,6 @@
   "agreement": "Agreement",
   "removeDocument": "Remove document?",
   "removeDocumentDesc": "\"{{fileName}}\" will be permanently removed. This action cannot be undone.",
-  "downloadPdf": "Download PDF"
+  "downloadPdf": "Download PDF",
+  "viewRequest": "View request"
 }

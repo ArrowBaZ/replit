@@ -556,7 +556,7 @@ export default function MyDocumentsPage() {
                         data-testid={`link-request-${group.requestId}`}
                       >
                         <ExternalLink className="h-3 w-3" />
-                        View request
+                        {t("viewRequest")}
                       </Link>
                     )}
                   </div>
