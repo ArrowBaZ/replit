@@ -1473,6 +1473,12 @@ export async function registerRoutes(
             return res.status(400).json({ message: "Item list is finalized and locked — no further changes allowed" });
           }
         }
+
+        // Prevent changing insurance if seller has already approved it
+        if (existingItem.priceApprovedBySeller && req.body.hasInsurance !== undefined && req.body.hasInsurance !== existingItem.hasInsurance) {
+          return res.status(400).json({ message: "Cannot change insurance after seller approval — insurance choice is locked" });
+        }
+
         const {
           title, description, brand, size, category, condition,
           minPrice, maxPrice, photos, certificatePhotos,
@@ -1877,7 +1883,8 @@ export async function registerRoutes(
           return res.status(409).json({ message: "This item was modified by another action. Please refresh and try again." });
         }
 
-        const insuranceFlag = req.body?.insurance === true;
+        // Insurance is locked if seller already decided it; marchand cannot change it
+        const insuranceFlag = existingItem.hasInsurance || req.body?.insurance === true;
         const insuranceCostVal = insuranceFlag && approvedPrice ? parseFloat((parseFloat(approvedPrice) * 0.05).toFixed(2)) : null;
 
         const acceptNewData = {
