@@ -251,9 +251,50 @@ npm run start      # Runs dist/index.cjs (must build first)
 - Safer for small teams; less ceremony than migrations
 
 #### i18next Internationalization
+
+The app supports English and French. **Every UI string must be translatable.**
+
+**How Translations Work:**
 - Configured in `client/src/lib/i18next.config.ts`
-- French translations available
-- Add new translation keys to `i18n/locales/fr.json`
+- Translation keys live in `locales/en.json` (English) and `locales/fr.json` (French)
+- Use `const { t } = useTranslation()` in React components (import `useTranslation` from `react-i18next`)
+- Display translated strings with `t("keyName")` or `t("keyName", { variable: value })` for interpolation
+- Keep both locale files in sync — every key in en.json must exist in fr.json with identical structure
+
+**Translation Checklist for Every Feature/Update:**
+
+1. **Before writing UI**: Identify all user-facing strings (labels, buttons, placeholders, messages, tooltips, empty states)
+2. **Add translation keys**: Add to both `locales/en.json` and `locales/fr.json` with consistent naming:
+   - Use camelCase names: `"agreementAwaitingSignatures"`, `"priceNegotiationHistory"`
+   - Group related keys: `"feeRoleSeller"`, `"feeRoleMarchand"` (all fee-related)
+   - Be specific: `"documentFulfilled"` not just `"fulfilled"`
+3. **Use t() in components**: Never hardcode strings — always use `t("keyName")`
+   - Add `useTranslation` hook at the top of component: `const { t } = useTranslation()`
+   - Import: `import { useTranslation } from "react-i18next"`
+4. **For nested components**: Inner components also need the hook (e.g., within `map()` functions, create helper functions)
+5. **Verify symmetry**: Run `jq -r 'keys[]' locales/en.json | sort > /tmp/en.txt && jq -r 'keys[]' locales/fr.json | sort > /tmp/fr.txt && diff /tmp/en.txt /tmp/fr.txt` to ensure all keys match
+6. **Test in both languages**: Switch language in the app and verify:
+   - All new UI strings appear in French (not English fallback)
+   - Spacing and text length look correct (French is typically 20-30% longer)
+   - No UI breaks due to longer French text
+
+**Known Limitations:**
+- Server-side notifications (error messages, email templates) are hardcoded in English — changing these requires storing user language preferences in the database
+- Static objects defined outside React components (e.g., constants, maps) cannot use `t()` directly — move inside component if translation needed
+
+**Example Pattern:**
+```typescript
+// ✅ GOOD: Translation key in en.json and fr.json
+const { t } = useTranslation();
+return <Button>{t("signAgreement")}</Button>;
+
+// ❌ BAD: Hardcoded string
+return <Button>Sign Agreement</Button>;
+
+// ✅ GOOD: Interpolation for dynamic values
+t("removeDocumentDesc", { fileName: "contract.pdf" })
+// locales/en.json: "removeDocumentDesc": "\"{{fileName}}\" will be permanently removed."
+```
 
 #### Admin Features
 - Admin dashboard at `/admin` requires `role === "admin"` on profile
