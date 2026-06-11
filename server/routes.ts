@@ -3653,9 +3653,14 @@ export async function registerRoutes(
       const passwordHash = await hashPassword(password);
       const userId = randomUUID();
 
-      await db.execute(
-        sql`INSERT INTO users (id, email, "passwordHash", "firstName", "lastName", "emailVerified") VALUES (${userId}, ${email}, ${passwordHash}, ${firstName || null}, ${lastName || null}, NOW())`
-      );
+      await db.insert(users).values({
+        id: userId,
+        email,
+        passwordHash,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        emailVerified: new Date(),
+      });
 
       // Create profile during registration
       await storage.createProfile({
@@ -3705,10 +3710,11 @@ export async function registerRoutes(
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input" });
+        return res.status(400).json({ message: "Invalid input", errors: error.flatten().fieldErrors });
       }
       console.error("Registration error:", error);
-      res.status(500).json({ message: "Registration failed" });
+      const message = error instanceof Error ? error.message : "Registration failed";
+      res.status(500).json({ message });
     }
   });
 
