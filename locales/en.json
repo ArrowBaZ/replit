@@ -561,6 +561,8 @@
   "allActiveFeeTiers": "All Active Fee Tiers",
   "noFeeTiersAvailable": "No fee tiers available",
   "adminNeedsConfigureFeeTiers": "An admin needs to configure fee tiers first.",
+  "finalizeItemList": "Finalize Item List",
+  "finalizeItemListDesc": "This will lock the item list and notify the seller to review and approve or decline items. You will no longer be able to add, edit, or remove items after this action. An agreement will be automatically generated once some items are approved, or you can generate it manually after the seller responds.",
   "actionNeeded": "Action needed",
   "messageSeller": "Message Seller",
   "noDocumentsYet": "No documents yet",

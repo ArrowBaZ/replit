@@ -1212,10 +1212,10 @@ export default function RequestDetailPage() {
               <Card className="border-amber-300 dark:border-amber-700">
                 <CardContent className="p-4 space-y-3">
                   <p className="text-sm font-semibold flex items-center gap-1.5">
-                    <Lock className="h-4 w-4 text-amber-600" /> Finalize Item List
+                    <Lock className="h-4 w-4 text-amber-600" /> {t("finalizeItemList")}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    This will lock the item list and notify the seller to review and approve or decline items. You will no longer be able to add, edit, or remove items after this action. An agreement will be automatically generated once some items are approved, or you can generate it manually after the seller responds.
+                    {t("finalizeItemListDesc")}
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -1241,7 +1241,7 @@ export default function RequestDetailPage() {
                 onClick={() => setShowFinalizeConfirm(true)}
                 data-testid="button-finalize-list"
               >
-                <Lock className="h-3.5 w-3.5 mr-1" /> Finalize Item List
+                <Lock className="h-3.5 w-3.5 mr-1" /> {t("finalizeItemList")}
               </Button>
             )
           )}

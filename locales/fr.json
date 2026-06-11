@@ -561,6 +561,8 @@
   "allActiveFeeTiers": "Tous les niveaux de frais actifs",
   "noFeeTiersAvailable": "Aucun niveau de frais disponible",
   "adminNeedsConfigureFeeTiers": "Un administrateur doit d'abord configurer les niveaux de frais.",
+  "finalizeItemList": "Finaliser la liste d'articles",
+  "finalizeItemListDesc": "Ceci verrouillera la liste d'articles et notifiera le vendeur pour qu'il examine et approuve ou refuse les articles. Vous ne pourrez plus ajouter, modifier ou supprimer d'articles après cette action. Un accord sera automatiquement généré une fois que certains articles seront approuvés, ou vous pourrez le générer manuellement après la réponse du vendeur.",
   "actionNeeded": "Action requise",
   "messageSeller": "Message au vendeur",
   "noDocumentsYet": "Aucun document",
