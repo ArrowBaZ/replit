@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import type { Profile } from "@shared/schema";
 import { FeeBreakdownCard } from "@/components/fee-breakdown-card";
 
 export default function FeeStructurePage() {
+  const { t } = useTranslation();
   const [priceInput, setPriceInput] = useState("");
 
   const { data: tiers = [], isLoading } = useQuery<FeeTier[]>({
@@ -37,11 +39,11 @@ export default function FeeStructurePage() {
           <Percent className="h-5 w-5 text-[hsl(var(--success))]" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold" data-testid="heading-fee-structure">Fee Structure</h1>
+          <h1 className="text-2xl font-bold" data-testid="heading-fee-structure">{t("feeStructure")}</h1>
           <p className="text-sm text-muted-foreground">
             {role === "seller"
-              ? "Understand how earnings are split when your items sell"
-              : "See the fee tiers that apply to your reselling work"}
+              ? t("feeStructureSellerDesc")
+              : t("feeStructureMarchandDesc")}
           </p>
         </div>
       </div>
@@ -50,9 +52,9 @@ export default function FeeStructurePage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
-            Earnings Calculator
+            {t("earningsCalculator")}
           </CardTitle>
-          <p className="text-sm text-muted-foreground">Enter an item price to see the projected earnings split</p>
+          <p className="text-sm text-muted-foreground">{t("earningsCalculatorDesc")}</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-3 max-w-xs">
@@ -72,7 +74,7 @@ export default function FeeStructurePage() {
           )}
           {!tierLoading && priceNum > 0 && matchedTier === null && (
             <p className="text-sm text-muted-foreground" data-testid="text-no-tier">
-              No active fee tier covers this price range.
+              {t("noActiveTierForPrice")}
             </p>
           )}
           {!tierLoading && priceNum > 0 && matchedTier && (
@@ -82,7 +84,7 @@ export default function FeeStructurePage() {
       </Card>
 
       <div>
-        <h2 className="text-lg font-semibold mb-3">All Active Fee Tiers</h2>
+        <h2 className="text-lg font-semibold mb-3">{t("allActiveFeeTiers")}</h2>
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}
@@ -91,8 +93,8 @@ export default function FeeStructurePage() {
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
               <Percent className="h-10 w-10 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No fee tiers available</p>
-              <p className="text-sm mt-1">An admin needs to configure fee tiers first.</p>
+              <p className="font-medium">{t("noFeeTiersAvailable")}</p>
+              <p className="text-sm mt-1">{t("adminNeedsConfigureFeeTiers")}</p>
             </CardContent>
           </Card>
         ) : (

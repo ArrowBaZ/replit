@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useUpload } from "@/hooks/use-upload";
@@ -72,6 +73,7 @@ const MAX_PHOTO_SIZE = 10 * 1024 * 1024;
 const MAX_CERT_SIZE = 5 * 1024 * 1024;
 
 function ReUploadDialog({ doc }: { doc: UserDocument }) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const { uploadFile, isUploading } = useUpload();
   const [open, setOpen] = useState(false);
@@ -210,6 +212,7 @@ function ReUploadDialog({ doc }: { doc: UserDocument }) {
 }
 
 function DocumentRow({ doc }: { doc: UserDocument }) {
+  const { t } = useTranslation();
   const { toast } = useToast();
 
   const deleteMutation = useMutation({
@@ -280,9 +283,9 @@ function DocumentRow({ doc }: { doc: UserDocument }) {
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Remove document?</AlertDialogTitle>
+              <AlertDialogTitle>{t("removeDocument")}</AlertDialogTitle>
               <AlertDialogDescription>
-                "{doc.fileName}" will be permanently removed. This action cannot be undone.
+                {t("removeDocumentDesc", { fileName: doc.fileName })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -303,6 +306,7 @@ function DocumentRow({ doc }: { doc: UserDocument }) {
 }
 
 function AgreementRow({ agreement }: { agreement: AgreementDetail }) {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [isDownloading, setIsDownloading] = useState(false);
   const isSigned = agreement.status === "fully_signed";
@@ -331,7 +335,7 @@ function AgreementRow({ agreement }: { agreement: AgreementDetail }) {
         </p>
         <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
           <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
-            Agreement
+            {t("agreement")}
           </Badge>
           <span
             className={`inline-flex items-center rounded px-1.5 py-0 text-[10px] font-medium ${
@@ -364,7 +368,7 @@ function AgreementRow({ agreement }: { agreement: AgreementDetail }) {
             ) : (
               <Download className="h-3.5 w-3.5 mr-1" />
             )}
-            Download PDF
+            {t("downloadPdf")}
           </Button>
         ) : null}
         <Link
@@ -383,6 +387,7 @@ function AgreementRow({ agreement }: { agreement: AgreementDetail }) {
 type TypeFilter = "all" | "photo" | "certificate" | "agreement";
 
 export default function MyDocumentsPage() {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
@@ -449,9 +454,9 @@ export default function MyDocumentsPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold" data-testid="text-page-title">My Documents</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-page-title">{t("myDocuments")}</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          All documents and agreements associated with your account.
+          {t("allDocumentsAndAgreements")}
         </p>
       </div>
 
@@ -511,7 +516,7 @@ export default function MyDocumentsPage() {
       ) : !hasAnyContent ? (
         <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="docs-empty">
           <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-muted-foreground font-medium">No documents yet</p>
+          <p className="text-muted-foreground font-medium">{t("noDocumentsYet")}</p>
           <p className="text-sm text-muted-foreground mt-1">
             Upload photos or certificates from your item pages. Signed agreements will also appear here.
           </p>
@@ -519,7 +524,7 @@ export default function MyDocumentsPage() {
       ) : !hasResults ? (
         <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="docs-no-results">
           <Search className="h-10 w-10 text-muted-foreground mb-4" />
-          <p className="text-muted-foreground font-medium">No documents match your search</p>
+          <p className="text-muted-foreground font-medium">{t("noDocumentsMatch")}</p>
           {isFiltering && (
             <Button
               variant="link"
@@ -569,7 +574,7 @@ export default function MyDocumentsPage() {
             <div data-testid="agreements-section">
               <div className="flex items-center gap-2 mb-3">
                 <h2 className="font-semibold text-sm" data-testid="agreements-section-title">
-                  Agreements
+                  {t("agreements")}
                 </h2>
                 <Badge variant="outline" className="text-xs flex-shrink-0">
                   {filteredAgreements.length} agreement{filteredAgreements.length !== 1 ? "s" : ""}

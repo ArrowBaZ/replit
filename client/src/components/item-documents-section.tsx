@@ -771,7 +771,7 @@ export function ItemDocumentsSection({ item, profile, userId }: ItemDocumentsSec
               )}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground">No documents uploaded yet.</p>
+            <p className="text-xs text-muted-foreground">{t("noDocumentsUploadedYet")}</p>
           )}
         </div>
       )}

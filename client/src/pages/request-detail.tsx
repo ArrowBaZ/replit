@@ -1103,7 +1103,7 @@ export default function RequestDetailPage() {
                 data-testid="button-message-seller"
               >
                 <MessageSquare className="h-3.5 w-3.5 mr-1" />
-                Message Seller
+                {t("messageSeller")}
               </Button>
             )}
           </CardContent>
@@ -1181,7 +1181,7 @@ export default function RequestDetailPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold">
-                    {fullyDone ? "Agreement fully signed" : "Agreement awaiting signatures"}
+                    {fullyDone ? t("agreementFullySigned") : t("agreementAwaitingSignatures")}
                   </p>
                   <p className="text-xs text-muted-foreground">{subtitle}</p>
                 </div>
@@ -1193,7 +1193,7 @@ export default function RequestDetailPage() {
                 data-testid="button-view-agreement"
               >
                 <FileSignature className="h-3.5 w-3.5 mr-1" />
-                {fullyDone || currentUserSigned ? "View Agreement" : "Sign Agreement"}
+                {fullyDone || currentUserSigned ? t("viewAgreement") : t("signAgreement")}
               </Button>
             </CardContent>
           </Card>
@@ -1675,7 +1675,7 @@ export default function RequestDetailPage() {
                           className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1"
                         >
                           <Shield className="h-3 w-3 text-blue-500" />
-                          Add insurance <span className="font-medium text-foreground">(+5% of item price)</span>
+                          {t("addInsurancePrefix")} <span className="font-medium text-foreground">({t("addInsuranceSuffix")})</span>
                         </label>
                       </div>
                       {(item.hasInsurance) && (item.maxPrice || item.minPrice) && parseFloat(item.maxPrice || item.minPrice || "0") > 0 && (
@@ -1720,7 +1720,7 @@ export default function RequestDetailPage() {
                               className={`text-xs cursor-pointer select-none flex items-center gap-1 ${!!item.hasInsurance ? "text-muted-foreground opacity-60" : "text-muted-foreground"}`}
                             >
                               <Shield className={`h-3 w-3 ${!!item.hasInsurance ? "text-amber-500" : "text-blue-500"}`} />
-                              Add insurance <span className="font-medium text-foreground">(+5% of item price)</span>
+                              {t("addInsurancePrefix")} <span className="font-medium text-foreground">({t("addInsuranceSuffix")})</span>
                               {!!item.hasInsurance && <span className="text-xs text-amber-600 dark:text-amber-400 font-medium ml-1">(Seller chose this)</span>}
                             </label>
                           </div>
@@ -1943,7 +1943,7 @@ export default function RequestDetailPage() {
                       data-testid={`button-toggle-history-${item.id}`}
                     >
                       <History className="h-3.5 w-3.5" />
-                      Price Negotiation History
+                      {t("priceNegotiationHistory")}
                       {expandedHistory.has(item.id) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                     </button>
                     {expandedHistory.has(item.id) && (
@@ -1976,7 +1976,7 @@ export default function RequestDetailPage() {
             <div className="space-y-2 pt-2 border-t mt-2">
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-amber-500" />
-                <h3 className="text-sm font-semibold">Documents Requested by Reseller</h3>
+                <h3 className="text-sm font-semibold">{t("documentsRequestedByReseller")}</h3>
               </div>
               <p className="text-xs text-muted-foreground">The reseller has requested documents for the following items. Please upload them in the item's document section below.</p>
               <div className="space-y-2">

@@ -135,7 +135,7 @@ export default function SellerDashboard() {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-amber-500" />
-            <h2 className="font-semibold text-lg">Pending Your Action</h2>
+            <h2 className="font-semibold text-lg">{t("pendingYourAction")}</h2>
             <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold" data-testid="badge-pending-action-count">{pendingActionRequests.length}</span>
           </div>
           <div className="space-y-2">
@@ -151,11 +151,11 @@ export default function SellerDashboard() {
                         <p className="text-sm font-medium truncate" data-testid={`text-pending-request-${req.id}`}>
                           {serviceTypeLabels[req.serviceType as keyof typeof serviceTypeLabels] || req.serviceType} #{req.id}
                         </p>
-                        <p className="text-xs text-muted-foreground">Review items or upload requested documents</p>
+                        <p className="text-xs text-muted-foreground">{t("reviewOrUploadDocs")}</p>
                       </div>
                     </div>
                     <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" data-testid={`badge-pending-action-${req.id}`}>
-                      Action needed
+                      {t("actionNeeded")}
                     </Badge>
                   </CardContent>
                 </Card>

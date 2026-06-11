@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useParams, useLocation } from "wouter";
@@ -21,6 +22,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function AgreementDetailPage() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -119,7 +121,7 @@ export default function AgreementDetailPage() {
           {agreement.status === "fully_signed" && (
             <>
               <Button variant="outline" size="sm" onClick={() => downloadAgreementPdf(agreement)} data-testid="button-download-pdf">
-                <Download className="h-4 w-4 mr-1" /> Download PDF
+                <Download className="h-4 w-4 mr-1" /> {t("downloadPdf")}
               </Button>
               <Button
                 variant="outline"
@@ -329,7 +331,7 @@ export default function AgreementDetailPage() {
                   data-testid="button-sign-agreement"
                 >
                   <FileSignature className="h-4 w-4 mr-2" />
-                  {signMutation.isPending ? "Signing..." : "Sign Agreement"}
+                  {signMutation.isPending ? t("signing") : t("signAgreement")}
                 </Button>
               </div>
             </>
