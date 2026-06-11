@@ -543,7 +543,7 @@
   "agreementAwaitingSignatures": "Accord en attente de signatures",
   "signAgreement": "Signer l'accord",
   "addInsurancePrefix": "Ajouter une assurance",
-  "addInsuranceSuffix": "(+5 % du prix de l'article)",
+  "addInsuranceSuffix": "+5 % du prix de l'article",
   "priceNegotiationHistory": "Historique des négociations de prix",
   "documentsRequestedByReseller": "Documents demandés par le revendeur",
   "documentRequestMessage": "📄 J'aimerais demander une documentation supplémentaire pour \"%s\". Veuillez télécharger les certificats d'authenticité, les reçus d'achat ou les documents pertinents.",
