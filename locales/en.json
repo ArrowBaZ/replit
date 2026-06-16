@@ -330,6 +330,8 @@
   "itemsInsured": "items insured",
   "insured": "Insured",
   "insurancePercentage": "+5% per item",
+  "insuranceDesc": "Request insurance for your items during the resale process.",
+  "requestInsurance": "Add insurance coverage",
   "returnIfUnsold": "Return if Unsold",
   "returnInstruction": "Back to seller",
   "keepIfUnsold": "Keep if Unsold",

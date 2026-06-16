@@ -330,6 +330,8 @@
   "itemsInsured": "articles assures",
   "insured": "Assure",
   "insurancePercentage": "+5% par article",
+  "insuranceDesc": "Demander une assurance pour vos articles pendant le processus de revente.",
+  "requestInsurance": "Ajouter une couverture d'assurance",
   "returnIfUnsold": "Retour si non vendu",
   "returnInstruction": "Retour au vendeur",
   "keepIfUnsold": "Conservation si non vendu",
