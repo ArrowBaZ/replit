@@ -431,13 +431,6 @@ export default function RequestDetailPage() {
     setUnsoldActionMap(prev => new Map(prev).set(itemId, action));
   };
 
-  const [insuranceChecked, setInsuranceChecked] = useState<Set<number>>(new Set());
-  const toggleInsurance = (itemId: number) => setInsuranceChecked((prev) => {
-    const next = new Set(prev);
-    if (next.has(itemId)) next.delete(itemId); else next.add(itemId);
-    return next;
-  });
-
   const setItemInsurance = useMutation({
     mutationFn: async ({ itemId, hasInsurance }: { itemId: number; hasInsurance: boolean }) => {
       const res = await apiRequest("PATCH", `/api/items/${itemId}`, { hasInsurance });
@@ -1879,32 +1872,6 @@ export default function RequestDetailPage() {
                     </div>
                   )}
 
-                  {isMarchand && isAssigned && !request.listReadyAt && item.status === "pending_approval" && !item.sellerCounterOffer && (
-                    <div className="ml-[4.25rem] space-y-1.5">
-                      <div className="flex items-center gap-2" data-testid={`insurance-row-initial-${item.id}`}>
-                        <Checkbox
-                          id={`insurance-initial-${item.id}`}
-                          checked={item.hasInsurance ?? false}
-                          onCheckedChange={(checked) => setItemInsurance.mutate({ itemId: item.id, hasInsurance: !!checked })}
-                          disabled={setItemInsurance.isPending}
-                          data-testid={`checkbox-insurance-initial-${item.id}`}
-                        />
-                        <label
-                          htmlFor={`insurance-initial-${item.id}`}
-                          className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1"
-                        >
-                          <Shield className="h-3 w-3 text-blue-500" />
-                          {t("addInsurancePrefix")} <span className="font-medium text-foreground">({t("addInsuranceSuffix")})</span>
-                        </label>
-                      </div>
-                      {(item.hasInsurance) && (
-                        <p className="text-xs text-blue-600 dark:text-blue-400 pl-6" data-testid={`text-insurance-amount-initial-${item.id}`}>
-                          {t("addInsuranceNote")}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
                   {item.sellerCounterOffer && item.status === "pending_approval" && isMarchand && (
                     <div className="ml-[4.25rem] space-y-2">
                       <div className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-md px-3 py-2 text-xs font-medium">
@@ -1925,37 +1892,11 @@ export default function RequestDetailPage() {
                         </div>
                       )}
                       {showRevisePrice !== item.id && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2" data-testid={`insurance-row-${item.id}`}>
-                            <Checkbox
-                              id={`insurance-${item.id}`}
-                              checked={!!item.hasInsurance || insuranceChecked.has(item.id)}
-                              onCheckedChange={() => !item.hasInsurance && toggleInsurance(item.id)}
-                              disabled={!!item.hasInsurance}
-                              data-testid={`checkbox-insurance-${item.id}`}
-                            />
-                            <label
-                              htmlFor={`insurance-${item.id}`}
-                              className={`text-xs cursor-pointer select-none flex items-center gap-1 ${!!item.hasInsurance ? "text-muted-foreground opacity-60" : "text-muted-foreground"}`}
-                            >
-                              <Shield className={`h-3 w-3 ${!!item.hasInsurance ? "text-amber-500" : "text-blue-500"}`} />
-                              {t("addInsurancePrefix")} <span className="font-medium text-foreground">({t("addInsuranceSuffix")})</span>
-                              {!!item.hasInsurance && <span className="text-xs text-amber-600 dark:text-amber-400 font-medium ml-1">(Seller chose this)</span>}
-                            </label>
-                          </div>
-                          {insuranceChecked.has(item.id) && (
-                            <p className="text-xs text-blue-600 dark:text-blue-400 pl-6" data-testid={`text-insurance-amount-${item.id}`}>
-                              {t("addInsuranceNote")}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      {showRevisePrice !== item.id && (
                         <div className="flex flex-wrap gap-2">
                           <Button
                             size="sm"
                             className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={() => acceptCounterOffer.mutate({ itemId: item.id, version: item.version ?? 1, insurance: insuranceChecked.has(item.id) })}
+                            onClick={() => acceptCounterOffer.mutate({ itemId: item.id, version: item.version ?? 1, insurance: false })}
                             disabled={acceptCounterOffer.isPending}
                             data-testid={`button-accept-counter-${item.id}`}
                           >
