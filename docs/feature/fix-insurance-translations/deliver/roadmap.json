@@ -1,0 +1,62 @@
+{
+  "feature_id": "fix-insurance-translations",
+  "description": "Add missing French translations for insurance feature in create-request form",
+  "scope": "bug-fix",
+  "start_date": "2026-06-16",
+  "files_affected": [
+    "locales/en.json",
+    "locales/fr.json"
+  ],
+  "steps": [
+    {
+      "step_id": "01-01",
+      "phase": "RED",
+      "name": "Write regression test for missing insurance translations",
+      "description": "Test that fails when translation keys are missing",
+      "files_to_modify": [
+        "client/src/pages/__tests__/create-request.test.tsx"
+      ],
+      "criteria": [
+        "Test fails when requestInsurance key is missing from locale",
+        "Test fails when insuranceDesc key is missing from locale",
+        "Test verifies French translations are not English fallback text"
+      ],
+      "implementation_notes": "Write test that mocks translation and validates keys exist in both locales",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Test exists and fails with current code",
+        "Test is independent and runnable"
+      ]
+    },
+    {
+      "step_id": "01-02",
+      "phase": "GREEN",
+      "name": "Add missing translation keys to locale files",
+      "description": "Add requestInsurance and insuranceDesc to en.json and fr.json",
+      "files_to_modify": [
+        "locales/en.json",
+        "locales/fr.json"
+      ],
+      "criteria": [
+        "Add requestInsurance: 'Add insurance coverage' to en.json",
+        "Add insuranceDesc: 'Request insurance for your items during the resale process.' to en.json",
+        "Add requestInsurance: 'Ajouter une couverture d'assurance' to fr.json",
+        "Add insuranceDesc: 'Demander une assurance pour vos articles pendant le processus de revente.' to fr.json"
+      ],
+      "implementation_notes": "Add keys alphabetically near other insurance-related keys",
+      "dependencies": [
+        "01-01"
+      ],
+      "acceptance_criteria": [
+        "All 4 keys added to correct location in both files",
+        "Regression test passes",
+        "All existing tests pass"
+      ]
+    }
+  ],
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "reviewed_at": null
+  }
+}
