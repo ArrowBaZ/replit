@@ -1,0 +1,40 @@
+{
+  "feature_id": "fix-insurance-translations",
+  "created_at": "2026-06-16T00:00:00Z",
+  "des_version": "3.14",
+  "tdd_phases": ["RED", "GREEN", "COMMIT"],
+  "entries": [
+    {
+      "step_id": "01-01",
+      "phase": "RED",
+      "status": "EXECUTED",
+      "timestamp": "2026-06-16T15:17:56Z",
+      "data": "PASS",
+      "message": "Regression test written and verified to fail with missing translation keys (semantic AssertionError, not import/syntax error)"
+    },
+    {
+      "step_id": "01-01",
+      "phase": "GREEN",
+      "status": "EXECUTED",
+      "timestamp": "2026-06-16T15:18:11Z",
+      "data": "PASS",
+      "message": "Translation keys added to en.json and fr.json; regression test passes; all existing tests pass; no regressions"
+    },
+    {
+      "step_id": "01-01",
+      "phase": "COMMIT",
+      "status": "EXECUTED",
+      "timestamp": "2026-06-16T15:18:30Z",
+      "data": "PASS",
+      "message": "Clean commit created: 388b9d7 - fix(locales): add missing insurance translation keys"
+    }
+  ],
+  "events": [
+    {
+      "type": "execution_complete",
+      "step_id": "01-01",
+      "timestamp": "2026-06-16T15:18:30Z",
+      "summary": "All 3 TDD phases executed successfully (RED → GREEN → COMMIT)"
+    }
+  ]
+}
