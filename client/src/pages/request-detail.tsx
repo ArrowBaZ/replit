@@ -1897,9 +1897,9 @@ export default function RequestDetailPage() {
                           {t("addInsurancePrefix")} <span className="font-medium text-foreground">({t("addInsuranceSuffix")})</span>
                         </label>
                       </div>
-                      {(item.hasInsurance) && (item.maxPrice || item.minPrice) && parseFloat(item.maxPrice || item.minPrice || "0") > 0 && (
+                      {(item.hasInsurance) && (
                         <p className="text-xs text-blue-600 dark:text-blue-400 pl-6" data-testid={`text-insurance-amount-initial-${item.id}`}>
-                          Insurance: +€{(parseFloat(item.maxPrice || item.minPrice || "0") * 0.05).toFixed(2)} — charged to the customer
+                          {t("addInsuranceNote")}
                         </p>
                       )}
                     </div>
@@ -1943,9 +1943,9 @@ export default function RequestDetailPage() {
                               {!!item.hasInsurance && <span className="text-xs text-amber-600 dark:text-amber-400 font-medium ml-1">(Seller chose this)</span>}
                             </label>
                           </div>
-                          {insuranceChecked.has(item.id) && item.minPrice && parseFloat(item.minPrice) > 0 && (
+                          {insuranceChecked.has(item.id) && (
                             <p className="text-xs text-blue-600 dark:text-blue-400 pl-6" data-testid={`text-insurance-amount-${item.id}`}>
-                              Insurance: +€{(parseFloat(item.minPrice) * 0.05).toFixed(2)} — charged to the customer
+                              {t("addInsuranceNote")}
                             </p>
                           )}
                         </div>
@@ -2036,11 +2036,9 @@ export default function RequestDetailPage() {
                           {t("addInsurancePrefix")} <span className="font-medium text-foreground">({t("addInsuranceSuffix")})</span>
                         </label>
                       </div>
-                      {(item.hasInsurance) && (item.maxPrice || item.minPrice) && parseFloat(item.maxPrice || item.minPrice || "0") > 0 && (
-                        <p className="text-xs text-blue-600 dark:text-blue-400 pl-6" data-testid={`text-insurance-amount-seller-${item.id}`}>
-                          Insurance: +€{(parseFloat(item.maxPrice || item.minPrice || "0") * 0.05).toFixed(2)}
-                        </p>
-                      )}
+                      <p className="text-xs text-blue-600 dark:text-blue-400 pl-6" data-testid={`text-insurance-amount-seller-${item.id}`}>
+                        {t("addInsuranceNote")}
+                      </p>
                     </div>
                   )}
 

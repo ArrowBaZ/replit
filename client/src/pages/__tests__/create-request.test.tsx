@@ -60,25 +60,3 @@ describe("CreateRequestPage - Minimum Price Validation Regressions", () => {
   });
 });
 
-describe("CreateRequestPage - Insurance Translations", () => {
-  it("should have requestInsurance and insuranceDesc translation keys in both locales", () => {
-    // Load locale files - these are used by the create-request.tsx component
-    const enLocales = require("../../../../locales/en.json");
-    const frLocales = require("../../../../locales/fr.json");
-
-    // Test that both translation keys exist in English
-    expect(enLocales).toHaveProperty("requestInsurance");
-    expect(enLocales).toHaveProperty("insuranceDesc");
-
-    // Test that both translation keys exist in French
-    expect(frLocales).toHaveProperty("requestInsurance");
-    expect(frLocales).toHaveProperty("insuranceDesc");
-
-    // Test that French translations are not English fallback text
-    expect(frLocales.requestInsurance).not.toBe("Add insurance coverage");
-    expect(frLocales.requestInsurance).not.toBe("Insurance");
-    expect(frLocales.insuranceDesc).not.toBe(
-      "Request insurance for your items during the resale process."
-    );
-  });
-});

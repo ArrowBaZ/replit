@@ -696,11 +696,11 @@ export default function SellerReviewPage() {
                   data-testid="checkbox-approve-insurance"
                 />
                 <Label htmlFor="approve-insurance" className="cursor-pointer">
-                  {t("addInsuranceCoverage")} <span className="text-xs text-muted-foreground">({t("addInsuranceSuffix")})</span>
+                  {t("addInsurancePrefix")} <span className="text-xs text-muted-foreground">({t("addInsuranceSuffix")})</span>
                 </Label>
               </div>
               <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 pl-6">
-                Insurance protects your item during the resale process.
+                {t("addInsuranceNote")}
               </p>
             </div>
             <div className="flex gap-2 justify-end">
