@@ -1293,18 +1293,6 @@ export default function RequestDetailPage() {
         </Card>
       )}
 
-      {request.hasInsurance && (
-        <Card className="border-blue-200 dark:border-blue-800">
-          <CardContent className="p-4 flex items-center gap-3">
-            <Shield className="h-5 w-5 text-blue-500 shrink-0" />
-            <div>
-              <p className="text-sm font-medium">Insurance Requested</p>
-              <p className="text-xs text-muted-foreground">The seller has requested insurance coverage for this consignment.</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {contactInfo && (
         <Card className="border-blue-200 dark:border-blue-800">
           <CardContent className="p-4 flex items-start gap-3">

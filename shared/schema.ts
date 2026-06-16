@@ -52,7 +52,6 @@ export const requests = pgTable("requests", {
   preferredDateStart: timestamp("preferred_date_start"),
   preferredDateEnd: timestamp("preferred_date_end"),
   notes: text("notes"),
-  hasInsurance: boolean("has_insurance").default(false),
   deadlineDays: integer("deadline_days").default(30),
   deadlineDate: timestamp("deadline_date"),
   sellerCounterDeadline: boolean("seller_counter_deadline").default(false),

@@ -105,7 +105,6 @@ async function seed() {
       itemCount: 3,
       estimatedValue: "500",
       meetingLocation: "Lyon 6ème",
-      hasInsurance: true,
       notes: "Luxury items including a Chanel bag, Louis Vuitton scarf, and Hermès belt.",
     }).returning();
     requestId = request.id;

@@ -659,7 +659,6 @@ export async function registerRoutes(
           preferredDateStart,
           preferredDateEnd,
           notes,
-          hasInsurance,
           deadlineDays,
         } = req.body;
         const request = await storage.createRequest({
@@ -679,7 +678,6 @@ export async function registerRoutes(
             ? new Date(preferredDateEnd)
             : null,
           notes: notes || null,
-          hasInsurance: hasInsurance ?? false,
           deadlineDays: deadlineDays ?? 30,
           deadlineDate: null,
         });
