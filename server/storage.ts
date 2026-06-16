@@ -244,9 +244,16 @@ export class DatabaseStorage implements IStorage {
     requestId: number,
     marchantId: string,
   ): Promise<Request | undefined> {
+    const [existingRequest] = await db.select().from(requests).where(eq(requests.id, requestId));
+    if (!existingRequest) return undefined;
+
+    const deadlineDays = existingRequest.deadlineDays ?? 30;
+    const deadlineDate = new Date();
+    deadlineDate.setDate(deadlineDate.getDate() + deadlineDays);
+
     const [request] = await db
       .update(requests)
-      .set({ marchantId, status: "matched", updatedAt: new Date() })
+      .set({ marchantId, status: "matched", deadlineDate, updatedAt: new Date() })
       .where(and(eq(requests.id, requestId), eq(requests.status, "pending")))
       .returning();
     return request;
@@ -1056,7 +1063,7 @@ export class DatabaseStorage implements IStorage {
     const sigs = await db.select().from(agreementSignatures).where(eq(agreementSignatures.agreementId, id));
 
     const [sellerUser] = await db.select().from(users).where(eq(users.id, agreement.sellerId));
-    const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.marchantId));
+    const [marchandUser] = await db.select().from(users).where(eq(users.id, agreement.marchantId));
     const [request] = await db.select().from(requests).where(eq(requests.id, agreement.requestId));
 
     const sigWithNames = await Promise.all(sigs.map(async (sig) => {
@@ -1070,7 +1077,7 @@ export class DatabaseStorage implements IStorage {
     return {
       ...agreement,
       seller: sellerUser ? { id: sellerUser.id, firstName: sellerUser.firstName, lastName: sellerUser.lastName, email: sellerUser.email } : null,
-      reusse: reusseUser ? { id: reusseUser.id, firstName: reusseUser.firstName, lastName: reusseUser.lastName, email: reusseUser.email } : null,
+      marchand: marchandUser ? { id: marchandUser.id, firstName: marchandUser.firstName, lastName: marchandUser.lastName, email: marchandUser.email } : null,
       request: request || null,
       signatures: sigWithNames,
     };
@@ -1085,7 +1092,7 @@ export class DatabaseStorage implements IStorage {
     return Promise.all(rows.map(async (agreement) => {
       const sigs = await db.select().from(agreementSignatures).where(eq(agreementSignatures.agreementId, agreement.id));
       const [sellerUser] = await db.select().from(users).where(eq(users.id, agreement.sellerId));
-      const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.marchantId));
+      const [marchandUser] = await db.select().from(users).where(eq(users.id, agreement.marchantId));
       const [request] = await db.select().from(requests).where(eq(requests.id, agreement.requestId));
       const sigWithNames = await Promise.all(sigs.map(async (sig) => {
         const [u] = await db.select().from(users).where(eq(users.id, sig.userId));
@@ -1097,7 +1104,7 @@ export class DatabaseStorage implements IStorage {
       return {
         ...agreement,
         seller: sellerUser ? { id: sellerUser.id, firstName: sellerUser.firstName, lastName: sellerUser.lastName, email: sellerUser.email } : null,
-        reusse: reusseUser ? { id: reusseUser.id, firstName: reusseUser.firstName, lastName: reusseUser.lastName, email: reusseUser.email } : null,
+        marchand: marchandUser ? { id: marchandUser.id, firstName: marchandUser.firstName, lastName: marchandUser.lastName, email: marchandUser.email } : null,
         request: request || null,
         signatures: sigWithNames,
       };
@@ -1109,16 +1116,16 @@ export class DatabaseStorage implements IStorage {
     return Promise.all(rows.map(async (agreement) => {
       const sigs = await db.select().from(agreementSignatures).where(eq(agreementSignatures.agreementId, agreement.id));
       const [sellerUser] = await db.select().from(users).where(eq(users.id, agreement.sellerId));
-      const [reusseUser] = await db.select().from(users).where(eq(users.id, agreement.marchantId));
+      const [marchandUser] = await db.select().from(users).where(eq(users.id, agreement.marchantId));
       const sellerSig = sigs.find((s) => s.userId === agreement.sellerId);
-      const reusseSig = sigs.find((s) => s.userId === agreement.marchantId);
+      const marchandSig = sigs.find((s) => s.userId === agreement.marchantId);
       return {
         ...agreement,
         sellerName: sellerUser ? `${sellerUser.firstName || ""} ${sellerUser.lastName || ""}`.trim() || sellerUser.email : "Unknown",
-        reusseName: reusseUser ? `${reusseUser.firstName || ""} ${reusseUser.lastName || ""}`.trim() || reusseUser.email : "Unknown",
+        marchandName: marchandUser ? `${marchandUser.firstName || ""} ${marchandUser.lastName || ""}`.trim() || marchandUser.email : "Unknown",
         signatureCount: sigs.length,
         sellerSignedAt: sellerSig?.signedAt ?? null,
-        reusseSignedAt: reusseSig?.signedAt ?? null,
+        marchandSignedAt: marchandSig?.signedAt ?? null,
       };
     }));
   }

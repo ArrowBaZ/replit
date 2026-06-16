@@ -24,7 +24,10 @@ export interface AgreementDetail {
   totalValue: string;
   itemsSnapshot: string;
   feeBreakdown: string | null;
+  deadlineDays?: number | null;
+  deadlineDate?: string | null;
   generatedAt: string;
+  [key: string]: unknown;
   seller: { id: string; firstName: string | null; lastName: string | null; email: string | null } | null;
   marchand: { id: string; firstName: string | null; lastName: string | null; email: string | null } | null;
   request: unknown | null;
@@ -59,14 +62,22 @@ export function downloadAgreementPdf(agreement: AgreementDetail): void {
 
   const fmt = (n: number) => `€${n.toFixed(2)}`;
 
-  const items = JSON.parse(agreement.itemsSnapshot) as Array<{
+  let items: Array<{
     id: number;
     title: string;
     approvedPrice: number;
     hasInsurance?: boolean;
     insuranceCost?: number;
+    unsoldAction?: string;
     fees: SnapshotFees;
   }>;
+
+  try {
+    items = JSON.parse(agreement.itemsSnapshot);
+  } catch (error) {
+    console.error("Failed to parse agreement items for PDF:", error);
+    throw new Error("Failed to generate PDF: agreement data is corrupted");
+  }
 
   const totalValue = parseFloat(agreement.totalValue);
   const totalFees = items.reduce(
@@ -106,6 +117,50 @@ export function downloadAgreementPdf(agreement: AgreementDetail): void {
   doc.text(`Marchand: ${userName(agreement.marchand)}${agreement.marchand?.email ? `  <${agreement.marchand.email}>` : ""}`, margin, y);
   y += 10;
 
+  if (agreement.deadlineDate) {
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Sale Deadline", margin, y);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Deadline: ${new Date(agreement.deadlineDate).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`, margin, y);
+    y += 5;
+    if (agreement.deadlineDays) {
+      doc.text(`Duration: ${agreement.deadlineDays} days`, margin, y);
+      y += 5;
+    }
+    y += 5;
+  }
+
+  const insuredCount = items.filter(i => i.hasInsurance).length;
+  const returnCount = items.filter(i => i.unsoldAction === "return").length;
+  const keepCount = items.filter(i => i.unsoldAction === "keep").length;
+
+  if (insuredCount > 0 || returnCount > 0 || keepCount > 0) {
+    y += 5;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Agreement Terms Summary", margin, y);
+    y += 6;
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    if (insuredCount > 0) {
+      doc.text(`Insurance Coverage: ${insuredCount} item${insuredCount > 1 ? "s" : ""} insured (+5% per item)`, margin + 2, y);
+      y += 4;
+    }
+    if (returnCount > 0) {
+      doc.text(`Return if Unsold: ${returnCount} item${returnCount > 1 ? "s" : ""} to be returned to seller`, margin + 2, y);
+      y += 4;
+    }
+    if (keepCount > 0) {
+      doc.text(`Keep if Unsold: ${keepCount} item${keepCount > 1 ? "s" : ""} retained by marchand`, margin + 2, y);
+      y += 4;
+    }
+    y += 3;
+  }
+
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.text("Item List & Fee Breakdown", margin, y);
@@ -123,13 +178,19 @@ export function downloadAgreementPdf(agreement: AgreementDetail): void {
 
   const pctStr = (v: number | undefined) => (v != null ? ` (${v}%)` : "");
 
-  const tableBody = items.map((item) => [
-    item.hasInsurance ? `${item.title} 🛡 (+5% ins.)` : item.title,
-    fmt(item.approvedPrice),
-    `${fmt(item.fees.sellerAmount)}${pctStr(item.fees.sellerPct)}`,
-    `${fmt(item.fees.marchantAmount)}${pctStr(item.fees.marchantPct)}`,
-    `${fmt(item.fees.platformAmount)}${pctStr(item.fees.platformPct)}`,
-  ]);
+  const tableBody = items.map((item) => {
+    let titleStr = item.title;
+    if (item.hasInsurance) titleStr += " 🛡 (+5% ins.)";
+    if (item.unsoldAction === "keep") titleStr += " [Keep if unsold]";
+    else if (item.unsoldAction === "return") titleStr += " [Return if unsold]";
+    return [
+      titleStr,
+      fmt(item.approvedPrice),
+      `${fmt(item.fees.sellerAmount)}${pctStr(item.fees.sellerPct)}`,
+      `${fmt(item.fees.marchantAmount)}${pctStr(item.fees.marchantPct)}`,
+      `${fmt(item.fees.platformAmount)}${pctStr(item.fees.platformPct)}`,
+    ];
+  });
 
   tableBody.push([
     `Totals (${agreement.itemCount} items)`,

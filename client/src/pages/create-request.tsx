@@ -33,6 +33,7 @@ export default function CreateRequestPage() {
     preferredDateStart: "",
     preferredDateEnd: "",
     notes: "",
+    deadlineDays: "30",
   });
 
   const serviceTypes = [
@@ -108,6 +109,7 @@ export default function CreateRequestPage() {
       preferredDateEnd: formData.preferredDateEnd || null,
       notes: formData.notes || null,
       hasInsurance,
+      deadlineDays: parseInt(formData.deadlineDays) || 30,
     });
   };
 
@@ -288,6 +290,23 @@ export default function CreateRequestPage() {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="deadlineDays">{t("deadlineLabel") || "Item deadline (days)"}</Label>
+            <Input
+              id="deadlineDays"
+              type="number"
+              min="1"
+              max="365"
+              placeholder="30"
+              value={formData.deadlineDays}
+              onChange={(e) => updateField("deadlineDays", e.target.value)}
+              data-testid="input-deadline-days"
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("deadlineHint") || "The marchand will have this many days to sell the items."}
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="notes">{t("additionalNotes")}</Label>
             <Textarea
               id="notes"
@@ -386,6 +405,10 @@ export default function CreateRequestPage() {
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground flex items-center gap-1"><Shield className="h-3.5 w-3.5 text-blue-500" />{t("requestInsurance") || "Insurance"}</span>
                 <span className="text-sm font-medium">{hasInsurance ? "Yes" : "No"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">{t("deadlineLabel") || "Deadline"}</span>
+                <span className="text-sm font-medium">{formData.deadlineDays} {t("days") || "days"}</span>
               </div>
             </CardContent>
           </Card>

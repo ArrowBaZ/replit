@@ -54,21 +54,22 @@ type PriceOffer = {
 };
 
 function NegotiationHistory({ itemId }: { itemId: number }) {
+  const { t } = useTranslation();
   const { data: history, isLoading, isError } = useQuery<PriceOffer[]>({
     queryKey: [`/api/items/${itemId}/price-history`],
     retry: 1,
   });
 
   if (isLoading) {
-    return <div className="text-xs text-muted-foreground py-1">Loading history...</div>;
+    return <div className="text-xs text-muted-foreground py-1">{t("loading")}</div>;
   }
 
   if (isError) {
-    return <p className="text-xs text-red-500 py-1">Could not load negotiation history.</p>;
+    return <p className="text-xs text-red-500 py-1">{t("error")}: Could not load negotiation history.</p>;
   }
 
   if (!history || history.length === 0) {
-    return <p className="text-xs text-muted-foreground py-1">No price history recorded yet.</p>;
+    return <p className="text-xs text-muted-foreground py-1">{t("priceNegotiationHistory")} — No offers yet.</p>;
   }
 
   const actionLabel: Record<string, string> = {
@@ -187,6 +188,10 @@ export default function RequestDetailPage() {
   } | null>({
     queryKey: ["/api/requests", params.id, "contact"],
     enabled: !!request && (!!request.marchantId),
+  });
+
+  const { data: minPriceSetting } = useQuery<{ minPrice: number }>({
+    queryKey: ["/api/settings/min-price"],
   });
 
   const conditionLabel = (cond: string | null): string => {
@@ -338,7 +343,7 @@ export default function RequestDetailPage() {
   };
 
   const addItem = useMutation({
-    mutationFn: async (data: any) => {
+  mutationFn: async (data: any) => {
       const res = await apiRequest("POST", `/api/requests/${params.id}/items`, data);
       const item = await res.json();
       let docFailCount = 0;
@@ -368,6 +373,10 @@ export default function RequestDetailPage() {
       } else {
         toast({ title: t("addItem") });
       }
+    },
+    onError: (err: any) => {
+      const { message } = parseApiError(err);
+      toast({ title: t("error") || "Error", description: message, variant: "destructive" });
     },
   });
 
@@ -414,6 +423,14 @@ export default function RequestDetailPage() {
   const [reportReason, setReportReason] = useState("");
   const [declineReason, setDeclineReason] = useState("");
 
+  const [showDeadlineCounter, setShowDeadlineCounter] = useState(false);
+  const [deadlineCounterProposal, setDeadlineCounterProposal] = useState("");
+
+  const [unsoldActionMap, setUnsoldActionMap] = useState<Map<number, string>>(new Map());
+  const setUnsoldAction = (itemId: number, action: string) => {
+    setUnsoldActionMap(prev => new Map(prev).set(itemId, action));
+  };
+
   const [insuranceChecked, setInsuranceChecked] = useState<Set<number>>(new Set());
   const toggleInsurance = (itemId: number) => setInsuranceChecked((prev) => {
     const next = new Set(prev);
@@ -431,6 +448,19 @@ export default function RequestDetailPage() {
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message || "Failed to update insurance", variant: "destructive" });
+    },
+  });
+
+  const setItemUnsoldAction = useMutation({
+    mutationFn: async ({ itemId, unsoldAction }: { itemId: number; unsoldAction: string }) => {
+      const res = await apiRequest("PATCH", `/api/items/${itemId}`, { unsoldAction });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to update unsold action", variant: "destructive" });
     },
   });
 
@@ -681,6 +711,36 @@ export default function RequestDetailPage() {
       setShowReport(false);
       setReportReason("");
       toast({ title: t("reportSuccess") });
+    },
+  });
+
+  const counterDeadline = useMutation({
+    mutationFn: async (proposedDeadlineDays: number) => {
+      const res = await apiRequest("POST", `/api/requests/${params.id}/counter-deadline`, { proposedDeadlineDays });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id] });
+      toast({ title: t("deadlineCounterOfferSent") || "Deadline counter-offer sent" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to submit counter-offer", variant: "destructive" });
+    },
+  });
+
+  const respondDeadlineCounter = useMutation({
+    mutationFn: async (data: { accept?: boolean; counterProposal?: number }) => {
+      const res = await apiRequest("POST", `/api/requests/${params.id}/respond-deadline-counter`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id] });
+      setShowDeadlineCounter(false);
+      setDeadlineCounterProposal("");
+      toast({ title: t("deadlineCounterOfferResponded") || "Deadline counter-offer updated" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to respond", variant: "destructive" });
     },
   });
 
@@ -1052,6 +1112,176 @@ export default function RequestDetailPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {request.deadlineDate && (() => {
+        const now = new Date();
+        const deadline = new Date(request.deadlineDate);
+        const daysRemaining = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        const isExpired = daysRemaining <= 0;
+        const statusColor = isExpired ? "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20" : daysRemaining <= 7 ? "border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20" : "border-blue-200 dark:border-blue-800";
+        const textColor = isExpired ? "text-red-600 dark:text-red-400" : daysRemaining <= 7 ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400";
+
+        return (
+          <Card className={`border-2 ${statusColor}`} data-testid="card-deadline-countdown">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Clock className={`h-5 w-5 mt-0.5 ${textColor}`} />
+              <div className="flex-1">
+                <p className={`text-sm font-semibold ${textColor}`}>
+                  {isExpired ? (t("deadlineExpired") || "Deadline expired") : `${daysRemaining} ${t("daysRemaining") || "days remaining"}`}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {t("deadlineUntil") || "Until"}: {deadline.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long", year: "numeric" })}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {request.marchandCounterDeadline && isSeller && (
+        <Card className="border-2 border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20" data-testid="card-deadline-counter-offer">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                  {t("deadlineCounterOffer") || "Marchand Counter-Offered Deadline"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {request.marchandProposedDeadlineDays} {t("days") || "days"}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                size="sm"
+                className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                onClick={() => respondDeadlineCounter.mutate({ accept: true })}
+                disabled={respondDeadlineCounter.isPending}
+                data-testid="button-accept-deadline-counter"
+              >
+                {t("accept")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowDeadlineCounter(true)}
+                data-testid="button-counter-deadline"
+              >
+                {t("counterOffer")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-300 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                onClick={() => respondDeadlineCounter.mutate({ accept: false })}
+                disabled={respondDeadlineCounter.isPending}
+                data-testid="button-reject-deadline-counter"
+              >
+                {t("reject")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {request.sellerCounterDeadline && isMarchand && isAssigned && (
+        <Card className="border-2 border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20" data-testid="card-seller-deadline-counter">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <Clock className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+                  {t("sellerCounterDeadlineOffer") || "Seller Counter-Offered Deadline"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {request.sellerProposedDeadlineDays} {t("days") || "days"}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                size="sm"
+                className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                onClick={() => {
+                  const newDeadlineDays = request.sellerProposedDeadlineDays;
+                  counterDeadline.mutate(newDeadlineDays || 30);
+                }}
+                disabled={counterDeadline.isPending}
+                data-testid="button-accept-seller-deadline"
+              >
+                {t("accept")}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowDeadlineCounter(true)}
+                data-testid="button-counter-seller-deadline"
+              >
+                {t("counterOffer")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {showDeadlineCounter && (
+        <Dialog open={showDeadlineCounter} onOpenChange={setShowDeadlineCounter}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>
+                {isSeller ? (t("counterOfferDeadline") || "Counter-Offer Deadline") : (t("proposeDeadline") || "Propose New Deadline")}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="deadline-days">{t("deadlineDays") || "Deadline (days)"}</Label>
+                <Input
+                  id="deadline-days"
+                  type="number"
+                  min="1"
+                  max="365"
+                  placeholder="30"
+                  value={deadlineCounterProposal}
+                  onChange={(e) => setDeadlineCounterProposal(e.target.value)}
+                  data-testid="input-deadline-counter-days"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {isSeller ? (t("yourProposal") || "Your counter-proposal") : (t("marchandProposal") || "Your proposal")}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => {
+                    const days = parseInt(deadlineCounterProposal) || 30;
+                    if (isSeller) {
+                      respondDeadlineCounter.mutate({ counterProposal: days });
+                    } else {
+                      counterDeadline.mutate(days);
+                    }
+                  }}
+                  disabled={!deadlineCounterProposal || counterDeadline.isPending || respondDeadlineCounter.isPending}
+                  data-testid="button-submit-deadline-counter"
+                >
+                  {t("submit")}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowDeadlineCounter(false);
+                    setDeadlineCounterProposal("");
+                  }}
+                  data-testid="button-cancel-deadline-counter"
+                >
+                  {t("cancel")}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {request.notes && (
@@ -1478,6 +1708,13 @@ export default function RequestDetailPage() {
                       </Select>
                     </div>
                   )}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        {t("minItemPrice") || "Minimum item price"}: <span className="font-medium">€{minPriceSetting?.minPrice?.toFixed(2) || "80.00"}</span>
+                      </span>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>{t("minPrice")} (EUR)</Label>
@@ -1790,6 +2027,43 @@ export default function RequestDetailPage() {
                   {isSeller && item.status === "pending_approval" && request.listReadyAt && item.minPrice && (
                     <div className="ml-[4.25rem]" data-testid={`fee-preview-pending-${item.id}`}>
                       <ItemFeePreview price={parseFloat(item.minPrice)} />
+                    </div>
+                  )}
+
+                  {isSeller && item.status === "pending_approval" && request.listReadyAt && (
+                    <div className="ml-[4.25rem] space-y-2">
+                      <div className="space-y-1.5 p-3 bg-muted/50 rounded-lg border border-dashed">
+                        <Label className="text-xs font-medium">{t("unsoldAction") || "If unsold"}</Label>
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`unsold-${item.id}`}
+                              value="return"
+                              checked={(unsoldActionMap.get(item.id) ?? item.unsoldAction ?? "return") === "return"}
+                              onChange={(e) => { setUnsoldAction(item.id, e.target.value); setItemUnsoldAction.mutate({ itemId: item.id, unsoldAction: e.target.value }); }}
+                              disabled={setItemUnsoldAction.isPending}
+                              data-testid={`radio-unsold-return-${item.id}`}
+                              className="cursor-pointer"
+                            />
+                            <span className="text-xs text-muted-foreground">{t("returnToMe") || "Return to me"}</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`unsold-${item.id}`}
+                              value="keep"
+                              checked={(unsoldActionMap.get(item.id) ?? item.unsoldAction ?? "return") === "keep"}
+                              onChange={(e) => { setUnsoldAction(item.id, e.target.value); setItemUnsoldAction.mutate({ itemId: item.id, unsoldAction: e.target.value }); }}
+                              disabled={setItemUnsoldAction.isPending}
+                              data-testid={`radio-unsold-keep-${item.id}`}
+                              className="cursor-pointer"
+                            />
+                            <span className="text-xs text-muted-foreground">{t("keepIt") || "Keep it"}</span>
+                          </label>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{t("unsoldActionHint") || "This is non-negotiable and will be locked in the agreement."}</p>
+                      </div>
                     </div>
                   )}
 

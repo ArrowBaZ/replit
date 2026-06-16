@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTranslation } from "react-i18next";
+import { translateNotifications } from "@/lib/notification-translator";
 import type { Profile, Notification, ItemDocument } from "@shared/schema";
 import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
 import { useEffect, useRef } from "react";
@@ -122,11 +123,11 @@ function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?:
             description: t("notifPrefAgreementReadyDesc"),
             action: (
               <ToastAction
-                altText="View and sign the agreement"
+                altText={t("signAgreement")}
                 onClick={() => navigate(`/agreements/${data.agreementId}`)}
                 data-testid="toast-link-agreement"
               >
-                View &amp; Sign
+                {t("viewAgreement")}
               </ToastAction>
             ),
           });
@@ -295,7 +296,7 @@ function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?:
           </div>
         ) : (
           <ScrollArea className="max-h-80">
-            {notifs.slice(0, 15).map((notif) => (
+            {translateNotifications(notifs).slice(0, 15).map((notif) => (
               <button
                 key={notif.id}
                 className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-muted/50 border-b last:border-b-0 transition-colors ${!notif.isRead ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}`}

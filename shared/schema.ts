@@ -53,6 +53,13 @@ export const requests = pgTable("requests", {
   preferredDateEnd: timestamp("preferred_date_end"),
   notes: text("notes"),
   hasInsurance: boolean("has_insurance").default(false),
+  deadlineDays: integer("deadline_days").default(30),
+  deadlineDate: timestamp("deadline_date"),
+  sellerCounterDeadline: boolean("seller_counter_deadline").default(false),
+  sellerProposedDeadlineDays: integer("seller_proposed_deadline_days"),
+  marchandCounterDeadline: boolean("marchand_counter_deadline").default(false),
+  marchandProposedDeadlineDays: integer("marchand_proposed_deadline_days"),
+  deadlineOfferCount: integer("deadline_offer_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   completedAt: timestamp("completed_at"),
@@ -108,6 +115,7 @@ export const items = pgTable("items", {
   marchantRejectionReason: text("marchand_rejection_reason"),
   hasInsurance: boolean("has_insurance").default(false),
   insuranceCost: numeric("insurance_cost"),
+  unsoldAction: varchar("unsold_action", { length: 20 }).default("return"),
   sellerCounterOffer: boolean("seller_counter_offer").default(false),
   declineReason: text("decline_reason"),
   status: varchar("status", { length: 20 }).notNull().default("pending_approval"),
@@ -330,6 +338,19 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
   marchand: one(users, { fields: [reviews.marchantId], references: [users.id], relationName: "marchantReviews" }),
 }));
 
+export const adminSettings = pgTable("admin_settings", {
+  id: serial("id").primaryKey(),
+  settingKey: varchar("setting_key", { length: 100 }).notNull().unique(),
+  settingValue: text("setting_value").notNull(),
+  description: text("description"),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const adminSettingsRelations = relations(adminSettings, ({ one }) => ({
+  updatedByUser: one(users, { fields: [adminSettings.updatedBy], references: [users.id] }),
+}));
+
 export const agreements = pgTable("agreements", {
   id: serial("id").primaryKey(),
   requestId: integer("request_id").notNull().references(() => requests.id),
@@ -340,6 +361,8 @@ export const agreements = pgTable("agreements", {
   totalValue: numeric("total_value").notNull(),
   itemsSnapshot: text("items_snapshot").notNull(),
   feeBreakdown: text("fee_breakdown"),
+  deadlineDays: integer("deadline_days"),
+  deadlineDate: timestamp("deadline_date"),
   generatedAt: timestamp("generated_at").defaultNow(),
 }, (table) => [
   index("idx_agreements_request").on(table.requestId),
@@ -408,6 +431,7 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({ i
 export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, createdAt: true });
 export const insertFeeTierSchema = createInsertSchema(feeTiers).omit({ id: true, createdAt: true });
 export const insertFeeTierChangelogSchema = createInsertSchema(feeTierChangelog).omit({ id: true, changedAt: true });
+export const insertAdminSettingsSchema = createInsertSchema(adminSettings).omit({ id: true, updatedAt: true });
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
@@ -439,3 +463,5 @@ export type FeeTier = typeof feeTiers.$inferSelect;
 export type InsertFeeTier = z.infer<typeof insertFeeTierSchema>;
 export type FeeTierChangelog = typeof feeTierChangelog.$inferSelect;
 export type InsertFeeTierChangelog = z.infer<typeof insertFeeTierChangelogSchema>;
+export type AdminSettings = typeof adminSettings.$inferSelect;
+export type InsertAdminSettings = z.infer<typeof insertAdminSettingsSchema>;

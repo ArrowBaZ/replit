@@ -1,12 +1,13 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users, emailVerificationCodes, sessions } from "../shared/models/auth";
+import { adminSettings, agreements } from "@shared/schema";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 import { ITEM_CATEGORIES, ITEM_CONDITIONS, CATEGORY_ALLOWED_FIELDS, NOTIF_PREF_KEYS } from "@shared/constants";
@@ -20,6 +21,8 @@ interface AuthRequest extends Request {
   user?: { id: string };
   cookies: Record<string, string>;
 }
+
+const INSURANCE_RATE = 0.05;
 
 function generateVerificationCode(): string {
   const code = Math.floor(randomBytes(4).readUInt32BE(0) % 1000000);
@@ -55,7 +58,7 @@ async function buildAgreementSnapshot(items: Item[]): Promise<{ itemsSnapshot: s
   const snapItems = await Promise.all(items.map(async (i) => {
     const price = resolveItemPrice(i);
     const feeRes = await resolveFeePercentages(price);
-    const insuranceCost = i.hasInsurance ? parseFloat((price * 0.05).toFixed(2)) : 0;
+    const insuranceCost = i.hasInsurance ? parseFloat((price * INSURANCE_RATE).toFixed(2)) : 0;
     const fees = {
       sellerAmount: parseFloat(((price * feeRes.sellerPct) / 100).toFixed(2)),
       marchantAmount: parseFloat(((price * feeRes.marchantPct) / 100).toFixed(2)),
@@ -64,12 +67,12 @@ async function buildAgreementSnapshot(items: Item[]): Promise<{ itemsSnapshot: s
       marchantPct: feeRes.marchantPct,
       platformPct: feeRes.platformPct,
     };
-    return { id: i.id, title: i.title, approvedPrice: price, hasInsurance: i.hasInsurance ?? false, insuranceCost, fees };
+    return { id: i.id, title: i.title, approvedPrice: price, hasInsurance: i.hasInsurance ?? false, insuranceCost, unsoldAction: i.unsoldAction ?? "return", fees };
   }));
   const totalValue = snapItems.reduce((sum, it) => sum + it.approvedPrice, 0);
   return {
     itemsSnapshot: JSON.stringify(snapItems),
-    feeBreakdown: JSON.stringify(snapItems.map((it) => ({ itemId: it.id, title: it.title, salePrice: it.approvedPrice, hasInsurance: it.hasInsurance, insuranceCost: it.insuranceCost, fees: it.fees }))),
+    feeBreakdown: JSON.stringify(snapItems.map((it) => ({ itemId: it.id, title: it.title, salePrice: it.approvedPrice, hasInsurance: it.hasInsurance, insuranceCost: it.insuranceCost, unsoldAction: it.unsoldAction, fees: it.fees }))),
     totalValue: totalValue.toFixed(2),
   };
 }
@@ -657,6 +660,7 @@ export async function registerRoutes(
           preferredDateEnd,
           notes,
           hasInsurance,
+          deadlineDays,
         } = req.body;
         const request = await storage.createRequest({
           sellerId: userId,
@@ -676,6 +680,8 @@ export async function registerRoutes(
             : null,
           notes: notes || null,
           hasInsurance: hasInsurance ?? false,
+          deadlineDays: deadlineDays ?? 30,
+          deadlineDate: null,
         });
         res.json(request);
       } catch (error) {
@@ -868,6 +874,10 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Item list is finalized and locked — no further changes allowed" });
         }
 
+        // Fetch minimum price setting
+        const minPriceSetting = await db.select().from(adminSettings).where(eq(adminSettings.settingKey, "min_item_price"));
+        const minPriceLimitEur = minPriceSetting.length > 0 ? parseFloat(minPriceSetting[0].settingValue) : 80;
+
         const {
           title,
           description,
@@ -897,6 +907,25 @@ export async function registerRoutes(
           subcategory,
         platformOnly,
         } = req.body;
+
+        // Validate minimum price
+        if (minPrice && minPriceLimitEur > 0) {
+          const minPriceNum = parseFloat(minPrice);
+          if (minPriceNum < minPriceLimitEur) {
+            return res.status(400).json({
+              message: `Item price must be at least €${minPriceLimitEur.toFixed(2)}. Proposed minimum: €${minPriceNum.toFixed(2)}`
+            });
+          }
+        }
+        if (maxPrice && minPriceLimitEur > 0) {
+          const maxPriceNum = parseFloat(maxPrice);
+          if (maxPriceNum < minPriceLimitEur) {
+            return res.status(400).json({
+              message: `Item price must be at least €${minPriceLimitEur.toFixed(2)}. Proposed maximum: €${maxPriceNum.toFixed(2)}`
+            });
+          }
+        }
+
         const item = await storage.createItem({
           requestId,
           sellerId: request.sellerId,
@@ -1479,13 +1508,25 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Cannot change insurance after seller approval — insurance choice is locked" });
         }
 
+        // Check if item is locked in an agreement (prevent changing unsoldAction after agreement)
+        if (req.body.unsoldAction !== undefined && req.body.unsoldAction !== existingItem.unsoldAction) {
+          if (existingItem.requestId) {
+            const agreementWithItem = await db.select().from(agreements).where(
+              eq(agreements.requestId, existingItem.requestId)
+            );
+            if (agreementWithItem.length > 0) {
+              return res.status(400).json({ message: "Cannot change unsold action after agreement creation — this choice is now locked" });
+            }
+          }
+        }
+
         const {
           title, description, brand, size, category, condition,
           minPrice, maxPrice, photos, certificatePhotos,
           material, dimensions, author, genre, language, vintage,
           ageRange, model, deviceStorage, ram, volume, frameSize,
           instrumentType, applianceType, decorStyle, subcategory,
-          platformOnly, hasInsurance,
+          platformOnly, hasInsurance, unsoldAction,
         } = req.body;
 
         // Apply category-aware validation using existing item's category when not changing it
@@ -1533,6 +1574,7 @@ export async function registerRoutes(
           ...(subcategory !== undefined && { subcategory: subcategory || null }),
           ...(platformOnly !== undefined && { platformOnly: !!platformOnly }),
           ...(hasInsurance !== undefined && { hasInsurance: !!hasInsurance, insuranceCost: insuranceCostPreview }),
+          ...(unsoldAction !== undefined && { unsoldAction: unsoldAction || null }),
         });
         if (!updated) return res.status(404).json({ message: "Item not found" });
         res.json(updated);
@@ -2949,6 +2991,127 @@ export async function registerRoutes(
     },
   );
 
+  // Counter-offer deadline (marchand proposes different deadline)
+  app.post(
+    "/api/requests/:id/counter-deadline",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const requestId = parseInt(req.params.id);
+        const { proposedDeadlineDays } = req.body;
+
+        const profile = await storage.getProfile(userId);
+        if (!profile || profile.role !== "marchand") {
+          return res.status(403).json({ message: "Only marchand can counter-offer deadline" });
+        }
+
+        const request = await storage.getRequest(requestId);
+        if (!request) return res.status(404).json({ message: "Request not found" });
+
+        if (request.marchantId !== userId) {
+          return res.status(403).json({ message: "Not assigned to this request" });
+        }
+
+        if (!request.deadlineDate) {
+          return res.status(400).json({ message: "Cannot counter-offer before deadline is set" });
+        }
+
+        if ((request.deadlineOfferCount || 0) >= 3) {
+          return res.status(400).json({ message: "Maximum 3 rounds of deadline negotiation allowed" });
+        }
+
+        const updated = await storage.updateRequest(requestId, {
+          marchandCounterDeadline: true,
+          marchandProposedDeadlineDays: proposedDeadlineDays,
+          deadlineOfferCount: (request.deadlineOfferCount || 0) + 1,
+        });
+
+        if (!updated) {
+          return res.status(500).json({ message: "Failed to submit counter-offer" });
+        }
+
+        res.json(updated);
+      } catch (error) {
+        console.error("Error counter-offering deadline:", error);
+        res.status(500).json({ message: "Failed to counter-offer deadline" });
+      }
+    },
+  );
+
+  // Accept/reject marchand's deadline counter-offer
+  app.post(
+    "/api/requests/:id/respond-deadline-counter",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const requestId = parseInt(req.params.id);
+        const { accept, counterProposal } = req.body;
+
+        const profile = await storage.getProfile(userId);
+        if (!profile || profile.role !== "seller") {
+          return res.status(403).json({ message: "Only seller can respond to deadline counter-offer" });
+        }
+
+        const request = await storage.getRequest(requestId);
+        if (!request) return res.status(404).json({ message: "Request not found" });
+
+        if (request.sellerId !== userId) {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+
+        if (!request.marchandCounterDeadline) {
+          return res.status(400).json({ message: "No pending deadline counter-offer" });
+        }
+
+        if (accept) {
+          // Accept marchand's counter-offer
+          const newDeadlineDays = request.marchandProposedDeadlineDays;
+          const newDeadlineDate = new Date();
+          newDeadlineDate.setDate(newDeadlineDate.getDate() + (newDeadlineDays || 30));
+
+          const updated = await storage.updateRequest(requestId, {
+            deadlineDays: newDeadlineDays,
+            deadlineDate: newDeadlineDate,
+            marchandCounterDeadline: false,
+            marchandProposedDeadlineDays: null,
+            sellerCounterDeadline: false,
+            sellerProposedDeadlineDays: null,
+            deadlineOfferCount: 0,
+          });
+
+          res.json(updated);
+        } else if (counterProposal) {
+          // Seller makes a counter-proposal
+          if ((request.deadlineOfferCount || 0) >= 3) {
+            return res.status(400).json({ message: "Maximum 3 rounds of deadline negotiation reached" });
+          }
+
+          const updated = await storage.updateRequest(requestId, {
+            sellerCounterDeadline: true,
+            sellerProposedDeadlineDays: counterProposal,
+            marchandCounterDeadline: false,
+            deadlineOfferCount: (request.deadlineOfferCount || 0) + 1,
+          });
+
+          res.json(updated);
+        } else {
+          // Reject the counter-offer
+          const updated = await storage.updateRequest(requestId, {
+            marchandCounterDeadline: false,
+            marchandProposedDeadlineDays: null,
+          });
+
+          res.json(updated);
+        }
+      } catch (error) {
+        console.error("Error responding to deadline counter-offer:", error);
+        res.status(500).json({ message: "Failed to respond to deadline counter-offer" });
+      }
+    },
+  );
+
   app.post(
     "/api/requests/:id/generate-agreement",
     isAuthenticated,
@@ -2987,6 +3150,8 @@ export async function registerRoutes(
           totalValue,
           itemsSnapshot,
           feeBreakdown,
+          deadlineDays: request.deadlineDays,
+          deadlineDate: request.deadlineDate,
         });
         await storage.createNotification({
           userId: request.sellerId,
@@ -3402,6 +3567,81 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching uncovered items:", error);
       res.status(500).json({ message: "Failed to fetch uncovered items" });
+    }
+  });
+
+  // Admin settings endpoints
+  app.get(
+    "/api/admin/settings/min-price",
+    isAuthenticated,
+    requireAdmin,
+    async (req: any, res) => {
+      try {
+        const result = await db.select().from(adminSettings).where(eq(adminSettings.settingKey, "min_item_price"));
+        const minPrice = result.length > 0 ? parseFloat(result[0].settingValue) : 80;
+        res.json({ minPrice });
+      } catch (error) {
+        console.error("Error fetching min price:", error);
+        res.status(500).json({ message: "Failed to fetch min price setting" });
+      }
+    }
+  );
+
+  app.post(
+    "/api/admin/settings/min-price",
+    isAuthenticated,
+    requireAdmin,
+    async (req: any, res) => {
+      try {
+        const { minPrice } = req.body;
+        const userId = req.user.id;
+
+        if (minPrice === undefined || minPrice === null || isNaN(parseFloat(minPrice))) {
+          return res.status(400).json({ message: "Valid minPrice number required" });
+        }
+
+        const minPriceNum = parseFloat(minPrice);
+        if (minPriceNum < 0) {
+          return res.status(400).json({ message: "Minimum price must be 0 or greater" });
+        }
+
+        const existing = await db.select().from(adminSettings).where(eq(adminSettings.settingKey, "min_item_price"));
+
+        let result;
+        if (existing.length > 0) {
+          result = await db.update(adminSettings)
+            .set({
+              settingValue: minPriceNum.toFixed(2),
+              updatedBy: userId,
+              updatedAt: new Date(),
+            })
+            .where(eq(adminSettings.settingKey, "min_item_price"))
+            .returning();
+        } else {
+          result = await db.insert(adminSettings).values({
+            settingKey: "min_item_price",
+            settingValue: minPriceNum.toFixed(2),
+            description: "Global minimum item price",
+            updatedBy: userId,
+          }).returning();
+        }
+
+        res.json({ minPrice: minPriceNum, message: "Minimum price updated successfully" });
+      } catch (error) {
+        console.error("Error updating min price:", error);
+        res.status(500).json({ message: "Failed to update min price setting" });
+      }
+    }
+  );
+
+  app.get("/api/settings/min-price", async (req: any, res) => {
+    try {
+      const result = await db.select().from(adminSettings).where(eq(adminSettings.settingKey, "min_item_price"));
+      const minPrice = result.length > 0 ? parseFloat(result[0].settingValue) : 80;
+      res.json({ minPrice });
+    } catch (error) {
+      console.error("Error fetching min price:", error);
+      res.status(500).json({ minPrice: 80 });
     }
   });
 
