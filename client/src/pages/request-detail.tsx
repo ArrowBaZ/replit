@@ -2019,6 +2019,32 @@ export default function RequestDetailPage() {
                   )}
 
                   {isSeller && item.status === "pending_approval" && request.listReadyAt && (
+                    <div className="ml-[4.25rem] space-y-1.5">
+                      <div className="flex items-center gap-2" data-testid={`insurance-row-seller-${item.id}`}>
+                        <Checkbox
+                          id={`insurance-seller-${item.id}`}
+                          checked={item.hasInsurance ?? false}
+                          onCheckedChange={(checked) => setItemInsurance.mutate({ itemId: item.id, hasInsurance: !!checked })}
+                          disabled={setItemInsurance.isPending}
+                          data-testid={`checkbox-insurance-seller-${item.id}`}
+                        />
+                        <label
+                          htmlFor={`insurance-seller-${item.id}`}
+                          className="text-xs text-muted-foreground cursor-pointer select-none flex items-center gap-1"
+                        >
+                          <Shield className="h-3 w-3 text-blue-500" />
+                          {t("addInsurancePrefix")} <span className="font-medium text-foreground">({t("addInsuranceSuffix")})</span>
+                        </label>
+                      </div>
+                      {(item.hasInsurance) && (item.maxPrice || item.minPrice) && parseFloat(item.maxPrice || item.minPrice || "0") > 0 && (
+                        <p className="text-xs text-blue-600 dark:text-blue-400 pl-6" data-testid={`text-insurance-amount-seller-${item.id}`}>
+                          Insurance: +€{(parseFloat(item.maxPrice || item.minPrice || "0") * 0.05).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {isSeller && item.status === "pending_approval" && request.listReadyAt && (
                     <div className="ml-[4.25rem] space-y-2">
                       <div className="space-y-1.5 p-3 bg-muted/50 rounded-lg border border-dashed">
                         <Label className="text-xs font-medium">{t("unsoldAction") || "If unsold"}</Label>
