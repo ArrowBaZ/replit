@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -489,6 +489,9 @@ export default function AdminFeeTiersPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [createServerError, setCreateServerError] = useState<string | null>(null);
   const [editServerError, setEditServerError] = useState<string | null>(null);
+  const [minPrice, setMinPrice] = useState<string>("");
+  const [editingMinPrice, setEditingMinPrice] = useState(false);
+  const [minPriceSaving, setMinPriceSaving] = useState(false);
 
   const { data: tiers = [], isLoading } = useQuery<FeeTier[]>({
     queryKey: ["/api/admin/fee-tiers"],
@@ -497,6 +500,51 @@ export default function AdminFeeTiersPage() {
   const { data: changelog = [], isLoading: changelogLoading } = useQuery<FeeTierChangelog[]>({
     queryKey: ["/api/admin/fee-tiers/changelog"],
   });
+
+  const fetchMinPrice = async () => {
+    try {
+      const response = await apiRequest("GET", "/api/admin/settings/min-price");
+      const data = await response.json();
+      setMinPrice(data.minPrice?.toString() || "");
+    } catch (error) {
+      console.error("Failed to fetch minimum price:", error);
+    }
+  };
+
+  const handleSaveMinPrice = async () => {
+    setMinPriceSaving(true);
+    const parsed = parseFloat(minPrice);
+
+    // Validation
+    if (isNaN(parsed) || parsed < 0) {
+      toast({
+        title: "Error",
+        description: "Minimum price must be a valid positive number",
+        variant: "destructive"
+      });
+      setMinPriceSaving(false);
+      return;
+    }
+
+    try {
+      await apiRequest("POST", "/api/admin/settings/min-price", { minPrice: parsed });
+      toast({ title: "Minimum price updated" });
+      setEditingMinPrice(false);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update minimum price", variant: "destructive" });
+    } finally {
+      setMinPriceSaving(false);
+    }
+  };
+
+  const handleCancelEditMinPrice = () => {
+    fetchMinPrice();
+    setEditingMinPrice(false);
+  };
+
+  useEffect(() => {
+    fetchMinPrice();
+  }, []);
 
   function invalidateAll() {
     queryClient.invalidateQueries({ queryKey: ["/api/admin/fee-tiers"] });
@@ -607,6 +655,70 @@ export default function AdminFeeTiersPage() {
       <CoverageIndicator tiers={tiers} isLoading={isLoading} />
 
       <UncoveredItemsBanner onAddTier={() => setCreateOpen(true)} />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Minimum Request Value</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Set the minimum estimated value that sellers must enter when creating a request.
+          </p>
+          {editingMinPrice ? (
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <label className="text-sm font-medium">Minimum Price (EUR)</label>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-sm text-muted-foreground">€</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    placeholder="0"
+                    className="flex-1"
+                    data-testid="input-min-price"
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={handleSaveMinPrice}
+                disabled={minPriceSaving}
+                data-testid="button-save-min-price"
+              >
+                {minPriceSaving ? "Saving..." : "Save"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleCancelEditMinPrice}
+                disabled={minPriceSaving}
+                data-testid="button-cancel-min-price"
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Current minimum</p>
+                <p className="text-2xl font-bold text-foreground" data-testid="text-min-price">
+                  €{parseFloat(minPrice || "0").toFixed(2)}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingMinPrice(true)}
+                data-testid="button-edit-min-price"
+              >
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="tiers">
         <TabsList data-testid="tabs-fee-tiers">

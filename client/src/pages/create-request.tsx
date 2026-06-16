@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { isUnauthorizedError } from "@/lib/auth-utils";
-import { ArrowLeft, ArrowRight, Package, Zap, Sparkles, Check, Shield } from "lucide-react";
+import { ArrowLeft, ArrowRight, Package, Zap, Sparkles, Check, Shield, AlertCircle } from "lucide-react";
 
 import { ITEM_CONDITIONS as CONDITIONS, ITEM_CATEGORIES as CATEGORIES } from "@shared/constants";
 
@@ -25,6 +25,7 @@ export default function CreateRequestPage() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedCondition, setSelectedCondition] = useState("");
   const [hasInsurance, setHasInsurance] = useState(false);
+  const [minPrice, setMinPrice] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     itemCount: "",
     estimatedValue: "",
@@ -35,6 +36,19 @@ export default function CreateRequestPage() {
     notes: "",
     deadlineDays: "30",
   });
+
+  useEffect(() => {
+    const fetchMinPrice = async () => {
+      try {
+        const response = await apiRequest("GET", "/api/settings/min-price");
+        const data = await response.json();
+        setMinPrice(data.minPrice);
+      } catch (error) {
+        console.error("Failed to fetch minimum price:", error);
+      }
+    };
+    fetchMinPrice();
+  }, []);
 
   const serviceTypes = [
     {
@@ -237,6 +251,14 @@ export default function CreateRequestPage() {
                 onChange={(e) => updateField("estimatedValue", e.target.value)}
                 data-testid="input-estimated-value"
               />
+              {minPrice !== null && formData.estimatedValue && parseFloat(formData.estimatedValue) < minPrice && (
+                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                  <p className="text-xs text-amber-700 dark:text-amber-200">
+                    {t("estimatedValueBelowMinimum", { minPrice: minPrice.toFixed(2) })}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
