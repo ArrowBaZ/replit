@@ -133,11 +133,10 @@ export function downloadAgreementPdf(agreement: AgreementDetail): void {
     y += 5;
   }
 
-  const insuredCount = items.filter(i => i.hasInsurance).length;
   const returnCount = items.filter(i => i.unsoldAction === "return").length;
   const keepCount = items.filter(i => i.unsoldAction === "keep").length;
 
-  if (insuredCount > 0 || returnCount > 0 || keepCount > 0) {
+  if (returnCount > 0 || keepCount > 0) {
     y += 5;
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -146,10 +145,6 @@ export function downloadAgreementPdf(agreement: AgreementDetail): void {
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    if (insuredCount > 0) {
-      doc.text(`Insurance Coverage: ${insuredCount} item${insuredCount > 1 ? "s" : ""} insured (+5% per item)`, margin + 2, y);
-      y += 4;
-    }
     if (returnCount > 0) {
       doc.text(`Return if Unsold: ${returnCount} item${returnCount > 1 ? "s" : ""} to be returned to seller`, margin + 2, y);
       y += 4;
@@ -180,7 +175,6 @@ export function downloadAgreementPdf(agreement: AgreementDetail): void {
 
   const tableBody = items.map((item) => {
     let titleStr = item.title;
-    if (item.hasInsurance) titleStr += " 🛡 (+5% ins.)";
     if (item.unsoldAction === "keep") titleStr += " [Keep if unsold]";
     else if (item.unsoldAction === "return") titleStr += " [Return if unsold]";
     return [

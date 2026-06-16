@@ -28,6 +28,7 @@ export default function AgreementDetailPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [agreed, setAgreed] = useState(false);
+  const isSeller = user?.id === agreement?.sellerId;
 
   const { data: agreement, isLoading } = useQuery<AgreementDetail>({
     queryKey: ["/api/agreements", params.id],
@@ -185,7 +186,7 @@ export default function AgreementDetailPage() {
       </Card>
 
       {(() => {
-        const insuredCount = items.filter(i => i.hasInsurance).length;
+        const insuredCount = isSeller ? items.filter(i => i.hasInsurance).length : 0;
         const returnCount = items.filter(i => i.unsoldAction === "return").length;
         const keepCount = items.filter(i => i.unsoldAction === "keep").length;
 
@@ -206,7 +207,7 @@ export default function AgreementDetailPage() {
                     </div>
                   </div>
                 )}
-                {insuredCount > 0 && (
+                {isSeller && insuredCount > 0 && (
                   <div className="flex items-start gap-3">
                     <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                     <div>
@@ -289,7 +290,7 @@ export default function AgreementDetailPage() {
                     <td className="py-2 pr-4">
                       <div className="flex items-center gap-1 flex-wrap">
                         <span>{item.title}</span>
-                        {item.hasInsurance && (
+                        {isSeller && item.hasInsurance && (
                           <span className="inline-flex items-center gap-0.5 text-xs text-blue-600 dark:text-blue-400" data-testid={`badge-insurance-${item.id}`}>
                             <Shield className="h-3 w-3" /> {t("insured")}
                           </span>
@@ -303,7 +304,7 @@ export default function AgreementDetailPage() {
                     </td>
                     <td className="text-right py-2 px-2">
                       <span>€{item.approvedPrice.toFixed(2)}</span>
-                      {item.hasInsurance && item.insuranceCost != null && item.insuranceCost > 0 && (
+                      {isSeller && item.hasInsurance && item.insuranceCost != null && item.insuranceCost > 0 && (
                         <span className="block text-xs text-blue-600 dark:text-blue-400" data-testid={`text-insurance-cost-${item.id}`}>+€{(item.insuranceCost as number).toFixed(2)} ins.</span>
                       )}
                     </td>
