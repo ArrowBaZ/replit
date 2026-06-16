@@ -1,0 +1,68 @@
+{
+  "feature_id": "fix-minimum-price-validation",
+  "description": "Fix critical issues in minimum price validation: falsy zero check, missing input validation, and currency formatting",
+  "scope": "bug-fix",
+  "start_date": "2026-06-16",
+  "files_affected": [
+    "client/src/pages/create-request.tsx",
+    "client/src/pages/admin-fee-tiers.tsx"
+  ],
+  "steps": [
+    {
+      "step_id": "01-01",
+      "phase": "RED",
+      "name": "Write regression tests for minimum price validation",
+      "description": "Create tests that fail with current code to prove the bugs exist",
+      "files_to_modify": [
+        "client/src/pages/__tests__/create-request.test.tsx",
+        "client/src/pages/__tests__/admin-fee-tiers.test.tsx"
+      ],
+      "test_file": "client/src/pages/__tests__/create-request.test.tsx",
+      "criteria": [
+        "Test that warning displays when minPrice = 0 and estimatedValue = -1 (currently fails because 0 is falsy)",
+        "Test that admin cannot save negative minPrice values (currently fails, accepts negative)",
+        "Test that error toast shows for invalid input (currently no validation)",
+        "Test that currency formatting is €X.XX not €X (currently fails, shows €X)"
+      ],
+      "implementation_notes": "Tests must reproduce the exact bugs described in RCA. Use React Testing Library for component tests. Mock apiRequest for API calls.",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "All 4 tests exist",
+        "All 4 tests FAIL with current code",
+        "Tests are isolated and independently runnable"
+      ]
+    },
+    {
+      "step_id": "01-02",
+      "phase": "GREEN",
+      "name": "Implement minimum price validation fixes",
+      "description": "Fix the three critical bugs and make all tests pass",
+      "files_to_modify": [
+        "client/src/pages/create-request.tsx",
+        "client/src/pages/admin-fee-tiers.tsx"
+      ],
+      "criteria": [
+        "Fix falsy zero check: change condition from `minPrice &&` to `minPrice !== null`",
+        "Add input validation in handleSaveMinPrice: parse and validate number, show error if NaN or negative",
+        "Fix currency formatting: change `.toFixed(0)` to `.toFixed(2)`",
+        "Add minPrice error state to admin-fee-tiers component",
+        "Display validation error in admin UI when invalid input detected"
+      ],
+      "implementation_notes": "Minimal fixes only - no refactoring beyond what's required to fix the bugs. Use existing toast/error patterns from codebase.",
+      "dependencies": [
+        "01-01"
+      ],
+      "acceptance_criteria": [
+        "All regression tests from 01-01 now PASS",
+        "All existing tests still pass (no regressions)",
+        "Both critical and medium issues resolved",
+        "Error feedback visible to users in both components"
+      ]
+    }
+  ],
+  "validation": {
+    "status": "pending",
+    "reviewer": null,
+    "reviewed_at": null
+  }
+}

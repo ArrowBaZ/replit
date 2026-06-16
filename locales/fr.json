@@ -154,6 +154,8 @@
   "sosDressingDesc": "Vidage complet de garde-robe et revente.",
   "numberOfItems": "Nombre estime d'articles",
   "estimatedValue": "Valeur estimee",
+  "estimatedValueBelowMinimum": "La valeur estimee doit etre d'au moins {{minPrice}} EUR",
+  "minimumEstimatedValue": "Valeur estimee minimale: {{minPrice}} EUR",
   "meetingLocation": "Lieu de rencontre souhaite",
   "additionalNotes": "Notes supplementaires",
   "submitRequest": "Soumettre la demande",

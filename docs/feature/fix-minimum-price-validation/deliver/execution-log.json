@@ -1,0 +1,49 @@
+{
+  "feature_id": "fix-minimum-price-validation",
+  "created_at": "2026-06-16T00:00:00Z",
+  "des_version": "3.14",
+  "tdd_phases": [
+    "RED",
+    "GREEN",
+    "COMMIT"
+  ],
+  "entries": [],
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "PREPARE",
+      "s": "EXECUTED",
+      "d": "PASS: Skills loaded, test directory created",
+      "t": "2026-06-16T12:51:46Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "RED_ACCEPTANCE",
+      "s": "EXECUTED",
+      "d": "PASS: 4 regression tests written, fail for correct business logic reason",
+      "t": "2026-06-16T12:51:50Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "RED_UNIT",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: Unit tests covered by regression tests (port-to-port)",
+      "t": "2026-06-16T12:51:53Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS: All 4 tests pass, no regressions",
+      "t": "2026-06-16T12:51:55Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS: Commit d39684c created with 4 tests and 3 production fixes",
+      "t": "2026-06-16T12:51:58Z"
+    }
+  ],
+  "schema_version": "3.0"
+}

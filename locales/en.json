@@ -154,6 +154,8 @@
   "sosDressingDesc": "Full wardrobe cleanout and resale.",
   "numberOfItems": "Estimated Number of Items",
   "estimatedValue": "Estimated Value",
+  "estimatedValueBelowMinimum": "The estimated value should be at least {{minPrice}} EUR",
+  "minimumEstimatedValue": "Minimum estimated value: {{minPrice}} EUR",
   "meetingLocation": "Preferred Meeting Location",
   "additionalNotes": "Additional Notes",
   "submitRequest": "Submit Request",
