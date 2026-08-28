@@ -292,6 +292,10 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(items.createdAt));
   }
 
+  // Soft delete item by setting deletedAt timestamp
+  // Does NOT cascade delete related data (itemDocuments, itemPriceOffers, transactions)
+  // Intentional: preserves audit trail and historical data for financial/legal records
+  // Deleted items are excluded from queries by default (isNull(items.deletedAt))
   async softDeleteItem(id: number): Promise<void> {
     await db
       .update(items)

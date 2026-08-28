@@ -2862,6 +2862,68 @@ export async function registerRoutes(
     },
   );
 
+  // DELETE /api/items/:id - Soft delete an item
+  // Soft delete strategy: Sets deletedAt timestamp instead of removing record
+  // Preserves audit trail and related data (itemDocuments, itemPriceOffers, transactions)
+  // Only allows deletion if: item is pending_approval, creator matches user (or admin), no active agreement
+  app.delete(
+    "/api/items/:id",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const itemId = parseInt(req.params.id);
+
+        // Get item
+        const item = await storage.getItem(itemId);
+        if (!item) {
+          return res.status(404).json({ message: "Item not found" });
+        }
+
+        // Authorization: only creator (marchantId) or admin can delete
+        const profile = await storage.getProfile(userId);
+        const isAdmin = profile?.role === "admin";
+        if (!isAdmin && item.marchantId !== userId) {
+          return res.status(403).json({ message: "Not authorized to delete this item" });
+        }
+
+        // Business rule: can only delete pending items
+        if (item.status !== "pending_approval") {
+          return res.status(409).json({
+            message: "Item is approved or finalized; cannot delete"
+          });
+        }
+
+        // Business rule: cannot delete if item has an active agreement
+        if (item.requestId) {
+          const agreement = await storage.getAgreementByRequest(item.requestId);
+          if (agreement) {
+            return res.status(409).json({
+              message: "Item is part of an active agreement; cannot delete"
+            });
+          }
+        }
+
+        // Business rule: cannot delete if item has transactions
+        const transactions = await storage.getTransactions(userId, profile?.role || "");
+        const itemTransactions = transactions.filter((t: any) => t.itemId === itemId);
+        if (itemTransactions.length > 0) {
+          return res.status(409).json({
+            message: "Item has associated transactions; cannot delete"
+          });
+        }
+
+        // Soft delete the item
+        await storage.softDeleteItem(itemId);
+
+        res.status(204).send();
+      } catch (error) {
+        console.error("Error deleting item:", error);
+        res.status(500).json({ message: "Failed to delete item" });
+      }
+    },
+  );
+
   app.delete(
     "/api/items/:id/documents/:docId",
     isAuthenticated,
