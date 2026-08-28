@@ -419,6 +419,7 @@ export default function RequestDetailPage() {
   const [showReschedule, setShowReschedule] = useState<number | null>(null);
   const [rescheduleForm, setRescheduleForm] = useState({ date: "", time: "", location: "" });
   const [showDeclineReason, setShowDeclineReason] = useState<number | null>(null);
+  const [showDeleteItem, setShowDeleteItem] = useState<number | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [declineReason, setDeclineReason] = useState("");
@@ -596,6 +597,29 @@ export default function RequestDetailPage() {
         toast({ title: "Item changed", description: "This item was modified since you loaded the page. Please refresh and try again.", variant: "destructive" });
       } else {
         toast({ title: "Error", description: message || "Failed to decline item", variant: "destructive" });
+      }
+    },
+  });
+
+  const deleteItem = useMutation({
+    mutationFn: async (itemId: number) => {
+      const res = await apiRequest("DELETE", `/api/items/${itemId}`);
+      if (!res.ok) throw new Error(await res.text());
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/requests", params.id, "items"] });
+      setShowDeleteItem(null);
+      toast({ title: t("itemDeletedSuccess") });
+    },
+    onError: (err: any) => {
+      const { status, message } = parseApiError(err);
+      if (status === 409) {
+        toast({ title: "Cannot delete", description: "This item is approved or has an active agreement.", variant: "destructive" });
+      } else if (status === 403) {
+        toast({ title: "Not authorized", description: "You don't have permission to delete this item.", variant: "destructive" });
+      } else {
+        toast({ title: t("itemDeleteFailed"), description: message, variant: "destructive" });
       }
     },
   });
@@ -1947,6 +1971,52 @@ export default function RequestDetailPage() {
                     </div>
                   )}
 
+                  {isMarchand && item.status === "pending_approval" && item.marchantId === user?.id && (
+                    <div className="ml-[4.25rem] space-y-2">
+                      <Dialog open={showDeleteItem === item.id} onOpenChange={(open) => !open && setShowDeleteItem(null)}>
+                        <button
+                          onClick={() => setShowDeleteItem(item.id)}
+                          className="text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium underline"
+                          data-testid={`button-delete-item-${item.id}`}
+                        >
+                          {t("deleteItem")}
+                        </button>
+                        <DialogContent data-testid={`dialog-delete-item-${item.id}`}>
+                          <DialogHeader>
+                            <DialogTitle>{t("deleteItemConfirmTitle")}</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <p className="text-sm text-muted-foreground">{t("deleteItemConfirmMessage")}</p>
+                            <div className="bg-muted/50 rounded-lg p-3 border border-dashed">
+                              <p className="text-xs font-medium">{item.title}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{CATEGORY_LABELS[item.category] || item.category}</p>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setShowDeleteItem(null)}
+                                data-testid={`button-cancel-delete-${item.id}`}
+                              >
+                                {t("cancel")}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => deleteItem.mutate(item.id)}
+                                disabled={deleteItem.isPending}
+                                data-testid={`button-confirm-delete-${item.id}`}
+                              >
+                                {deleteItem.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <X className="h-3.5 w-3.5 mr-1" />}
+                                {t("deleteItemConfirmButton")}
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  )}
+
                   {item.status === "returned" && item.declineReason && (
                     <div className="ml-[4.25rem] text-xs text-muted-foreground bg-red-50 dark:bg-red-900/20 rounded-md px-3 py-1.5">
                       <span className="font-medium text-red-600 dark:text-red-400">{t("itemDeclinedReason")}</span> {item.declineReason}
@@ -2145,8 +2215,7 @@ export default function RequestDetailPage() {
                         size="sm"
                         variant="ghost"
                         className="text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => duplicateItem.mutate(item.id)}
-                        disabled={duplicateItem.isPending}
+                        onClick={() => openAddItemPrefilled(item)}
                         data-testid={`button-duplicate-${item.id}`}
                       >
                         <Copy className="h-3 w-3 mr-1" /> {t("duplicateItem")}
