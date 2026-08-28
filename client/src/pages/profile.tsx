@@ -14,9 +14,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Profile } from "@shared/schema";
+import { NOTIF_PREF_KEYS } from "@shared/constants";
 import { User, MapPin, Phone, Mail, Pencil, Save, Bell, Link as LinkIcon } from "lucide-react";
 
-const PREF_KEYS = ["toast_agreement_ready", "toast_document_request", "toast_counter_offer", "toast_price_revised", "toast_meeting_update", "toast_item_pricing"] as const;
+const PREF_KEYS = NOTIF_PREF_KEYS;
 type PrefKey = typeof PREF_KEYS[number];
 
 function getPref(prefs: Record<string, boolean> | null | undefined, key: PrefKey): boolean {
@@ -88,7 +89,15 @@ export default function ProfilePage() {
 
   const togglePref = (key: PrefKey, value: boolean) => {
     const current = profile?.notificationPrefs || {};
-    updatePrefs.mutate({ ...current, [key]: value });
+    const allowedKeys = new Set<string>(PREF_KEYS);
+    const sanitized: Record<string, boolean> = {};
+    for (const k of Object.keys(current)) {
+      if (allowedKeys.has(k)) {
+        sanitized[k] = current[k];
+      }
+    }
+    sanitized[key] = value;
+    updatePrefs.mutate(sanitized);
   };
 
   const updateField = (field: string, value: string) => {

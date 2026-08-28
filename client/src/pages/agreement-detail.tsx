@@ -28,11 +28,12 @@ export default function AgreementDetailPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [agreed, setAgreed] = useState(false);
-  const isSeller = user?.id === agreement?.sellerId;
 
   const { data: agreement, isLoading } = useQuery<AgreementDetail>({
     queryKey: ["/api/agreements", params.id],
   });
+
+  const isSeller = user?.id === agreement?.sellerId;
 
   const signMutation = useMutation({
     mutationFn: async () => {
