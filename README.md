@@ -164,7 +164,7 @@ Point `DB_SEED_FILE` at the dump (path relative to the repo root), then restore 
 
 ```bash
 # .env
-DB_SEED_FILE=./db/backups/sellzy_20261009_120000.sql
+DB_SEED_FILE=./db/seed/sellzy_20261009_120000.sql
 
 npm run db:restore
 ```
