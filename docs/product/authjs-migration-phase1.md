@@ -1,7 +1,7 @@
 ---
 tags: [copilot, prd]
 feature: authjs-migration-phase1
-status: active
+status: completed
 date: 2026-05-27
 type: feat
 origin: brainstorms/2026-05-27-authjs-migration-phase1.md

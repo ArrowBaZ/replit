@@ -10,7 +10,7 @@ None.
 Sellzy is built with a modern web stack:
 - **Frontend**: React, Vite, TailwindCSS, and shadcn/ui for a responsive and consistent user experience. `wouter` is used for client-side routing.
 - **Backend**: Express.js handles API endpoints, interacting with a PostgreSQL database via Drizzle ORM.
-- **Authentication**: Replit Auth (OpenID Connect) is used for secure user authentication.
+- **Authentication**: Email and password with bcrypt and database-backed sessions. The migration away from Replit Auth is completed.
 - **Storage**: Replit Object Storage manages file uploads, particularly for item photos and certificates.
 - **Core Features**:
     - **User Roles**: Differentiated roles for Seller, Reseller (Reusse), and Admin, each with specific functionalities and dashboards.
@@ -46,7 +46,22 @@ Demo credentials inserted by the seed:
 - Seller: `seller@sellzy.demo` / `password123`
 
 ## External Dependencies
-- **Replit Auth**: For user authentication and authorization.
+- **Replit Auth**: Retired. The auth migration is completed and sign-in no longer uses it.
+- **Replit SaaS environment**: Hosts the app and supplies `.replit`, the Replit dev plugins, and the Object Storage sidecar (see "Replit-specific items" below).
 - **Replit Object Storage**: For storing item photos, certificates, and other documents.
 - **PostgreSQL**: The primary database for all application data.
 - **Resend/SendGrid**: Planned integration for email notifications (currently mocked).
+
+## Replit-specific items
+
+Things in this repo that exist because of the Replit SaaS environment. Anything marked "not used" can be removed when the lockfile is next regenerated.
+
+| Item | Status | Notes |
+|------|--------|-------|
+| `prisma` and `@prisma/client` (v7.5.0) in `package-lock.json` | Not used | Not declared in `package.json` and not imported anywhere. Pulled in as an optional peer of `drizzle-orm`. Origin per the project owner: the Replit SaaS environment. Drizzle is the only ORM. |
+| `.replit` | In use by Replit | Run command (`npm run dev`), port 5000, autoscale deployment (`npm run build`, then `node ./dist/index.cjs`). |
+| `@replit/vite-plugin-runtime-error-modal` | In use | Loaded on every Vite build in `vite.config.ts`. |
+| `@replit/vite-plugin-cartographer`, `@replit/vite-plugin-dev-banner` | Replit only | Loaded only when `REPL_ID` is set, so they are inert elsewhere. |
+| `server/replit_integrations/object_storage/` | Replit only | Calls the Replit sidecar at `http://127.0.0.1:1106`. File uploads need Replit Object Storage or a replacement. |
+
+Auth no longer depends on Replit. The Replit OIDC code has been removed from `server/`.

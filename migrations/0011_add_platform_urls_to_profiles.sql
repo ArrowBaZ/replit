@@ -1,4 +1,0 @@
-ALTER TABLE profiles
-  ADD COLUMN IF NOT EXISTS leboncoin_url TEXT,
-  ADD COLUMN IF NOT EXISTS vinted_url TEXT,
-  ADD COLUMN IF NOT EXISTS ricardo_url TEXT;

@@ -5,7 +5,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTranslation } from "react-i18next";
 import { translateNotifications } from "@/lib/notification-translator";
 import type { Profile, Notification, ItemDocument } from "@shared/schema";
-import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
+import sellzyLogo from "@/assets/sellzy_logo_bold_green_1771510604189.png";
 import { useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";

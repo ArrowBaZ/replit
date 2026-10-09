@@ -58,8 +58,8 @@ npm run db:push
 echo "✅ Database schema created!"
 
 # Seed database with sample data
-echo "🌱 Seeding database with sample data..."
-./script/seed-database.sh
+echo "🌱 Seeding database with demo data..."
+npm run db:seed
 
 echo "✅ Database seeded!"
 
