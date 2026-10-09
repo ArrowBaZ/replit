@@ -34,6 +34,10 @@ playwright-report
 .env*
 !.env.example
 
+# database backups contain personal data, keep them out of git
+/db/backups/*
+!/db/backups/.gitkeep
+
 # vercel
 .vercel
 

@@ -25,6 +25,7 @@ EXCLUDES=(
   --exclude='.agent/'
   --exclude='.agents/'
   --exclude='.claude/settings.local.json'
+  --exclude='db/backups/'
   --exclude='.DS_Store'
   --exclude='*.log'
 )

@@ -150,11 +150,25 @@ NODE_ENV=development
 - This project uses Drizzle **push** (not migrations)
 - All database operations go through `server/storage.ts` interface
 
-## Export Replit Data
+## Database backup and restore
 
-```
-pg_dump "$DATABASE_URL" --no-owner --no-privileges > sellzy_backup_$(date +%Y%m%d_%H%M%S).sql
+All seed and backup files live in [`db/`](db/README.md). Dumps contain personal data, so `db/backups/` is git-ignored.
 
+Dump the Replit database (run in the Replit Shell, then download the file into `db/backups/`):
+
+```bash
+pg_dump "$DATABASE_URL" --no-owner --no-privileges > sellzy_$(date +%Y%m%d_%H%M%S).sql
 ```
+
+Point `DB_SEED_FILE` at the dump (path relative to the repo root), then restore it locally:
+
+```bash
+# .env
+DB_SEED_FILE=./db/backups/sellzy_20261009_120000.sql
+
+npm run db:restore
+```
+
+Demo data without a dump: `npm run db:seed`.
 
 
