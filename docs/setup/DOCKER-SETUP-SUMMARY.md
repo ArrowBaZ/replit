@@ -30,7 +30,7 @@
 - Added `db:seed-sql` - Seed database from dump.sql
 
 ### 5. Documentation
-- `README.md` - Main documentation with Docker quick start
+- `../../README.md` - Main documentation with Docker quick start
 - `README-docker.md` - Detailed Docker documentation
 - `DOCKER-SETUP-SUMMARY.md` - This file
 - `script/seed-database.sh` - Database seeding script

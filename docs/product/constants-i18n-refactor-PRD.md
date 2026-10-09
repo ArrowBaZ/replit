@@ -685,7 +685,7 @@ npm run tsc -- --noEmit  # TypeScript error until all references updated
   - Decisions: Phased approach, i18next choice, centralized constants
 
 ### Codebase Analysis
-- Detailed analysis: `/Users/fabienplart/Projects/local/replit/CODEBASE_ANALYSIS.md`
+- Detailed analysis: `docs/analysis/CODEBASE_ANALYSIS.md`
   - Current patterns, gaps, recommendations
 
 ### Code Examples (Reference)

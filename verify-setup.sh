@@ -12,8 +12,8 @@ REQUIRED_FILES=(
     "script/seed-database.sh"
     "dump.sql"
     "README.md"
-    "README-docker.md"
-    "DOCKER-SETUP-SUMMARY.md"
+    "docs/setup/README-docker.md"
+    "docs/setup/DOCKER-SETUP-SUMMARY.md"
 )
 
 ALL_OK=true

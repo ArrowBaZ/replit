@@ -54,7 +54,7 @@ Your app will be available at `http://localhost:5000`
 
 ## 🐳 Docker Setup
 
-See [README-docker.md](README-docker.md) for detailed Docker documentation.
+See [docs/setup/README-docker.md](docs/setup/README-docker.md) for detailed Docker documentation.
 
 ## 🗃️ Database
 
@@ -102,7 +102,8 @@ Uses Replit OIDC (OpenID Connect) via Passport.js. For local development, you ma
 
 ## 📚 Documentation
 
-- [Docker Setup](README-docker.md) - Detailed Docker documentation
+- [docs/README.md](docs/README.md) - Index of product specs, analyses, setup guides and history
+- [Docker Setup](docs/setup/README-docker.md) - Detailed Docker documentation
 - [replit.md](replit.md) - Replit-specific documentation
 - [AGENTS.md](AGENTS.md) - Agent configuration
 
@@ -152,3 +153,12 @@ NODE_ENV=development
 - Replit Auth only works in Replit environment
 - For local development, you may need to implement a mock auth strategy
 - All database operations go through `server/storage.ts` interface
+
+## Export Replit Data
+
+```
+pg_dump "$DATABASE_URL" --no-owner --no-privileges > sellzy_backup_$(date +%Y%m%d_%H%M%S).sql
+
+```
+
+
