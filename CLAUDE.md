@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Project context shared with other agents lives in AGENTS.md, imported below.
+
+@AGENTS.md
+
 ## Approach
 - Read existing files before writing. Don't re-read unless changed.
 - Thorough in reasoning, concise in output.
@@ -20,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Database: PostgreSQL with Drizzle ORM (exclusive ORM—no Prisma)
 - Routing: wouter (client-side), Express (server)
 - Styling: Tailwind CSS + shadcn/ui
-- Auth: Passport.js with email/password authentication
+- Auth: email/password with bcrypt, Replit auth migration completed (see AGENTS.md)
 
 ## Quick Start Commands
 
@@ -157,11 +161,7 @@ wouter handles client-side routing. Routes defined in `App.tsx`:
 
 ### Authentication
 
-Uses **email/password** authentication with Passport.js (local strategy). Session stored in PostgreSQL via `connect-pg-simple`.
-
-- Login/signup via `/api/auth/login` and `/api/auth/register`
-- Session management: stored in DB, checked on each request
-- Protected routes use `requireAuth` middleware
+See the Authentication section in AGENTS.md. Passport is not used on the server. The migration plan is in `docs/product/authjs-migration-phase1.md`.
 - User ID available on `req.user.id` in authenticated routes
 
 ### Key Patterns & Conventions

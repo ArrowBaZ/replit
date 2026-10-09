@@ -1,31 +1,32 @@
 # Sellzy Documentation
 
-Index of project documentation. Start with the root [README.md](../README.md) for setup and [CLAUDE.md](../CLAUDE.md) / [AGENTS.md](../AGENTS.md) for the codebase conventions used by AI coding tools.
+Start with the root [README.md](../README.md) for setup. [AGENTS.md](../AGENTS.md) holds the shared project context for AI agents, and [CLAUDE.md](../CLAUDE.md) imports it.
 
 ## Structure
 
 | Folder | Contents |
 |--------|----------|
-| [`product/`](product/) | Product requirements (PRDs) and specs: features, i18n refactor, auth migration, insurance billing |
-| [`analysis/`](analysis/) | Codebase analysis, audits, gap analysis, completion summaries, and the insurance (T-001) investigation |
-| [`brainstorms/`](brainstorms/) | Early exploration documents that preceded the PRDs |
-| [`setup/`](setup/) | Docker and local database setup guides |
-| [`feature/`](feature/) | Per-feature delta documents for changes in progress |
+| [`product/`](product/) | Current PRDs, specs, and per-feature delta notes |
+| [`reference/`](reference/) | Detailed codebase reference: schema, endpoints, storage interface (snapshot, verify against code) |
+| [`analysis/`](analysis/) | Codebase analysis, i18n audit, gap analysis, and the insurance (T-001) model |
+| [`setup/`](setup/) | Local database setup with Docker |
 | [`solutions/`](solutions/) | Solved problems and their fixes, kept as reference |
-| [`history/`](history/) | Original AI prompts and the pasted inputs that produced the PRDs. Kept for traceability, not current guidance |
+| [`history/`](history/) | Superseded material kept for traceability: brainstorms, original AI prompts and their inputs, agent run logs, superseded analyses, screenshots and logos |
 
 ## Where to start
 
 | Need | Read |
 |------|------|
-| Run the project locally | [`../README.md`](../README.md), then [`setup/README-docker.md`](setup/README-docker.md) |
-| Understand a feature's requirements | The matching file in [`product/`](product/) |
-| Understand the insurance / billing model | [`analysis/insurance-t001/T-001-FINAL-SUMMARY.md`](analysis/insurance-t001/T-001-FINAL-SUMMARY.md) (supersedes the earlier ANALYSIS and CORRECTED-ANALYSIS files) |
-| Understand the i18n work | [`product/i18n-i18next-migration-PRD.md`](product/i18n-i18next-migration-PRD.md), [`analysis/AUDIT_FINDINGS.md`](analysis/AUDIT_FINDINGS.md) |
+| Run the project locally | [`../README.md`](../README.md), then [`setup/docker.md`](setup/docker.md) |
+| Project context for an AI agent | [`../AGENTS.md`](../AGENTS.md) |
+| Requirements for a feature | The matching file in [`product/`](product/) |
+| Insurance and billing model | [`analysis/insurance-t001/T-001-FINAL-SUMMARY.md`](analysis/insurance-t001/T-001-FINAL-SUMMARY.md). Earlier drafts are in `history/analysis-superseded/` |
+| Auth migration (completed) | [`product/authjs-migration-phase1.md`](product/authjs-migration-phase1.md) |
+| i18n work | [`product/i18n-i18next-migration-PRD.md`](product/i18n-i18next-migration-PRD.md), [`analysis/AUDIT_FINDINGS.md`](analysis/AUDIT_FINDINGS.md) |
 | Known gaps against the MVP | [`analysis/gap-analysis.md`](analysis/gap-analysis.md) |
 | Why a past bug was fixed the way it was | [`solutions/`](solutions/) |
 
 ## Conventions
 
-- Product docs in `product/` use the PRD template with YAML front matter (`feature:`, `origin:`).
-- Files under `history/` and `brainstorms/` may refer to Obsidian paths (`Copilot/…`) that no longer exist in this repository. Those references are historical.
+- Files in `history/` and `brainstorms/` may refer to Obsidian paths (`Copilot/...`) that no longer exist here. Those references are historical.
+- Product docs use YAML front matter (`feature:`, `origin:`) where it applies.

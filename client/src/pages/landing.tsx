@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Package, HandshakeIcon, TrendingUp, ArrowRight, Star, Shield, Zap } from "lucide-react";
-import sellzyLogo from "@assets/sellzy_logo_bold_green_1771510604189.png";
+import sellzyLogo from "@/assets/sellzy_logo_bold_green_1771510604189.png";
 import { useTranslation } from "react-i18next";
 import i18n from "i18next";
 

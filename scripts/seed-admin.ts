@@ -2,10 +2,10 @@
  * Seed script to set a user as admin.
  *
  * Usage:
- *   npm run db:seed -- <USER_ID>
+ *   npm run db:seed:admin -- <USER_ID>
  *
  * Example:
- *   npm run db:seed -- abc123-def456
+ *   npm run db:seed:admin -- abc123-def456
  *
  * This is idempotent — running it multiple times has no additional effect.
  */
@@ -18,7 +18,7 @@ async function main() {
   const userId = process.argv[2];
 
   if (!userId) {
-    console.error("Usage: npm run db:seed -- <USER_ID>");
+    console.error("Usage: npm run db:seed:admin -- <USER_ID>");
     console.error("  Sets the specified user's profile role to 'admin'.");
     process.exit(1);
   }
