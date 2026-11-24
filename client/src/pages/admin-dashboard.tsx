@@ -302,6 +302,14 @@ export default function AdminDashboard() {
                       </>
                     )}
                     {!u.profile && <Badge variant="secondary">no profile</Badge>}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setLocation(`/admin/transactions?userId=${u.id}`)}
+                      data-testid={`button-payments-${u.id}`}
+                    >
+                      {t("paymentHistory")}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

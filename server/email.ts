@@ -38,6 +38,25 @@ function getBaseUrl(): string {
   );
 }
 
+interface PaymentReceiptParams {
+  toEmail: string;
+  toName: string;
+  amount: string;
+  currency: string;
+  sessionId: string;
+  items: Array<{ title: string; amount: string }>;
+}
+
+export async function sendPaymentReceipt(params: PaymentReceiptParams): Promise<void> {
+  const subject = `Sellzy receipt — €${params.amount}`;
+  const rows = params.items
+    .map((item) => `<tr><td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">${item.title}</td><td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">€${item.amount}</td></tr>`)
+    .join("");
+  const html = `<p>Hello ${params.toName},</p><p>Your payment of €${params.amount} ${params.currency.toUpperCase()} was received.</p><table>${rows}</table><p>Reference: ${params.sessionId}</p>`;
+  console.log(`[EMAIL MOCK] To: ${params.toEmail} | Subject: ${subject}`);
+  console.log(`[EMAIL MOCK] Receipt items: ${params.items.length} | HTML body length: ${html.length} chars`);
+}
+
 export async function sendAgreementReadyEmail(params: AgreementEmailParams): Promise<void> {
   const { toEmail, toName, requestId, agreementId } = params;
   const signingUrl = `${getBaseUrl()}/agreements/${agreementId}`;

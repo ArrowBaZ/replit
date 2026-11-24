@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { translateNotifications } from "@/lib/notification-translator";
 import type { Profile, Notification, ItemDocument } from "@shared/schema";
 import sellzyLogo from "@/assets/sellzy_logo_bold_green_1771510604189.png";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import {
@@ -43,6 +43,9 @@ import {
   Check,
   FolderOpen,
   Percent,
+  ShoppingBag,
+  ShoppingCart,
+  Receipt,
 } from "lucide-react";
 
 function getInitials(firstName?: string | null, lastName?: string | null): string {
@@ -72,11 +75,27 @@ function toastAllowed(prefs: Record<string, boolean> | null | undefined, key: st
   return prefs[key];
 }
 
+function resolveNotifLink(notif: Notification): string | null {
+  if (notif.type === "payout_held" || notif.type === "payout_held_seller" || notif.type === "payout_released") {
+    return "/profile#earnings";
+  }
+  return notif.link || null;
+}
+
+function scrollToHash(hash: string) {
+  const id = hash.replace(/^#/, "");
+  if (!id) return;
+  window.setTimeout(() => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 80);
+}
+
 function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?: Record<string, boolean> | null }) {
   const { t } = useTranslation();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const wsRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
+  const [open, setOpen] = useState(false);
 
   const { data: notifs = [] } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
@@ -245,11 +264,31 @@ function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?:
 
   const handleNotifClick = (notif: Notification) => {
     if (!notif.isRead) markRead.mutate(notif.id);
-    if (notif.link) navigate(notif.link);
+    setOpen(false);
+    const target = resolveNotifLink(notif);
+    if (!target) return;
+
+    const [pathPart, hashPart] = target.split("#");
+    const path = pathPart || location;
+    const hash = hashPart ? `#${hashPart}` : "";
+
+    if (path !== location) {
+      navigate(path + hash);
+      if (hash) scrollToHash(hash);
+      return;
+    }
+
+    if (hash) {
+      window.history.replaceState(null, "", path + hash);
+      scrollToHash(hash);
+      return;
+    }
+
+    navigate(path);
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           size="icon"
@@ -271,7 +310,7 @@ function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?:
       <PopoverContent
         align="end"
         side="right"
-        className="w-80 p-0"
+        className="w-96 p-0"
         data-testid="panel-notifications"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
@@ -295,11 +334,12 @@ function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?:
             {t("noNotifications")}
           </div>
         ) : (
-          <ScrollArea className="max-h-80">
+          <ScrollArea className="max-h-96">
             {translateNotifications(notifs).slice(0, 15).map((notif) => (
               <button
                 key={notif.id}
-                className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-muted/50 border-b last:border-b-0 transition-colors ${!notif.isRead ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}`}
+                type="button"
+                className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-muted/50 border-b last:border-b-0 transition-colors cursor-pointer ${!notif.isRead ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}`}
                 onClick={() => handleNotifClick(notif)}
                 data-testid={`notif-item-${notif.id}`}
               >
@@ -307,8 +347,8 @@ function NotificationBell({ userId, notifPrefs }: { userId: string; notifPrefs?:
                   <NotificationIcon type={notif.type} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium leading-tight truncate">{notif.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notif.message}</p>
+                  <p className="text-sm font-medium leading-snug">{notif.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1 whitespace-normal break-words leading-relaxed">{notif.message}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   <span className="text-[10px] text-muted-foreground">{notif.createdAt ? timeAgo(notif.createdAt) : ""}</span>
@@ -352,7 +392,10 @@ export function AppSidebar() {
     { title: t("discoverMarchands"), url: "/marchands", icon: Star },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
     { title: t("feeStructure"), url: "/fee-structure", icon: Percent },
+    { title: t("earningsHistoryTitle"), url: "/profile#earnings", icon: Receipt },
     { title: t("profile"), url: "/profile", icon: User },
+    { title: t("shop"), url: "/shop", icon: ShoppingBag },
+    { title: t("checkout"), url: "/checkout", icon: ShoppingCart },
   ];
 
   const marchandItems = [
@@ -362,17 +405,29 @@ export function AppSidebar() {
     { title: t("schedule"), url: "/schedule", icon: Calendar },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
     { title: t("feeStructure"), url: "/fee-structure", icon: Percent },
+    { title: t("earningsHistoryTitle"), url: "/profile#earnings", icon: Receipt },
     { title: t("profile"), url: "/profile", icon: User },
+    { title: t("shop"), url: "/shop", icon: ShoppingBag },
+    { title: t("checkout"), url: "/checkout", icon: ShoppingCart },
   ];
 
   const adminItems = [
     { title: t("dashboard"), url: "/dashboard", icon: LayoutDashboard },
     { title: t("adminRequests"), url: "/admin/requests", icon: ClipboardList },
     { title: t("feeTiers"), url: "/admin/fee-tiers", icon: Percent },
+    { title: t("transactions"), url: "/admin/transactions", icon: Receipt },
+    { title: t("shop"), url: "/shop", icon: ShoppingBag },
+    { title: t("checkout"), url: "/checkout", icon: ShoppingCart },
     { title: t("messages"), url: "/messages", icon: MessageSquare },
   ];
 
-  const menuItems = role === "admin" ? adminItems : role === "marchand" ? marchandItems : sellerItems;
+  const customerItems = [
+    { title: t("shop"), url: "/shop", icon: ShoppingBag },
+    { title: t("checkout"), url: "/checkout", icon: ShoppingCart },
+    { title: t("profile"), url: "/profile", icon: User },
+  ];
+
+  const menuItems = role === "admin" ? adminItems : role === "marchand" ? marchandItems : role === "customer" ? customerItems : sellerItems;
 
   return (
     <Sidebar>
@@ -397,7 +452,7 @@ export function AppSidebar() {
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel>{role === "admin" ? t("administration") : role === "marchand" ? t("marchand") : t("seller")}</SidebarGroupLabel>
+          <SidebarGroupLabel>{role === "admin" ? t("administration") : role === "marchand" ? t("marchand") : role === "customer" ? t("customer") : t("seller")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
@@ -406,12 +461,12 @@ export function AppSidebar() {
                     <Link href={item.url} data-testid={`link-nav-${item.url.replace(/\//g, "-").slice(1)}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
-                      {"badge" in item && item.badge !== null && item.badge !== undefined && (
+                      {"badge" in item && typeof item.badge === "number" && (
                         <span
                           className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground px-1"
                           data-testid="badge-document-count"
                         >
-                          {(item.badge as number) > 99 ? "99+" : item.badge}
+                          {item.badge > 99 ? "99+" : item.badge}
                         </span>
                       )}
                     </Link>
@@ -436,7 +491,7 @@ export function AppSidebar() {
               {user?.firstName || "User"}
             </p>
             <p className="text-xs text-muted-foreground truncate">
-              {role === "marchand" ? t("marchand") : role === "admin" ? "Admin" : t("seller")}
+              {role === "marchand" ? t("marchand") : role === "admin" ? "Admin" : role === "customer" ? t("customer") : t("seller")}
             </p>
           </div>
           {user?.id && <NotificationBell userId={user.id} notifPrefs={profile?.notificationPrefs} />}

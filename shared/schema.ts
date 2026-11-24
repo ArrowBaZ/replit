@@ -29,6 +29,10 @@ export const profiles = pgTable("profiles", {
   status: varchar("status", { length: 20 }).default("approved"),
   preferredContactMethod: varchar("preferred_contact_method", { length: 20 }),
   notificationPrefs: jsonb("notification_prefs").$type<Record<string, boolean>>(),
+  bankAccountHolder: varchar("bank_account_holder", { length: 255 }),
+  // Masked display value only. The full IBAN lives in payoutBankAccounts.
+  bankIbanLast4: varchar("bank_iban_last4", { length: 4 }),
+  bankBic: varchar("bank_bic", { length: 11 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -36,6 +40,14 @@ export const profiles = pgTable("profiles", {
 export const profilesRelations = relations(profiles, ({ one }) => ({
   user: one(users, { fields: [profiles.userId], references: [users.id] }),
 }));
+
+// Kept out of profiles so profile responses never carry the ciphertext.
+export const payoutBankAccounts = pgTable("payout_bank_accounts", {
+  userId: varchar("user_id").primaryKey().references(() => users.id),
+  // AES-256-GCM ciphertext (server/crypto.ts). Read only by the admin payouts view.
+  ibanEncrypted: text("iban_encrypted").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
 export const requests = pgTable("requests", {
   id: serial("id").primaryKey(),
@@ -266,6 +278,72 @@ export const feeTierChangelogRelations = relations(feeTierChangelog, ({ one }) =
   admin: one(users, { fields: [feeTierChangelog.adminId], references: [users.id] }),
 }));
 
+export type CartSnapshotLine = {
+  itemId: number;
+  title: string;
+  unitAmount: string;
+  quantity: number;
+  sellerId: string;
+  marchantId: string;
+  requestId: number | null;
+};
+
+export const cartItems = pgTable("cart_items", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  itemId: integer("item_id").notNull().references(() => items.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_cart_items_user").on(table.userId),
+  uniqueIndex("uq_cart_user_item").on(table.userId, table.itemId),
+]);
+
+export const cartItemsRelations = relations(cartItems, ({ one }) => ({
+  user: one(users, { fields: [cartItems.userId], references: [users.id] }),
+  item: one(items, { fields: [cartItems.itemId], references: [items.id] }),
+}));
+
+export const payments = pgTable("payments", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }).notNull(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  amount: numeric("amount").notNull(),
+  currency: varchar("currency", { length: 10 }).notNull().default("eur"),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  cartSnapshot: jsonb("cart_snapshot").$type<CartSnapshotLine[]>().notNull(),
+  receiptSentAt: timestamp("receipt_sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  paidAt: timestamp("paid_at"),
+}, (table) => [
+  uniqueIndex("uq_payments_session").on(table.stripeCheckoutSessionId),
+  index("idx_payments_user").on(table.userId),
+]);
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  payer: one(users, { fields: [payments.userId], references: [users.id] }),
+}));
+
+// One row per seller or reseller share of a sale. Admin pays it by SEPA transfer, then marks it paid.
+export const payouts = pgTable("payouts", {
+  id: serial("id").primaryKey(),
+  paymentId: integer("payment_id").notNull().references(() => payments.id),
+  transactionId: integer("transaction_id").notNull().references(() => transactions.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  role: varchar("role", { length: 20 }).notNull(),
+  amount: numeric("amount").notNull(),
+  currency: varchar("currency", { length: 10 }).notNull().default("eur"),
+  status: varchar("status", { length: 20 }).notNull().default("owed"),
+  transferReference: varchar("transfer_reference", { length: 255 }),
+  paidByUserId: varchar("paid_by_user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  paidAt: timestamp("paid_at"),
+}, (table) => [
+  uniqueIndex("uq_payouts_line").on(table.transactionId, table.role),
+  index("idx_payouts_user").on(table.userId),
+  index("idx_payouts_status").on(table.status),
+]);
+
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   itemId: integer("item_id").references(() => items.id),
@@ -281,11 +359,17 @@ export const transactions = pgTable("transactions", {
   marchantPercent: numeric("marchand_percent"),
   platformPercent: numeric("platform_percent"),
   status: varchar("status", { length: 20 }).notNull().default("completed"),
+  paymentId: integer("payment_id").references(() => payments.id),
+  payerUserId: varchar("payer_user_id").references(() => users.id),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_transactions_seller").on(table.sellerId),
   index("idx_transactions_marchand").on(table.marchantId),
   index("idx_transactions_item").on(table.itemId),
+  index("idx_transactions_payment").on(table.paymentId),
+  index("idx_transactions_payer").on(table.payerUserId),
 ]);
 
 export const transactionsRelations = relations(transactions, ({ one }) => ({
@@ -426,6 +510,8 @@ export const insertItemSchema = createInsertSchema(items).omit({ id: true, creat
 export const insertMeetingSchema = createInsertSchema(meetings).omit({ id: true, createdAt: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true, isRead: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, isRead: true });
+export const insertCartItemSchema = createInsertSchema(cartItems).omit({ id: true, createdAt: true });
+export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true, paidAt: true, receiptSentAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true });
 export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, createdAt: true });
 export const insertFeeTierSchema = createInsertSchema(feeTiers).omit({ id: true, createdAt: true });
@@ -444,6 +530,13 @@ export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type CartItem = typeof cartItems.$inferSelect;
+export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export const insertPayoutSchema = createInsertSchema(payouts).omit({ id: true, createdAt: true, paidAt: true });
+export type Payout = typeof payouts.$inferSelect;
+export type InsertPayout = z.infer<typeof insertPayoutSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type ModerationAction = typeof moderationActions.$inferSelect;
