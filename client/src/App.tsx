@@ -35,13 +35,20 @@ import PrivacyPage from "@/pages/privacy";
 import AdminFeeTiersPage from "@/pages/admin-fee-tiers";
 import FeeStructurePage from "@/pages/fee-structure";
 import SellerReviewPage from "@/pages/seller-review";
+import CheckoutPage, { GuestCheckoutRedirect } from "@/pages/checkout";
+import CheckoutSuccessPage from "@/pages/checkout-success";
+import CheckoutCancelPage from "@/pages/checkout-cancel";
+import ShopPage from "@/pages/shop";
+import AdminTransactionsPage from "@/pages/admin-transactions";
 import { LoginPage } from "@/pages/login";
 import { SignupPage } from "@/pages/signup";
 import { VerifyEmailPage } from "@/pages/verify-email";
 import { ForgotPasswordPage } from "@/pages/forgot-password";
 import { ResetPasswordPage } from "@/pages/reset-password";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
+import { safeInternalPath } from "@shared/checkout";
 import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
 
 function DashboardRoute() {
   const { data: profile, isLoading } = useQuery<Profile>({
@@ -62,7 +69,23 @@ function DashboardRoute() {
 
   if (profile.role === "admin") return <AdminDashboard />;
   if (profile.role === "marchand") return <MarchendDashboard />;
+  if (profile.role === "customer") return <ShopPage />;
   return <SellerDashboard />;
+}
+
+function FollowRedirect() {
+  const search = useSearch();
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    const raw = search.startsWith("?") ? search.slice(1) : search;
+    const target = safeInternalPath(new URLSearchParams(raw).get("redirect"));
+    setLocation(target === "/" ? "/shop" : target);
+  }, [search, setLocation]);
+  return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+  );
 }
 
 function AuthenticatedRouter() {
@@ -83,6 +106,11 @@ function AuthenticatedRouter() {
       <Route path="/admin/applications">{() => <AdminDashboard />}</Route>
       <Route path="/admin/requests" component={AdminRequestsPage} />
       <Route path="/admin/fee-tiers" component={AdminFeeTiersPage} />
+      <Route path="/admin/transactions" component={AdminTransactionsPage} />
+      <Route path="/shop" component={ShopPage} />
+      <Route path="/checkout/success" component={CheckoutSuccessPage} />
+      <Route path="/checkout/cancel" component={CheckoutCancelPage} />
+      <Route path="/checkout" component={CheckoutPage} />
       <Route path="/fee-structure" component={FeeStructurePage} />
       <Route path="/agreements/:id" component={AgreementDetailPage} />
       <Route path="/marchands/:id" component={MarchendDetailPage} />
@@ -91,6 +119,8 @@ function AuthenticatedRouter() {
       <Route path="/contact" component={ContactPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/login" component={FollowRedirect} />
+      <Route path="/signup" component={FollowRedirect} />
       <Route path="/">{() => <DashboardRoute />}</Route>
       <Route component={NotFound} />
     </Switch>
@@ -140,6 +170,9 @@ function AppContent() {
   if (!user) {
     return (
       <Switch>
+        <Route path="/checkout/success" component={CheckoutSuccessPage} />
+        <Route path="/checkout/cancel" component={CheckoutCancelPage} />
+        <Route path="/checkout" component={GuestCheckoutRedirect} />
         <Route path="/login" component={LoginPage} />
         <Route path="/signup" component={SignupPage} />
         <Route path="/verify-email" component={VerifyEmailPage} />

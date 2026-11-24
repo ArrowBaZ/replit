@@ -34,6 +34,19 @@ export function translateNotification(notif: DbNotification): DbNotification {
     }
   }
 
+  if (notif.type === 'payout_held') {
+    notif.title = t('notifPayoutHeldTitle');
+    notif.message = t('notifPayoutHeldMessage');
+  }
+  if (notif.type === 'payout_held_seller') {
+    notif.title = t('notifPayoutHeldSellerTitle');
+    notif.message = t('notifPayoutHeldSellerMessage');
+  }
+  if (notif.type === 'payout_released') {
+    notif.title = t('notifPayoutReleasedTitle');
+    notif.message = t('notifPayoutReleasedMessage');
+  }
+
   return notif;
 }
 

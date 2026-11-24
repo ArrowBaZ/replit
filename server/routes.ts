@@ -16,6 +16,8 @@ import { sendAgreementReadyEmail } from "./email";
 import { signInSchema, registerSchema, hashPassword, verifyPassword } from "./auth";
 import { randomUUID, randomBytes } from "crypto";
 import { validateApprovedItemsForAgreement } from "./domain/agreement";
+import { registerCheckoutRoutes } from "./checkout";
+import { encryptField } from "./crypto";
 
 interface AuthRequest extends Request {
   user?: { id: string };
@@ -491,9 +493,49 @@ export async function registerRoutes(
           }
         }
 
+        // Clients never set the masked IBAN directly; it is derived from bankIban below.
+        delete body.bankIbanLast4;
+        let ibanCiphertext: string | null | undefined;
+
+        const bankFields = ["bankAccountHolder", "bankIban", "bankBic"] as const;
+        const wantsBankUpdate = bankFields.some((field) => body[field] !== undefined);
+        if (wantsBankUpdate) {
+          const existingForBank = await storage.getProfile(userId);
+          if (!existingForBank || (existingForBank.role !== "seller" && existingForBank.role !== "marchand")) {
+            return res.status(403).json({ message: "Only sellers and resellers can save bank details" });
+          }
+          if (body.bankIban !== undefined) {
+            const iban = body.bankIban === null ? "" : String(body.bankIban).replace(/\s+/g, "").toUpperCase();
+            if (iban === "") {
+              ibanCiphertext = null;
+              body.bankIbanLast4 = null;
+            } else {
+              if (!/^[A-Z]{2}[0-9A-Z]{13,32}$/.test(iban)) {
+                return res.status(400).json({ message: "Invalid IBAN format" });
+              }
+              ibanCiphertext = encryptField(iban);
+              body.bankIbanLast4 = iban.slice(-4);
+            }
+            delete body.bankIban;
+          }
+          if (body.bankBic !== undefined && body.bankBic !== null && body.bankBic !== "") {
+            const bic = String(body.bankBic).replace(/\s+/g, "").toUpperCase();
+            if (!/^[A-Z0-9]{8}([A-Z0-9]{3})?$/.test(bic)) {
+              return res.status(400).json({ message: "Invalid BIC/SWIFT format" });
+            }
+            body.bankBic = bic;
+          }
+          if (body.bankAccountHolder !== undefined && body.bankAccountHolder !== null) {
+            body.bankAccountHolder = String(body.bankAccountHolder).trim().slice(0, 255) || null;
+          }
+        }
+
         const profile = await storage.updateProfile(userId, body);
         if (!profile) {
           return res.status(404).json({ message: "Profile not found" });
+        }
+        if (ibanCiphertext !== undefined) {
+          await storage.setPayoutIbanEncrypted(userId, ibanCiphertext);
         }
         res.json(profile);
       } catch (error) {
@@ -4215,6 +4257,8 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to reset password" });
     }
   });
+
+  registerCheckoutRoutes(app);
 
   return httpServer;
 }

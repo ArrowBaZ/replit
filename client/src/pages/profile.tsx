@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -13,9 +13,29 @@ import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Profile } from "@shared/schema";
+import type { Payout, Profile } from "@shared/schema";
 import { NOTIF_PREF_KEYS } from "@shared/constants";
-import { User, MapPin, Phone, Mail, Pencil, Save, Bell, Link as LinkIcon } from "lucide-react";
+import { User, MapPin, Phone, Mail, Pencil, Save, Bell, Link as LinkIcon, Wallet, Landmark, Receipt } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+interface EarningsHistory {
+  total: number;
+  receivedTotal: number;
+  pendingTotal: number;
+  transactions: Array<{
+    id: number;
+    itemTitle: string | null;
+    salePrice: string;
+    amountReceived: string;
+    payoutStatus: string | null;
+    payoutPaidAt: string | null;
+    createdAt: string | null;
+  }>;
+}
+
+function payoutStatusLabel(t: (key: string) => string, status: string): string {
+  return status === "paid" ? t("payoutPaid") : t("payoutOwed");
+}
 
 const PREF_KEYS = NOTIF_PREF_KEYS;
 type PrefKey = typeof PREF_KEYS[number];
@@ -34,6 +54,60 @@ export default function ProfilePage() {
   const { data: profile, isLoading } = useQuery<Profile>({
     queryKey: ["/api/profile"],
   });
+  const receivesPayouts = profile?.role === "seller" || profile?.role === "marchand";
+
+  const { data: payouts } = useQuery<Payout[]>({
+    queryKey: ["/api/payouts"],
+    enabled: receivesPayouts,
+  });
+
+  const { data: earnings } = useQuery<EarningsHistory>({
+    queryKey: ["/api/earnings"],
+    enabled: receivesPayouts,
+  });
+
+  const [bankForm, setBankForm] = useState({
+    bankAccountHolder: "",
+    bankIban: "",
+    bankBic: "",
+  });
+  const [editingBank, setEditingBank] = useState(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    setBankForm({
+      bankAccountHolder: profile.bankAccountHolder || "",
+      bankIban: "",
+      bankBic: profile.bankBic || "",
+    });
+  }, [profile]);
+
+  const saveBankDetails = useMutation({
+    mutationFn: async () => {
+      // An empty IBAN field keeps the stored one (only the masked last 4 is shown).
+      const res = await apiRequest("PATCH", "/api/profile", {
+        bankAccountHolder: bankForm.bankAccountHolder.trim() || null,
+        ...(bankForm.bankIban.trim() ? { bankIban: bankForm.bankIban.trim() } : {}),
+        bankBic: bankForm.bankBic.trim() || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+      setEditingBank(false);
+      toast({ title: t("bankDetailsSaved") });
+    },
+    onError: (error: Error) => {
+      toast({ title: t("error"), description: error.message, variant: "destructive" });
+    },
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#earnings") return;
+    const el = document.getElementById("earnings");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [earnings, receivesPayouts]);
 
   const [formData, setFormData] = useState<Partial<Profile>>({});
 
@@ -341,6 +415,168 @@ export default function ProfilePage() {
           )}
         </CardContent>
       </Card>
+
+      {receivesPayouts && (
+        <Card data-testid="card-bank-details">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Landmark className="h-4 w-4" />
+                  {t("bankDetailsTitle")}
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">{t("bankDetailsDesc")}</p>
+              </div>
+              {!editingBank && (
+                <Button variant="outline" size="sm" onClick={() => setEditingBank(true)} data-testid="button-edit-bank">
+                  <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {editingBank ? (
+              <form
+                className="space-y-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  saveBankDetails.mutate();
+                }}
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="bankAccountHolder">{t("bankAccountHolder")}</Label>
+                  <Input
+                    id="bankAccountHolder"
+                    value={bankForm.bankAccountHolder}
+                    onChange={(e) => setBankForm((prev) => ({ ...prev, bankAccountHolder: e.target.value }))}
+                    data-testid="input-bank-holder"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bankIban">{t("bankIban")}</Label>
+                  <Input
+                    id="bankIban"
+                    placeholder={t("bankIbanPlaceholder")}
+                    value={bankForm.bankIban}
+                    onChange={(e) => setBankForm((prev) => ({ ...prev, bankIban: e.target.value }))}
+                    data-testid="input-bank-iban"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bankBic">{t("bankBic")}</Label>
+                  <Input
+                    id="bankBic"
+                    placeholder={t("bankBicPlaceholder")}
+                    value={bankForm.bankBic}
+                    onChange={(e) => setBankForm((prev) => ({ ...prev, bankBic: e.target.value }))}
+                    data-testid="input-bank-bic"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={saveBankDetails.isPending} data-testid="button-save-bank">
+                    <Save className="h-4 w-4 mr-2" />
+                    {t("saveBankDetails")}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setEditingBank(false)}>
+                    {t("cancel")}
+                  </Button>
+                </div>
+              </form>
+            ) : profile?.bankIbanLast4 || profile?.bankAccountHolder ? (
+              <div className="text-sm space-y-1" data-testid="text-bank-details">
+                {profile.bankAccountHolder && <p>{t("bankAccountHolder")}: {profile.bankAccountHolder}</p>}
+                {profile.bankIbanLast4 && <p className="font-mono tracking-wide">{t("bankIban")}: •••• {profile.bankIbanLast4}</p>}
+                {profile.bankBic && <p className="font-mono">{t("bankBic")}: {profile.bankBic}</p>}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground" data-testid="text-bank-missing">{t("bankDetailsMissing")}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {receivesPayouts && (
+        <Card data-testid="card-payouts">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Wallet className="h-4 w-4" />
+              {t("payoutsTitle")}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">{t("payoutsDesc")}</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {payouts && payouts.length > 0 ? (
+              <ul className="text-sm space-y-3">
+                {payouts.map((payout) => (
+                  <li key={payout.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3 last:border-0 last:pb-0" data-testid={`payout-${payout.id}`}>
+                    <span className="capitalize">{payout.role}</span>
+                    <span className="font-medium">€{payout.amount}</span>
+                    <Badge variant={payout.status === "paid" ? "secondary" : "outline"}>
+                      {payoutStatusLabel(t, payout.status)}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t("payoutsNone")}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {receivesPayouts && (
+        <Card id="earnings" data-testid="card-earnings-history">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Receipt className="h-4 w-4" />
+              {t("earningsHistoryTitle")}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">{t("earningsHistoryDesc")}</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+              <div className="rounded-md border p-3" data-testid="stat-earnings-total">
+                <p className="text-xs text-muted-foreground">{t("earningsTotalEarned")}</p>
+                <p className="font-semibold">€{(earnings?.total ?? 0).toFixed(2)}</p>
+              </div>
+              <div className="rounded-md border p-3" data-testid="stat-earnings-received">
+                <p className="text-xs text-muted-foreground">{t("earningsReceived")}</p>
+                <p className="font-semibold text-emerald-700 dark:text-emerald-400">€{(earnings?.receivedTotal ?? 0).toFixed(2)}</p>
+              </div>
+              <div className="rounded-md border p-3" data-testid="stat-earnings-pending">
+                <p className="text-xs text-muted-foreground">{t("earningsPending")}</p>
+                <p className="font-semibold">€{(earnings?.pendingTotal ?? 0).toFixed(2)}</p>
+              </div>
+            </div>
+            {earnings?.transactions && earnings.transactions.length > 0 ? (
+              <ul className="text-sm space-y-3">
+                {earnings.transactions.map((row) => (
+                  <li key={row.id} className="space-y-1 border-b border-border/60 pb-3 last:border-0 last:pb-0" data-testid={`earning-${row.id}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium truncate">{row.itemTitle || `#${row.id}`}</span>
+                      <span>{t("earningsYourShare")}: €{row.amountReceived}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span>{t("earningsSalePrice")}: €{row.salePrice}</span>
+                      <span>
+                        {t("earningsPayoutStatus")}:{" "}
+                        {row.payoutStatus
+                          ? payoutStatusLabel(t, row.payoutStatus)
+                          : t("earningsPayoutNone")}
+                      </span>
+                    </div>
+                    {row.createdAt && (
+                      <p className="text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleString()}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t("earningsNone")}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card data-testid="card-notification-prefs">
         <CardHeader className="pb-3">

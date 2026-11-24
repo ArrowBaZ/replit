@@ -23,6 +23,14 @@ import {
   transactions,
   type Transaction,
   type InsertTransaction,
+  cartItems,
+  type CartItem,
+  payments,
+  type Payment,
+  type CartSnapshotLine,
+  payouts,
+  type Payout,
+  payoutBankAccounts,
   moderationActions,
   reviews,
   type Review,
@@ -48,6 +56,20 @@ import {
   type ItemPriceOffer,
   type InsertItemPriceOffer,
 } from "@shared/schema";
+
+export interface EarningsHistoryRow {
+  id: number;
+  itemId: number | null;
+  itemTitle: string | null;
+  salePrice: string;
+  amountReceived: string;
+  role: "seller" | "marchand";
+  saleStatus: string;
+  payoutStatus: string | null;
+  payoutPaidAt: string | null;
+  createdAt: string | null;
+  stripeCheckoutSessionId: string | null;
+}
 
 export interface IStorage {
   getProfile(userId: string): Promise<Profile | undefined>;
@@ -112,7 +134,12 @@ export interface IStorage {
   getEarnings(
     userId: string,
     role: string,
-  ): Promise<{ total: number; transactions: Transaction[] }>;
+  ): Promise<{
+    total: number;
+    receivedTotal: number;
+    pendingTotal: number;
+    transactions: EarningsHistoryRow[];
+  }>;
 
   getAdminRequests(status?: string): Promise<any[]>;
   logModerationAction(data: { requestId: number; adminId: string; action: string; reason?: string; metadata?: string }): Promise<any>;
@@ -161,6 +188,78 @@ export interface IStorage {
 
   createPriceOffer(data: InsertItemPriceOffer): Promise<ItemPriceOffer>;
   getPriceOffersByItem(itemId: number): Promise<(ItemPriceOffer & { proposedByName: string })[]>;
+
+  getListedItems(): Promise<Item[]>;
+  getCart(userId: string): Promise<Array<{ cartItem: CartItem; item: Item }>>;
+  addCartItem(userId: string, itemId: number): Promise<CartItem>;
+  removeCartItem(userId: string, itemId: number): Promise<void>;
+  removeCartItems(userId: string, itemIds: number[]): Promise<void>;
+  getUserById(userId: string): Promise<User | undefined>;
+  createPayment(data: {
+    userId: string;
+    stripeCheckoutSessionId: string;
+    amount: string;
+    currency: string;
+    cartSnapshot: CartSnapshotLine[];
+  }): Promise<Payment>;
+  getPaymentBySession(sessionId: string): Promise<Payment | undefined>;
+  markPaymentPaid(id: number, stripePaymentIntentId: string | null): Promise<Payment | undefined>;
+  markReceiptSent(id: number): Promise<void>;
+  listLedger(userId?: string): Promise<LedgerEntry[]>;
+  getPayment(id: number): Promise<Payment | undefined>;
+  getTransactionsByPayment(paymentId: number): Promise<Transaction[]>;
+  createPayoutIfMissing(data: {
+    paymentId: number;
+    transactionId: number;
+    userId: string;
+    role: string;
+    amount: string;
+    currency: string;
+  }): Promise<void>;
+  setPayoutIbanEncrypted(userId: string, ibanEncrypted: string | null): Promise<void>;
+  listPayoutsForUser(userId: string): Promise<Payout[]>;
+  listPayoutsByStatus(status: string): Promise<AdminPayoutRow[]>;
+  markPayoutPaid(id: number, adminUserId: string, transferReference: string): Promise<Payout | undefined>;
+}
+
+export interface AdminPayoutRow {
+  id: number;
+  paymentId: number;
+  transactionId: number;
+  userId: string;
+  role: string;
+  amount: string;
+  currency: string;
+  status: string;
+  createdAt: Date | null;
+  paidAt: Date | null;
+  transferReference: string | null;
+  recipientName: string | null;
+  recipientEmail: string | null;
+  bankAccountHolder: string | null;
+  bankIbanEncrypted: string | null;
+  bankIbanLast4: string | null;
+  bankBic: string | null;
+  itemTitle: string | null;
+}
+
+export interface LedgerEntry {
+  key: string;
+  kind: "stripe" | "manual";
+  createdAt: string | null;
+  status: string;
+  amount: string;
+  currency: string;
+  payerUserId: string | null;
+  payerName: string | null;
+  payerEmail: string | null;
+  sellerId: string | null;
+  sellerName: string | null;
+  marchantId: string | null;
+  marchantName: string | null;
+  itemTitles: string[];
+  stripeCheckoutSessionId: string | null;
+  stripePaymentIntentId: string | null;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -672,16 +771,58 @@ export class DatabaseStorage implements IStorage {
   async getEarnings(
     userId: string,
     role: string,
-  ): Promise<{ total: number; transactions: Transaction[] }> {
+  ): Promise<{
+    total: number;
+    receivedTotal: number;
+    pendingTotal: number;
+    transactions: EarningsHistoryRow[];
+  }> {
     const txns = await this.getTransactions(userId, role);
-    const total = txns.reduce((sum, t) => {
-      const earning =
-        role === "marchand"
-          ? parseFloat(t.marchantEarning)
-          : parseFloat(t.sellerEarning);
-      return sum + (isNaN(earning) ? 0 : earning);
-    }, 0);
-    return { total, transactions: txns };
+    const payoutRole = role === "marchand" ? "marchand" : "seller";
+    const history: EarningsHistoryRow[] = [];
+    let total = 0;
+    let receivedTotal = 0;
+    let pendingTotal = 0;
+
+    for (const txn of txns) {
+      const amountRaw = role === "marchand" ? txn.marchantEarning : txn.sellerEarning;
+      const amount = parseFloat(amountRaw);
+      const safeAmount = Number.isFinite(amount) ? amount : 0;
+      total += safeAmount;
+
+      let itemTitle: string | null = null;
+      if (txn.itemId != null) {
+        const item = await this.getItem(txn.itemId);
+        itemTitle = item?.title || null;
+      }
+
+      const [payout] = await db.select().from(payouts).where(and(
+        eq(payouts.transactionId, txn.id),
+        eq(payouts.userId, userId),
+        eq(payouts.role, payoutRole),
+      )).limit(1);
+      const payoutStatus = payout?.status ?? null;
+      const payoutPaidAt = payout?.paidAt ? payout.paidAt.toISOString() : null;
+
+      if (payoutStatus === "paid") receivedTotal += safeAmount;
+      else pendingTotal += safeAmount;
+
+      history.push({
+        id: txn.id,
+        itemId: txn.itemId,
+        itemTitle,
+        salePrice: txn.salePrice,
+        amountReceived: safeAmount.toFixed(2),
+        role: payoutRole,
+        saleStatus: txn.status,
+        payoutStatus,
+        payoutPaidAt,
+        createdAt: txn.createdAt ? txn.createdAt.toISOString() : null,
+        stripeCheckoutSessionId: txn.stripeCheckoutSessionId || null,
+      });
+    }
+
+    return { total, receivedTotal, pendingTotal, transactions: history };
   }
 
   async getAdminRequests(status?: string): Promise<any[]> {
@@ -1323,6 +1464,292 @@ export class DatabaseStorage implements IStorage {
         ? `${r.proposedBy.firstName || ""} ${r.proposedBy.lastName || ""}`.trim() || r.proposedBy.email || "Unknown"
         : "Unknown",
     }));
+  }
+
+  async getListedItems(): Promise<Item[]> {
+    return db
+      .select()
+      .from(items)
+      .where(and(eq(items.status, "listed"), isNull(items.deletedAt)))
+      .orderBy(desc(items.listedAt));
+  }
+
+  async getCart(userId: string): Promise<Array<{ cartItem: CartItem; item: Item }>> {
+    const rows = await db
+      .select({ cartItem: cartItems, item: items })
+      .from(cartItems)
+      .innerJoin(items, eq(items.id, cartItems.itemId))
+      .where(and(eq(cartItems.userId, userId), isNull(items.deletedAt)))
+      .orderBy(desc(cartItems.createdAt));
+    return rows;
+  }
+
+  async addCartItem(userId: string, itemId: number): Promise<CartItem> {
+    const [existing] = await db
+      .select()
+      .from(cartItems)
+      .where(and(eq(cartItems.userId, userId), eq(cartItems.itemId, itemId)))
+      .limit(1);
+    if (existing) return existing;
+    const [row] = await db.insert(cartItems).values({ userId, itemId }).returning();
+    return row;
+  }
+
+  async removeCartItem(userId: string, itemId: number): Promise<void> {
+    await db.delete(cartItems).where(and(eq(cartItems.userId, userId), eq(cartItems.itemId, itemId)));
+  }
+
+  async removeCartItems(userId: string, itemIds: number[]): Promise<void> {
+    if (itemIds.length === 0) return;
+    await db.delete(cartItems).where(and(eq(cartItems.userId, userId), inArray(cartItems.itemId, itemIds)));
+  }
+
+  async getUserById(userId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    return user;
+  }
+
+  async createPayment(data: {
+    userId: string;
+    stripeCheckoutSessionId: string;
+    amount: string;
+    currency: string;
+    cartSnapshot: CartSnapshotLine[];
+  }): Promise<Payment> {
+    const [row] = await db.insert(payments).values({
+      userId: data.userId,
+      stripeCheckoutSessionId: data.stripeCheckoutSessionId,
+      amount: data.amount,
+      currency: data.currency,
+      status: "pending",
+      cartSnapshot: data.cartSnapshot,
+    }).returning();
+    return row;
+  }
+
+  async getPaymentBySession(sessionId: string): Promise<Payment | undefined> {
+    const [row] = await db.select().from(payments).where(eq(payments.stripeCheckoutSessionId, sessionId)).limit(1);
+    return row;
+  }
+
+  async markPaymentPaid(id: number, stripePaymentIntentId: string | null): Promise<Payment | undefined> {
+    const [row] = await db
+      .update(payments)
+      .set({
+        status: "paid",
+        paidAt: new Date(),
+        stripePaymentIntentId,
+      })
+      .where(eq(payments.id, id))
+      .returning();
+    return row;
+  }
+
+  async markReceiptSent(id: number): Promise<void> {
+    await db.update(payments).set({ receiptSentAt: new Date() }).where(eq(payments.id, id));
+  }
+
+  async listLedger(userId?: string): Promise<LedgerEntry[]> {
+    const payRows = await db
+      .select({ payment: payments, payer: users })
+      .from(payments)
+      .leftJoin(users, eq(users.id, payments.userId))
+      .orderBy(desc(payments.createdAt));
+
+    const txnRows = await db
+      .select({ txn: transactions, itemTitle: items.title })
+      .from(transactions)
+      .leftJoin(items, eq(items.id, transactions.itemId))
+      .orderBy(desc(transactions.createdAt));
+
+    const ids = new Set<string>();
+    for (const row of txnRows) {
+      ids.add(row.txn.sellerId);
+      ids.add(row.txn.marchantId);
+      if (row.txn.payerUserId) ids.add(row.txn.payerUserId);
+    }
+    for (const row of payRows) {
+      for (const line of row.payment.cartSnapshot || []) {
+        ids.add(line.sellerId);
+        ids.add(line.marchantId);
+      }
+    }
+    const people = ids.size
+      ? await db.select().from(users).where(inArray(users.id, Array.from(ids)))
+      : [];
+    const byId = new Map(people.map((person) => [person.id, person]));
+    const displayName = (id: string | null | undefined) => {
+      if (!id) return null;
+      const person = byId.get(id);
+      if (!person) return null;
+      return `${person.firstName || ""} ${person.lastName || ""}`.trim() || person.email || null;
+    };
+
+    const stripeEntries: LedgerEntry[] = payRows.map((row) => {
+      const lines = row.payment.cartSnapshot || [];
+      const sellerId = lines[0]?.sellerId || null;
+      const marchantId = lines[0]?.marchantId || null;
+      return {
+        key: `payment-${row.payment.id}`,
+        kind: "stripe",
+        createdAt: (row.payment.paidAt || row.payment.createdAt)?.toISOString() ?? null,
+        status: row.payment.status,
+        amount: row.payment.amount,
+        currency: row.payment.currency,
+        payerUserId: row.payment.userId,
+        payerName: row.payer ? `${row.payer.firstName || ""} ${row.payer.lastName || ""}`.trim() || row.payer.email : null,
+        payerEmail: row.payer?.email || null,
+        sellerId,
+        sellerName: displayName(sellerId),
+        marchantId,
+        marchantName: displayName(marchantId),
+        itemTitles: lines.map((line) => line.title),
+        stripeCheckoutSessionId: row.payment.stripeCheckoutSessionId,
+        stripePaymentIntentId: row.payment.stripePaymentIntentId,
+      };
+    });
+
+    const manualEntries: LedgerEntry[] = txnRows
+      .filter((row) => !row.txn.paymentId)
+      .map((row) => ({
+        key: `txn-${row.txn.id}`,
+        kind: "manual",
+        createdAt: row.txn.createdAt?.toISOString() ?? null,
+        status: row.txn.status,
+        amount: row.txn.salePrice,
+        currency: "eur",
+        payerUserId: row.txn.payerUserId,
+        payerName: displayName(row.txn.payerUserId),
+        payerEmail: row.txn.payerUserId ? byId.get(row.txn.payerUserId)?.email || null : null,
+        sellerId: row.txn.sellerId,
+        sellerName: displayName(row.txn.sellerId),
+        marchantId: row.txn.marchantId,
+        marchantName: displayName(row.txn.marchantId),
+        itemTitles: row.itemTitle ? [row.itemTitle] : [],
+        stripeCheckoutSessionId: row.txn.stripeCheckoutSessionId,
+        stripePaymentIntentId: row.txn.stripePaymentIntentId,
+      }));
+
+    const merged = [...stripeEntries, ...manualEntries].sort((a, b) => {
+      const left = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const right = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return right - left;
+    });
+
+    if (!userId) return merged;
+    return merged.filter((entry) =>
+      entry.payerUserId === userId || entry.sellerId === userId || entry.marchantId === userId,
+    );
+  }
+
+  async getPayment(id: number): Promise<Payment | undefined> {
+    const [row] = await db.select().from(payments).where(eq(payments.id, id)).limit(1);
+    return row;
+  }
+
+  async getTransactionsByPayment(paymentId: number): Promise<Transaction[]> {
+    return db.select().from(transactions).where(eq(transactions.paymentId, paymentId));
+  }
+
+  async createPayoutIfMissing(data: {
+    paymentId: number;
+    transactionId: number;
+    userId: string;
+    role: string;
+    amount: string;
+    currency: string;
+  }): Promise<void> {
+    await db.insert(payouts).values(data).onConflictDoNothing();
+  }
+
+  async setPayoutIbanEncrypted(userId: string, ibanEncrypted: string | null): Promise<void> {
+    if (ibanEncrypted === null) {
+      await db.delete(payoutBankAccounts).where(eq(payoutBankAccounts.userId, userId));
+      return;
+    }
+    await db.insert(payoutBankAccounts)
+      .values({ userId, ibanEncrypted, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: payoutBankAccounts.userId,
+        set: { ibanEncrypted, updatedAt: new Date() },
+      });
+  }
+
+  async listPayoutsForUser(userId: string): Promise<Payout[]> {
+    return db.select().from(payouts).where(eq(payouts.userId, userId)).orderBy(desc(payouts.createdAt));
+  }
+
+  async listPayoutsByStatus(status: string): Promise<AdminPayoutRow[]> {
+    const rows = await db
+      .select({
+        id: payouts.id,
+        paymentId: payouts.paymentId,
+        transactionId: payouts.transactionId,
+        userId: payouts.userId,
+        role: payouts.role,
+        amount: payouts.amount,
+        currency: payouts.currency,
+        status: payouts.status,
+        createdAt: payouts.createdAt,
+        paidAt: payouts.paidAt,
+        transferReference: payouts.transferReference,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        bankAccountHolder: profiles.bankAccountHolder,
+        bankIbanEncrypted: payoutBankAccounts.ibanEncrypted,
+        bankIbanLast4: profiles.bankIbanLast4,
+        bankBic: profiles.bankBic,
+        itemId: transactions.itemId,
+      })
+      .from(payouts)
+      .leftJoin(users, eq(users.id, payouts.userId))
+      .leftJoin(profiles, eq(profiles.userId, payouts.userId))
+      .leftJoin(payoutBankAccounts, eq(payoutBankAccounts.userId, payouts.userId))
+      .leftJoin(transactions, eq(transactions.id, payouts.transactionId))
+      .where(eq(payouts.status, status))
+      .orderBy(desc(payouts.createdAt));
+
+    const result: AdminPayoutRow[] = [];
+    for (const row of rows) {
+      let itemTitle: string | null = null;
+      if (row.itemId != null) {
+        const item = await this.getItem(row.itemId);
+        itemTitle = item?.title || null;
+      }
+      const name = `${row.firstName || ""} ${row.lastName || ""}`.trim() || null;
+      result.push({
+        id: row.id,
+        paymentId: row.paymentId,
+        transactionId: row.transactionId,
+        userId: row.userId,
+        role: row.role,
+        amount: row.amount,
+        currency: row.currency,
+        status: row.status,
+        createdAt: row.createdAt,
+        paidAt: row.paidAt,
+        transferReference: row.transferReference,
+        recipientName: name,
+        recipientEmail: row.email,
+        bankAccountHolder: row.bankAccountHolder,
+        bankIbanEncrypted: row.bankIbanEncrypted,
+        bankIbanLast4: row.bankIbanLast4,
+        bankBic: row.bankBic,
+        itemTitle,
+      });
+    }
+    return result;
+  }
+
+  async markPayoutPaid(id: number, adminUserId: string, transferReference: string): Promise<Payout | undefined> {
+    const [row] = await db.update(payouts).set({
+      status: "paid",
+      paidAt: new Date(),
+      paidByUserId: adminUserId,
+      transferReference,
+    }).where(and(eq(payouts.id, id), eq(payouts.status, "owed"))).returning();
+    return row;
   }
 }
 

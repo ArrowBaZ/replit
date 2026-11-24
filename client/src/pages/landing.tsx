@@ -85,6 +85,9 @@ export default function LandingPage() {
                 </button>
               </div>
               <ThemeToggle />
+              <a href="/login?redirect=/checkout">
+                <Button variant="outline" data-testid="button-checkout">{t("checkout")}</Button>
+              </a>
               <a href="/login">
                 <Button variant="outline" data-testid="button-login">{t("logIn")}</Button>
               </a>
